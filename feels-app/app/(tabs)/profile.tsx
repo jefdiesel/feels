@@ -227,7 +227,7 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
           <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
-            <Text style={styles.settingsEmoji}>&#9881;</Text>
+            <Text style={styles.settingsEmoji}>⚙️</Text>
           </TouchableOpacity>
         </View>
 
@@ -444,33 +444,50 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* Search Filters - Most Important */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.searchFiltersButton}
+            onPress={() => router.push('/settings')}
+          >
+            <View style={styles.searchFiltersContent}>
+              <Text style={styles.searchFiltersEmoji}>🔍</Text>
+              <View>
+                <Text style={styles.searchFiltersTitle}>Search Filters</Text>
+                <Text style={styles.searchFiltersSubtitle}>Age, gender, kink level, distance</Text>
+              </View>
+            </View>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Actions */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionEmoji}>&#128276;</Text>
+            <Text style={styles.actionEmoji}>🔔</Text>
             <Text style={styles.actionText}>Notifications</Text>
-            <Text style={styles.actionArrow}>&#8250;</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionEmoji}>&#128274;</Text>
+            <Text style={styles.actionEmoji}>🔒</Text>
             <Text style={styles.actionText}>Privacy</Text>
-            <Text style={styles.actionArrow}>&#8250;</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setPremiumModalVisible(true)}
           >
-            <Text style={styles.actionEmoji}>&#128142;</Text>
+            <Text style={styles.actionEmoji}>💎</Text>
             <Text style={styles.actionText}>Premium</Text>
-            <Text style={styles.actionArrow}>&#8250;</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionEmoji}>?</Text>
+            <Text style={styles.actionEmoji}>❓</Text>
             <Text style={styles.actionText}>Help & Support</Text>
-            <Text style={styles.actionArrow}>&#8250;</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
         </View>
 
@@ -983,6 +1000,35 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
     marginTop: 20,
+  },
+  searchFiltersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 20, 147, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FF1493',
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+  },
+  searchFiltersContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  searchFiltersEmoji: {
+    fontSize: 28,
+  },
+  searchFiltersTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  searchFiltersSubtitle: {
+    fontSize: 13,
+    color: '#FF1493',
+    marginTop: 2,
   },
   actionButton: {
     flexDirection: 'row',
