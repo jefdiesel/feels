@@ -1,0 +1,130 @@
+import { create } from 'zustand';
+import { feedApi } from '@/api/client';
+
+export interface Profile {
+  id: string;
+  name: string;
+  age: number;
+  bio?: string;
+  photos: string[];
+  location?: string;
+  distance?: number;
+  kinkLevel?: string;
+}
+
+// Backend response types
+interface BackendPhoto {
+  id: string;
+  user_id: string;
+  url: string;
+  position: number;
+}
+
+interface BackendProfile {
+  user_id: string;
+  name: string;
+  age: number;
+  bio?: string;
+  photos?: BackendPhoto[];
+  neighborhood?: string;
+  distance?: number;
+  kink_level?: string;
+}
+
+interface FeedResponse {
+  profiles: BackendProfile[];
+  has_more: boolean;
+  queued_likes: number;
+  must_process_all: boolean;
+}
+
+// Transform backend profile to frontend format
+function transformProfile(bp: BackendProfile): Profile {
+  return {
+    id: bp.user_id,
+    name: bp.name,
+    age: bp.age,
+    bio: bp.bio,
+    photos: bp.photos?.map((p) => p.url) || [],
+    location: bp.neighborhood,
+    distance: bp.distance,
+    kinkLevel: bp.kink_level,
+  };
+}
+
+interface FeedState {
+  profiles: Profile[];
+  currentIndex: number;
+  isLoading: boolean;
+  error: string | null;
+
+  loadProfiles: () => Promise<void>;
+  nextProfile: () => void;
+  swipe: (action: 'like' | 'pass' | 'superlike') => Promise<boolean>;
+  reset: () => void;
+}
+
+export const useFeedStore = create<FeedState>((set, get) => ({
+  profiles: [],
+  currentIndex: 0,
+  isLoading: false,
+  error: null,
+
+  loadProfiles: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await feedApi.getProfiles(20);
+      const feedResponse: FeedResponse = response.data;
+      const profiles = feedResponse.profiles.map(transformProfile);
+      set({ profiles, currentIndex: 0, isLoading: false });
+    } catch (error: any) {
+      console.error('Feed load error:', error);
+      // Check if profile is required (428 Precondition Required)
+      if (error.response?.status === 428) {
+        set({
+          error: 'PROFILE_REQUIRED',
+          isLoading: false,
+        });
+        return;
+      }
+      set({
+        error: error.response?.data?.error || 'Failed to load profiles',
+        isLoading: false,
+      });
+    }
+  },
+
+  nextProfile: () => {
+    const { currentIndex, profiles } = get();
+    if (currentIndex < profiles.length - 1) {
+      set({ currentIndex: currentIndex + 1 });
+    } else {
+      // Reload profiles when we run out
+      get().loadProfiles();
+    }
+  },
+
+  swipe: async (action: 'like' | 'pass' | 'superlike') => {
+    const { profiles, currentIndex } = get();
+    const profile = profiles[currentIndex];
+
+    if (!profile) return false;
+
+    try {
+      const response = await feedApi.swipe(profile.id, action);
+      get().nextProfile();
+
+      // Return true if it's a match (backend returns { matched: bool, match_id?: string })
+      return response.data?.matched || false;
+    } catch (error: any) {
+      console.error('Swipe error:', error);
+      // Still advance even if API fails
+      get().nextProfile();
+      return false;
+    }
+  },
+
+  reset: () => {
+    set({ profiles: [], currentIndex: 0, isLoading: false, error: null });
+  },
+}));

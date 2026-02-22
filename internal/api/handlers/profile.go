@@ -1,0 +1,214 @@
+package handlers
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/feels/feels/internal/api/middleware"
+	"github.com/feels/feels/internal/domain/profile"
+	"github.com/feels/feels/internal/repository"
+	"github.com/feels/feels/internal/storage"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+)
+
+type ProfileHandler struct {
+	profileService *profile.Service
+}
+
+func NewProfileHandler(profileService *profile.Service) *ProfileHandler {
+	return &ProfileHandler{profileService: profileService}
+}
+
+func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	resp, err := h.profileService.GetProfile(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProfileNotFound) {
+			jsonError(w, "profile not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, resp, http.StatusOK)
+}
+
+func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req profile.CreateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	p, err := h.profileService.CreateProfile(r.Context(), userID, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrProfileExists):
+			jsonError(w, "profile already exists", http.StatusConflict)
+		case errors.Is(err, profile.ErrInvalidGender):
+			jsonError(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, profile.ErrInvalidDOB):
+			jsonError(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, profile.ErrTooYoung):
+			jsonError(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, profile.ErrInvalidKinkLevel):
+			jsonError(w, err.Error(), http.StatusBadRequest)
+		default:
+			jsonError(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonResponse(w, p, http.StatusCreated)
+}
+
+func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req profile.UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	p, err := h.profileService.UpdateProfile(r.Context(), userID, &req)
+	if err != nil {
+		if errors.Is(err, repository.ErrProfileNotFound) {
+			jsonError(w, "profile not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, p, http.StatusOK)
+}
+
+func (h *ProfileHandler) GetPreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	resp, err := h.profileService.GetProfile(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProfileNotFound) {
+			jsonError(w, "profile not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, resp.Preferences, http.StatusOK)
+}
+
+func (h *ProfileHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req profile.UpdatePreferencesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	prefs, err := h.profileService.UpdatePreferences(r.Context(), userID, &req)
+	if err != nil {
+		if errors.Is(err, repository.ErrPreferencesNotFound) {
+			jsonError(w, "preferences not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, prefs, http.StatusOK)
+}
+
+func (h *ProfileHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse multipart form (max 10MB)
+	if err := r.ParseMultipartForm(storage.MaxPhotoSize); err != nil {
+		jsonError(w, "file too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	file, header, err := r.FormFile("photo")
+	if err != nil {
+		jsonError(w, "photo file required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if !storage.IsAllowedContentType(contentType) {
+		jsonError(w, "invalid file type, must be jpeg, png, gif, or webp", http.StatusBadRequest)
+		return
+	}
+
+	photo, err := h.profileService.AddPhoto(r.Context(), userID, file, header.Size, contentType)
+	if err != nil {
+		if errors.Is(err, repository.ErrMaxPhotos) {
+			jsonError(w, "maximum 5 photos allowed", http.StatusBadRequest)
+			return
+		}
+		jsonError(w, "failed to upload photo", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, photo, http.StatusCreated)
+}
+
+func (h *ProfileHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	photoIDStr := chi.URLParam(r, "id")
+	photoID, err := uuid.Parse(photoIDStr)
+	if err != nil {
+		jsonError(w, "invalid photo id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.profileService.DeletePhoto(r.Context(), userID, photoID); err != nil {
+		if errors.Is(err, repository.ErrPhotoNotFound) {
+			jsonError(w, "photo not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "failed to delete photo", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
