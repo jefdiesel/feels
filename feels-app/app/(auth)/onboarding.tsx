@@ -30,6 +30,15 @@ const KINK_LEVELS = [
   { value: 'kinky', label: 'Kinky AF', emoji: '😈' },
 ];
 
+const LOOKING_FOR = [
+  { value: 'relationship', label: 'A real relationship', desc: 'Looking for my person' },
+  { value: 'partner', label: 'Life partner / family', desc: 'Ready for the real thing' },
+  { value: 'dating', label: 'Dating around', desc: 'Seeing what\'s out there' },
+  { value: 'exploring', label: 'Exploring new experiences', desc: 'Curious and open-minded' },
+  { value: 'casual', label: 'Something casual', desc: 'Fun without the pressure' },
+  { value: 'open', label: 'Open to anything', desc: 'Let\'s see where it goes' },
+];
+
 const AVAILABLE_PROMPTS = [
   "I'm done playing it safe, now I want...",
   "The energy I'm looking for is...",
@@ -61,6 +70,7 @@ export default function OnboardingScreen() {
   const [zipCode, setZipCode] = useState('');
   const [bio, setBio] = useState('');
   const [seekingGenders, setSeekingGenders] = useState<string[]>([]);
+  const [lookingFor, setLookingFor] = useState('');
 
   // Prompts state
   const [selectedPrompts, setSelectedPrompts] = useState<PromptAnswer[]>([]);
@@ -117,6 +127,10 @@ export default function OnboardingScreen() {
     }
     if (seekingGenders.length === 0) {
       Alert.alert('Error', 'Please select who you want to meet');
+      return false;
+    }
+    if (!lookingFor) {
+      Alert.alert('Error', 'Please select what you\'re looking for');
       return false;
     }
     return true;
@@ -203,6 +217,7 @@ export default function OnboardingScreen() {
         zip_code: zipCode.trim(),
         bio: bio.trim(),
         kink_level: kinkLevel,
+        looking_for: lookingFor,
         prompts: selectedPrompts.filter(p => p.answer.trim()),
       });
 
@@ -373,6 +388,37 @@ export default function OnboardingScreen() {
                 ))}
               </View>
               <Text style={styles.hint}>Select all that apply</Text>
+
+              <Text style={[styles.label, { marginTop: 24 }]}>I'm looking for...</Text>
+              <View style={styles.lookingForGrid}>
+                {LOOKING_FOR.map((l) => (
+                  <TouchableOpacity
+                    key={l.value}
+                    style={[
+                      styles.lookingForOption,
+                      lookingFor === l.value && styles.lookingForSelected,
+                    ]}
+                    onPress={() => setLookingFor(l.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.lookingForLabel,
+                        lookingFor === l.value && styles.lookingForLabelSelected,
+                      ]}
+                    >
+                      {l.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.lookingForDesc,
+                        lookingFor === l.value && styles.lookingForDescSelected,
+                      ]}
+                    >
+                      {l.desc}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
 
@@ -612,6 +658,37 @@ const styles = StyleSheet.create({
   },
   optionTextSelected: {
     color: '#FF1493',
+  },
+  lookingForGrid: {
+    gap: 10,
+  },
+  lookingForOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: '#111111',
+    borderWidth: 2,
+    borderColor: '#333333',
+  },
+  lookingForSelected: {
+    backgroundColor: 'rgba(255, 20, 147, 0.15)',
+    borderColor: '#FF1493',
+  },
+  lookingForLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  lookingForLabelSelected: {
+    color: '#FF1493',
+  },
+  lookingForDesc: {
+    fontSize: 13,
+    color: '#666666',
+  },
+  lookingForDescSelected: {
+    color: '#CC1177',
   },
   navigation: {
     flexDirection: 'row',

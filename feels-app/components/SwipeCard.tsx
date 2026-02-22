@@ -30,6 +30,18 @@ const formatKinkLevel = (level: string): string => {
   return labels[level] || level;
 };
 
+const formatLookingFor = (value: string): string => {
+  const labels: Record<string, string> = {
+    relationship: 'A real relationship',
+    partner: 'Life partner / family',
+    dating: 'Dating around',
+    exploring: 'Exploring new experiences',
+    casual: 'Something casual',
+    open: 'Open to anything',
+  };
+  return labels[value] || value;
+};
+
 // Default prompts when profile doesn't have any
 const getDefaultPrompts = (profile: Profile) => {
   const prompts = [];
@@ -46,7 +58,7 @@ const getDefaultPrompts = (profile: Profile) => {
     prompts.push({
       id: 'looking',
       question: "I'm looking for",
-      answer: profile.lookingFor,
+      answer: formatLookingFor(profile.lookingFor),
     });
   }
 
@@ -313,6 +325,16 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
               </View>
             )}
 
+            {/* Looking For badge */}
+            {profile.lookingFor && (
+              <View style={styles.lookingForContainer}>
+                <View style={styles.lookingForBadge}>
+                  <Text style={styles.lookingForBadgeLabel}>Looking for</Text>
+                  <Text style={styles.lookingForBadgeValue}>{formatLookingFor(profile.lookingFor)}</Text>
+                </View>
+              </View>
+            )}
+
             {/* Kink level badge */}
             {profile.kinkLevel && (
               <View style={styles.kinkContainer}>
@@ -547,6 +569,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FF1493',
+  },
+  lookingForContainer: {
+    marginBottom: 16,
+  },
+  lookingForBadge: {
+    backgroundColor: 'rgba(0, 212, 255, 0.12)',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lookingForBadgeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  lookingForBadgeValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#00D4FF',
   },
   viewMoreButton: {
     alignItems: 'center',

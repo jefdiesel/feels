@@ -25,6 +25,18 @@ const formatKinkLevel = (level: string): string => {
   return labels[level] || level;
 };
 
+const formatLookingFor = (value: string): string => {
+  const labels: Record<string, string> = {
+    relationship: 'A real relationship',
+    partner: 'Life partner / family',
+    dating: 'Dating around',
+    exploring: 'Exploring new experiences',
+    casual: 'Something casual',
+    open: 'Open to anything',
+  };
+  return labels[value] || value;
+};
+
 // Default prompts when profile doesn't have any
 const getDefaultPrompts = (profile: Profile) => {
   const prompts = [];
@@ -41,7 +53,7 @@ const getDefaultPrompts = (profile: Profile) => {
     prompts.push({
       id: 'looking',
       question: "I'm looking for",
-      answer: profile.lookingFor,
+      answer: formatLookingFor(profile.lookingFor),
     });
   }
 

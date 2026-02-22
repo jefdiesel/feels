@@ -136,6 +136,7 @@ export const profileApi = {
     bio: string;
     neighborhood?: string;
     kink_level?: string;
+    looking_for?: string;
     prompts?: ProfilePrompt[];
   }) => api.post('/profile', data),
 
@@ -143,6 +144,7 @@ export const profileApi = {
     name?: string;
     bio?: string;
     neighborhood?: string;
+    looking_for?: string;
     prompts?: ProfilePrompt[];
   }) => api.put('/profile', data),
 
