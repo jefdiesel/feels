@@ -227,6 +227,16 @@ export default function OnboardingScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Onboarding error:', error);
+      // If profile already exists (409), just navigate to main app
+      if (error.response?.status === 409) {
+        router.replace('/(tabs)');
+        return;
+      }
+      // If unauthorized (401), redirect to login
+      if (error.response?.status === 401) {
+        router.replace('/(auth)/login');
+        return;
+      }
       Alert.alert('Error', error.response?.data?.error || 'Failed to create profile');
     } finally {
       setIsLoading(false);
