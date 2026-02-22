@@ -28,6 +28,9 @@ var (
 	ErrDeviceRequired     = errors.New("device_id is required")
 	ErrTOTPRequired       = errors.New("2FA code required")
 	ErrInvalidTOTP        = errors.New("invalid 2FA code")
+	ErrMagicLinkExpired   = errors.New("magic link expired")
+	ErrMagicLinkUsed      = errors.New("magic link already used")
+	ErrMagicLinkInvalid   = errors.New("invalid magic link")
 )
 
 type Repository interface {
@@ -52,6 +55,17 @@ type Repository interface {
 	UpsertDeviceSession(ctx context.Context, s *DeviceSession) error
 	GetDeviceSessions(ctx context.Context, userID uuid.UUID) ([]*DeviceSession, error)
 	DeleteDeviceSession(ctx context.Context, userID uuid.UUID, deviceID string) error
+
+	// Magic links
+	CreateMagicLink(ctx context.Context, link *MagicLink) error
+	GetMagicLinkByToken(ctx context.Context, tokenHash string) (*MagicLink, error)
+	MarkMagicLinkUsed(ctx context.Context, id uuid.UUID) error
+	DeleteExpiredMagicLinks(ctx context.Context) error
+
+	// Public keys for E2E encryption
+	UpsertPublicKey(ctx context.Context, key *UserPublicKey) error
+	GetPublicKey(ctx context.Context, userID uuid.UUID, keyType string) (*UserPublicKey, error)
+	GetPublicKeysByUserIDs(ctx context.Context, userIDs []uuid.UUID, keyType string) (map[uuid.UUID]*UserPublicKey, error)
 }
 
 type Service struct {
@@ -501,4 +515,161 @@ func generateBackupCodes(n int) []string {
 		codes[i] = strings.ToUpper(uuid.New().String()[:8])
 	}
 	return codes
+}
+
+// SendMagicLink generates a magic link token for passwordless login
+// Returns the raw token (to be sent via email) - only the hash is stored
+func (s *Service) SendMagicLink(ctx context.Context, email string) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if !isValidEmail(email) {
+		return "", ErrInvalidEmail
+	}
+
+	// Check if user exists
+	existingUser, _ := s.repo.GetByEmail(ctx, email)
+	var userID *uuid.UUID
+	if existingUser != nil {
+		userID = &existingUser.ID
+	}
+
+	// Generate a secure random token
+	token := uuid.New().String() + "-" + uuid.New().String()
+	tokenHash := hashToken(token)
+
+	now := time.Now()
+	link := &MagicLink{
+		ID:        uuid.New(),
+		UserID:    userID,
+		Email:     email,
+		TokenHash: tokenHash,
+		ExpiresAt: now.Add(15 * time.Minute), // 15 minute expiry
+		CreatedAt: now,
+	}
+
+	if err := s.repo.CreateMagicLink(ctx, link); err != nil {
+		return "", err
+	}
+
+	// Log the token for development (remove in production!)
+	// In production, this would be sent via email service
+	// log.Printf("Magic link token for %s: %s", email, token)
+
+	return token, nil
+}
+
+// VerifyMagicLink validates a magic link token and returns auth tokens
+func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkRequest) (*AuthResponse, error) {
+	if req.DeviceID == "" {
+		return nil, ErrDeviceRequired
+	}
+
+	tokenHash := hashToken(req.Token)
+	link, err := s.repo.GetMagicLinkByToken(ctx, tokenHash)
+	if err != nil {
+		return nil, ErrMagicLinkInvalid
+	}
+
+	// Check if already used
+	if link.UsedAt != nil {
+		return nil, ErrMagicLinkUsed
+	}
+
+	// Check if expired
+	if time.Now().After(link.ExpiresAt) {
+		return nil, ErrMagicLinkExpired
+	}
+
+	// Mark as used
+	if err := s.repo.MarkMagicLinkUsed(ctx, link.ID); err != nil {
+		return nil, err
+	}
+
+	var user *User
+	if link.UserID != nil {
+		// Existing user
+		user, err = s.repo.GetByID(ctx, *link.UserID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// New user - create account
+		now := time.Now()
+		user = &User{
+			ID:            uuid.New(),
+			Email:         link.Email,
+			PasswordHash:  "", // No password for magic link users
+			EmailVerified: true,
+			DeviceID:      &req.DeviceID,
+			TOTPEnabled:   false,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+		if err := s.repo.Create(ctx, user); err != nil {
+			return nil, err
+		}
+	}
+
+	// Update device session
+	now := time.Now()
+	session := &DeviceSession{
+		ID:         uuid.New(),
+		UserID:     user.ID,
+		DeviceID:   req.DeviceID,
+		Platform:   req.Platform,
+		LastActive: now,
+		CreatedAt:  now,
+	}
+	_ = s.repo.UpsertDeviceSession(ctx, session)
+
+	return s.generateTokens(ctx, user.ID)
+}
+
+// SetPublicKey stores or updates a user's public key for E2E encryption
+func (s *Service) SetPublicKey(ctx context.Context, userID uuid.UUID, req *SetPublicKeyRequest) error {
+	keyType := req.KeyType
+	if keyType == "" {
+		keyType = "ECDH-P256"
+	}
+
+	key := &UserPublicKey{
+		ID:        uuid.New(),
+		UserID:    userID,
+		PublicKey: req.PublicKey,
+		KeyType:   keyType,
+		CreatedAt: time.Now(),
+	}
+
+	return s.repo.UpsertPublicKey(ctx, key)
+}
+
+// GetPublicKey retrieves a user's public key
+func (s *Service) GetPublicKey(ctx context.Context, userID uuid.UUID) (*GetPublicKeyResponse, error) {
+	key, err := s.repo.GetPublicKey(ctx, userID, "ECDH-P256")
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetPublicKeyResponse{
+		UserID:    key.UserID,
+		PublicKey: key.PublicKey,
+		KeyType:   key.KeyType,
+	}, nil
+}
+
+// GetPublicKeys retrieves public keys for multiple users
+func (s *Service) GetPublicKeys(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*GetPublicKeyResponse, error) {
+	keys, err := s.repo.GetPublicKeysByUserIDs(ctx, userIDs, "ECDH-P256")
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]*GetPublicKeyResponse)
+	for userID, key := range keys {
+		result[userID] = &GetPublicKeyResponse{
+			UserID:    key.UserID,
+			PublicKey: key.PublicKey,
+			KeyType:   key.KeyType,
+		}
+	}
+	return result, nil
 }

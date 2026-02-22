@@ -138,12 +138,13 @@ func (s *Service) SendMessage(ctx context.Context, userID, matchID uuid.UUID, re
 	}
 
 	msg := &Message{
-		ID:        uuid.New(),
-		MatchID:   matchID,
-		SenderID:  userID,
-		Content:   req.Content,
-		ImageURL:  req.ImageURL,
-		CreatedAt: time.Now(),
+		ID:               uuid.New(),
+		MatchID:          matchID,
+		SenderID:         userID,
+		Content:          req.Content,
+		EncryptedContent: req.EncryptedContent,
+		ImageURL:         req.ImageURL,
+		CreatedAt:        time.Now(),
 	}
 
 	if err := s.repo.Create(ctx, msg); err != nil {

@@ -3,6 +3,11 @@ import { Platform } from 'react-native';
 import { api } from '@/api/client';
 import { storage } from './storage';
 
+interface ProfilePrompt {
+  question: string;
+  answer: string;
+}
+
 interface User {
   id: string;
   email: string;
@@ -14,6 +19,7 @@ interface User {
   bio?: string;
   age?: number;
   location?: string;
+  prompts?: ProfilePrompt[];
 }
 
 interface AuthState {
@@ -32,6 +38,14 @@ interface AuthState {
   getDeviceId: () => Promise<string>;
   sendPhoneCode: (phone: string) => Promise<void>;
   verifyPhone: (phone: string, code: string) => Promise<void>;
+
+  // Magic link auth
+  sendMagicLink: (email: string) => Promise<void>;
+  verifyMagicLink: (token: string) => Promise<void>;
+
+  // Public key management for E2E encryption
+  uploadPublicKey: (publicKey: string) => Promise<void>;
+  getPublicKey: (userId: string) => Promise<string | null>;
 }
 
 // Generate or retrieve a persistent device ID
@@ -223,5 +237,64 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: (user: User) => {
     set({ user });
+  },
+
+  // Magic link methods
+  sendMagicLink: async (email: string) => {
+    set({ isLoading: true });
+    try {
+      await api.post('/auth/magic/send', { email });
+      set({ isLoading: false });
+    } catch (error: any) {
+      set({ isLoading: false });
+      throw new Error(error.response?.data?.error || 'Failed to send magic link');
+    }
+  },
+
+  verifyMagicLink: async (token: string) => {
+    set({ isLoading: true });
+    try {
+      const deviceId = await get().getDeviceId();
+      const response = await api.post('/auth/magic/verify', {
+        token,
+        device_id: deviceId,
+        platform: Platform.OS,
+      });
+
+      const { access_token, refresh_token, user } = response.data;
+
+      await storage.setItem('accessToken', access_token);
+      await storage.setItem('refreshToken', refresh_token);
+
+      set({
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch (error: any) {
+      set({ isLoading: false });
+      throw new Error(error.response?.data?.error || 'Invalid or expired magic link');
+    }
+  },
+
+  // Public key management for E2E encryption
+  uploadPublicKey: async (publicKey: string) => {
+    await api.post('/keys/public', {
+      public_key: publicKey,
+      key_type: 'ECDH-P256',
+    });
+  },
+
+  getPublicKey: async (userId: string) => {
+    try {
+      const response = await api.get('/keys/public', {
+        params: { user_id: userId },
+      });
+      return response.data.public_key as string;
+    } catch {
+      return null;
+    }
   },
 }));

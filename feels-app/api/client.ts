@@ -100,8 +100,11 @@ export const matchesApi = {
   getMessages: (matchId: string) =>
     api.get(`/matches/${matchId}/messages`),
 
-  sendMessage: (matchId: string, content: string) =>
-    api.post(`/matches/${matchId}/messages`, { content }),
+  sendMessage: (matchId: string, content: string, encryptedContent?: string) =>
+    api.post(`/matches/${matchId}/messages`, {
+      content,
+      encrypted_content: encryptedContent,
+    }),
 
   toggleImagePermission: (matchId: string, allowed: boolean) =>
     api.patch(`/matches/${matchId}/image-permission`, { allowed }),
@@ -117,6 +120,11 @@ export const userApi = {
   }) => api.patch('/users/me', data),
 };
 
+interface ProfilePrompt {
+  question: string;
+  answer: string;
+}
+
 export const profileApi = {
   get: () => api.get('/profile'),
 
@@ -128,12 +136,14 @@ export const profileApi = {
     bio: string;
     neighborhood?: string;
     kink_level?: string;
+    prompts?: ProfilePrompt[];
   }) => api.post('/profile', data),
 
   update: (data: {
     name?: string;
     bio?: string;
     neighborhood?: string;
+    prompts?: ProfilePrompt[];
   }) => api.put('/profile', data),
 
   getPreferences: () => api.get('/profile/preferences'),
@@ -145,4 +155,18 @@ export const profileApi = {
     distance_miles?: number;
     visible_to_genders?: string[];
   }) => api.put('/profile/preferences', data),
+};
+
+export const creditsApi = {
+  getCredits: () => api.get('/credits'),
+
+  getSubscription: () => api.get('/subscription'),
+};
+
+export const keysApi = {
+  setPublicKey: (publicKey: string, keyType: string = 'ECDH-P256') =>
+    api.post('/keys/public', { public_key: publicKey, key_type: keyType }),
+
+  getPublicKey: (userId: string) =>
+    api.get('/keys/public', { params: { user_id: userId } }),
 };

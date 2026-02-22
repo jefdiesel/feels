@@ -30,6 +30,24 @@ const KINK_LEVELS = [
   { value: 'kinky', label: 'Kinky AF', emoji: '😈' },
 ];
 
+const AVAILABLE_PROMPTS = [
+  "My ideal first date...",
+  "I'm looking for...",
+  "Two truths and a lie...",
+  "My love language is...",
+  "On weekends you'll find me...",
+  "The way to my heart is...",
+  "I get excited about...",
+  "My biggest flex is...",
+  "I'm convinced that...",
+  "A random fact about me...",
+];
+
+interface PromptAnswer {
+  question: string;
+  answer: string;
+}
+
 export default function OnboardingScreen() {
   const { user, setUser } = useAuthStore();
   const [step, setStep] = useState(1);
@@ -43,6 +61,11 @@ export default function OnboardingScreen() {
   const [zipCode, setZipCode] = useState('');
   const [bio, setBio] = useState('');
   const [seekingGenders, setSeekingGenders] = useState<string[]>([]);
+
+  // Prompts state
+  const [selectedPrompts, setSelectedPrompts] = useState<PromptAnswer[]>([]);
+  const [editingPromptIndex, setEditingPromptIndex] = useState<number | null>(null);
+  const [promptAnswer, setPromptAnswer] = useState('');
 
   const formatDob = (text: string) => {
     // Remove non-digits
@@ -111,16 +134,68 @@ export default function OnboardingScreen() {
     return true;
   };
 
+  const validateStep4 = () => {
+    // Prompts are optional but if selected, they must have answers
+    const incompletePrompts = selectedPrompts.filter(p => !p.answer.trim());
+    if (incompletePrompts.length > 0) {
+      Alert.alert('Error', 'Please answer all selected prompts or remove them');
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
     if (step === 1 && validateStep1()) setStep(2);
     else if (step === 2 && validateStep2()) setStep(3);
-    else if (step === 3 && validateStep3()) handleSubmit();
+    else if (step === 3 && validateStep3()) setStep(4);
+    else if (step === 4 && validateStep4()) handleSubmit();
+  };
+
+  const selectPrompt = (question: string) => {
+    if (selectedPrompts.length >= 3) {
+      Alert.alert('Limit reached', 'You can only select up to 3 prompts');
+      return;
+    }
+    if (selectedPrompts.some(p => p.question === question)) {
+      return; // Already selected
+    }
+    const index = selectedPrompts.length;
+    setSelectedPrompts([...selectedPrompts, { question, answer: '' }]);
+    setEditingPromptIndex(index);
+    setPromptAnswer('');
+  };
+
+  const savePromptAnswer = () => {
+    if (editingPromptIndex === null) return;
+
+    const updated = [...selectedPrompts];
+    updated[editingPromptIndex] = {
+      ...updated[editingPromptIndex],
+      answer: promptAnswer.trim()
+    };
+    setSelectedPrompts(updated);
+    setEditingPromptIndex(null);
+    setPromptAnswer('');
+  };
+
+  const editPrompt = (index: number) => {
+    setEditingPromptIndex(index);
+    setPromptAnswer(selectedPrompts[index].answer);
+  };
+
+  const removePrompt = (index: number) => {
+    const updated = selectedPrompts.filter((_, i) => i !== index);
+    setSelectedPrompts(updated);
+    if (editingPromptIndex === index) {
+      setEditingPromptIndex(null);
+      setPromptAnswer('');
+    }
   };
 
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // Create profile
+      // Create profile with prompts
       await profileApi.create({
         name: name.trim(),
         dob,
@@ -128,6 +203,7 @@ export default function OnboardingScreen() {
         zip_code: zipCode.trim(),
         bio: bio.trim(),
         kink_level: kinkLevel,
+        prompts: selectedPrompts.filter(p => p.answer.trim()),
       });
 
       // Set preferences
@@ -140,7 +216,12 @@ export default function OnboardingScreen() {
       });
 
       // Update user state
-      setUser({ ...user!, name: name.trim(), bio: bio.trim() });
+      setUser({
+        ...user!,
+        name: name.trim(),
+        bio: bio.trim(),
+        prompts: selectedPrompts.filter(p => p.answer.trim())
+      });
 
       // Navigate to main app
       router.replace('/(tabs)');
@@ -151,6 +232,10 @@ export default function OnboardingScreen() {
       setIsLoading(false);
     }
   };
+
+  const availableToSelect = AVAILABLE_PROMPTS.filter(
+    p => !selectedPrompts.some(sp => sp.question === p)
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -164,7 +249,7 @@ export default function OnboardingScreen() {
         >
           {/* Progress */}
           <View style={styles.progress}>
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <View
                 key={s}
                 style={[styles.progressDot, s <= step && styles.progressDotActive]}
@@ -190,15 +275,22 @@ export default function OnboardingScreen() {
               />
 
               <Text style={styles.label}>Birthday</Text>
-              <TextInput
-                style={styles.input}
-                value={dob}
-                onChangeText={(t) => setDob(formatDob(t))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#666"
-                keyboardType="number-pad"
-                maxLength={10}
-              />
+              <View style={styles.dobContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={dob}
+                  onChangeText={(t) => setDob(formatDob(t))}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#666"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                />
+                {dob.length > 0 && dob.length < 10 && (
+                  <Text style={styles.dobFormat}>
+                    {dob.length <= 4 ? 'Year' : dob.length <= 7 ? 'Month' : 'Day'}
+                  </Text>
+                )}
+              </View>
               <Text style={styles.hint}>You must be 18+ to use Feels</Text>
             </View>
           )}
@@ -277,7 +369,7 @@ export default function OnboardingScreen() {
           {/* Step 3: Location & Bio */}
           {step === 3 && (
             <View style={styles.stepContent}>
-              <Text style={styles.title}>Almost done!</Text>
+              <Text style={styles.title}>Almost there!</Text>
 
               <Text style={styles.label}>ZIP Code</Text>
               <TextInput
@@ -306,6 +398,77 @@ export default function OnboardingScreen() {
             </View>
           )}
 
+          {/* Step 4: Profile Prompts */}
+          {step === 4 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.title}>Show your personality</Text>
+              <Text style={styles.subtitle}>
+                Pick up to 3 prompts and answer them (optional)
+              </Text>
+
+              {/* Selected Prompts */}
+              {selectedPrompts.map((prompt, index) => (
+                <View key={index} style={styles.selectedPrompt}>
+                  <View style={styles.promptHeader}>
+                    <Text style={styles.promptQuestion}>{prompt.question}</Text>
+                    <TouchableOpacity onPress={() => removePrompt(index)}>
+                      <Text style={styles.removePrompt}>X</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {editingPromptIndex === index ? (
+                    <View>
+                      <TextInput
+                        style={[styles.input, styles.promptInput]}
+                        value={promptAnswer}
+                        onChangeText={setPromptAnswer}
+                        placeholder="Your answer..."
+                        placeholderTextColor="#666"
+                        multiline
+                        numberOfLines={3}
+                        maxLength={200}
+                        autoFocus
+                      />
+                      <View style={styles.promptActions}>
+                        <Text style={styles.charCount}>{promptAnswer.length}/200</Text>
+                        <TouchableOpacity
+                          style={styles.savePromptButton}
+                          onPress={savePromptAnswer}
+                        >
+                          <Text style={styles.savePromptText}>Save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity onPress={() => editPrompt(index)}>
+                      <Text style={prompt.answer ? styles.promptAnswer : styles.promptPlaceholder}>
+                        {prompt.answer || 'Tap to write your answer...'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+
+              {/* Available Prompts to Select */}
+              {selectedPrompts.length < 3 && editingPromptIndex === null && (
+                <View style={styles.availablePrompts}>
+                  <Text style={styles.label}>
+                    Choose a prompt ({selectedPrompts.length}/3)
+                  </Text>
+                  {availableToSelect.map((prompt) => (
+                    <TouchableOpacity
+                      key={prompt}
+                      style={styles.promptOption}
+                      onPress={() => selectPrompt(prompt)}
+                    >
+                      <Text style={styles.promptOptionText}>{prompt}</Text>
+                      <Text style={styles.promptAdd}>+</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Navigation */}
           <View style={styles.navigation}>
             {step > 1 && (
@@ -323,7 +486,7 @@ export default function OnboardingScreen() {
               disabled={isLoading}
             >
               <Text style={styles.nextButtonText}>
-                {isLoading ? 'Creating...' : step === 3 ? "Let's Go!" : 'Next'}
+                {isLoading ? 'Creating...' : step === 4 ? "Let's Go!" : 'Next'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -394,6 +557,16 @@ const styles = StyleSheet.create({
     minHeight: 120,
     paddingTop: 16,
   },
+  dobContainer: {
+    position: 'relative',
+  },
+  dobFormat: {
+    position: 'absolute',
+    right: 16,
+    top: 18,
+    fontSize: 14,
+    color: '#666666',
+  },
   hint: {
     fontSize: 12,
     color: '#666666',
@@ -461,5 +634,88 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  // Prompts styles
+  selectedPrompt: {
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FF1493',
+  },
+  promptHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  promptQuestion: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF1493',
+    flex: 1,
+  },
+  removePrompt: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#666666',
+    paddingLeft: 12,
+  },
+  promptInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  promptActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  savePromptButton: {
+    backgroundColor: '#FF1493',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  savePromptText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  promptAnswer: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    lineHeight: 22,
+  },
+  promptPlaceholder: {
+    fontSize: 16,
+    color: '#666666',
+    fontStyle: 'italic',
+  },
+  availablePrompts: {
+    marginTop: 8,
+  },
+  promptOption: {
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  promptOptionText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  promptAdd: {
+    fontSize: 24,
+    color: '#FF1493',
+    fontWeight: '700',
+    marginLeft: 12,
   },
 });

@@ -193,6 +193,120 @@ func (h *AuthHandler) Setup2FA(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, resp, http.StatusOK)
 }
 
+// SendMagicLink sends a magic link to the user's email
+func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
+	var req user.SendMagicLinkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.userService.SendMagicLink(r.Context(), req.Email)
+	if err != nil {
+		if errors.Is(err, user.ErrInvalidEmail) {
+			jsonError(w, "invalid email format", http.StatusBadRequest)
+			return
+		}
+		jsonError(w, "failed to send magic link", http.StatusInternalServerError)
+		return
+	}
+
+	// In development, log the token. In production, send via email service.
+	// For now, we return a success message and log the token for testing.
+	// TODO: Integrate with email service (SendGrid, SES, etc.)
+	_ = token // log.Printf("Magic link token for %s: %s", req.Email, token)
+
+	jsonResponse(w, map[string]string{
+		"message": "magic link sent",
+		// In development only - remove in production:
+		"token": token,
+	}, http.StatusOK)
+}
+
+// VerifyMagicLink verifies a magic link and returns auth tokens
+func (h *AuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
+	var req user.VerifyMagicLinkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.userService.VerifyMagicLink(r.Context(), &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, user.ErrMagicLinkExpired):
+			jsonError(w, "magic link expired", http.StatusBadRequest)
+		case errors.Is(err, user.ErrMagicLinkUsed):
+			jsonError(w, "magic link already used", http.StatusBadRequest)
+		case errors.Is(err, user.ErrMagicLinkInvalid):
+			jsonError(w, "invalid magic link", http.StatusBadRequest)
+		case errors.Is(err, user.ErrDeviceRequired):
+			jsonError(w, "device_id is required", http.StatusBadRequest)
+		default:
+			jsonError(w, "verification failed", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonResponse(w, resp, http.StatusOK)
+}
+
+// SetPublicKey stores the user's public key for E2E encryption
+func (h *AuthHandler) SetPublicKey(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		jsonError(w, "invalid user", http.StatusBadRequest)
+		return
+	}
+
+	var req user.SetPublicKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.PublicKey == "" {
+		jsonError(w, "public_key is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.userService.SetPublicKey(r.Context(), uid, &req); err != nil {
+		jsonError(w, "failed to store public key", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, map[string]string{"message": "public key stored"}, http.StatusOK)
+}
+
+// GetPublicKey retrieves a user's public key
+func (h *AuthHandler) GetPublicKey(w http.ResponseWriter, r *http.Request) {
+	targetUserID := r.URL.Query().Get("user_id")
+	if targetUserID == "" {
+		jsonError(w, "user_id query parameter required", http.StatusBadRequest)
+		return
+	}
+
+	uid, err := uuid.Parse(targetUserID)
+	if err != nil {
+		jsonError(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.userService.GetPublicKey(r.Context(), uid)
+	if err != nil {
+		jsonError(w, "public key not found", http.StatusNotFound)
+		return
+	}
+
+	jsonResponse(w, resp, http.StatusOK)
+}
+
 type errorResponse struct {
 	Error string `json:"error"`
 }

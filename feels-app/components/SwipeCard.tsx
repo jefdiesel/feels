@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Dimensions, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Dimensions, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -15,19 +15,10 @@ import Animated, {
 import { Profile } from '@/stores/feedStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
+const SWIPE_UP_THRESHOLD = SCREEN_HEIGHT * 0.15;
 
-// Helper functions for kink level display
-const getKinkEmoji = (level: string): string => {
-  const emojis: Record<string, string> = {
-    vanilla: '🍦',
-    curious: '🤔',
-    sensual: '🔥',
-    experienced: '⛓️',
-    kinky: '😈',
-  };
-  return emojis[level] || '✨';
-};
-
+// Helper function for kink level display
 const formatKinkLevel = (level: string): string => {
   const labels: Record<string, string> = {
     vanilla: 'Vanilla',
@@ -38,16 +29,46 @@ const formatKinkLevel = (level: string): string => {
   };
   return labels[level] || level;
 };
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
-const SWIPE_UP_THRESHOLD = SCREEN_HEIGHT * 0.15;
+
+// Default prompts when profile doesn't have any
+const getDefaultPrompts = (profile: Profile) => {
+  const prompts = [];
+
+  if (profile.bio) {
+    prompts.push({
+      id: 'bio',
+      question: 'About me',
+      answer: profile.bio,
+    });
+  }
+
+  if (profile.lookingFor) {
+    prompts.push({
+      id: 'looking',
+      question: "I'm looking for",
+      answer: profile.lookingFor,
+    });
+  }
+
+  if (profile.kinkLevel) {
+    prompts.push({
+      id: 'kink',
+      question: 'My vibe',
+      answer: formatKinkLevel(profile.kinkLevel),
+    });
+  }
+
+  return prompts;
+};
 
 interface SwipeCardProps {
   profile: Profile;
   onSwipe: (action: 'like' | 'pass' | 'superlike') => void;
   onExpandProfile: () => void;
+  onLikePrompt?: (promptId: string) => void;
 }
 
-export default function SwipeCard({ profile, onSwipe, onExpandProfile }: SwipeCardProps) {
+export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePrompt }: SwipeCardProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   const translateX = useSharedValue(0);
@@ -63,46 +84,46 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile }: SwipeCa
 
   const gesture = Gesture.Pan()
     .onStart(() => {
-      cardScale.value = withSpring(0.98);
+      cardScale.value = withSpring(0.99, { damping: 20, stiffness: 300 });
     })
     .onUpdate((event) => {
-      translateX.value = event.translationX;
-      translateY.value = event.translationY;
+      translateX.value = event.translationX * 0.9;
+      translateY.value = event.translationY * 0.6;
     })
     .onEnd((event) => {
-      cardScale.value = withSpring(1);
+      cardScale.value = withSpring(1, { damping: 20, stiffness: 300 });
 
       // Swipe up for superlike
       if (event.translationY < -SWIPE_UP_THRESHOLD && Math.abs(event.translationX) < SWIPE_THRESHOLD) {
-        translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 });
+        translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 350 });
         runOnJS(handleSwipe)('superlike');
         return;
       }
 
       // Swipe right for like
       if (event.translationX > SWIPE_THRESHOLD) {
-        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
+        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 350 });
         runOnJS(handleSwipe)('like');
         return;
       }
 
       // Swipe left for pass
       if (event.translationX < -SWIPE_THRESHOLD) {
-        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 });
+        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 350 });
         runOnJS(handleSwipe)('pass');
         return;
       }
 
-      // Reset position
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
+      // Reset position with smooth spring
+      translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
+      translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
     });
 
   const animatedCardStyle = useAnimatedStyle(() => {
     const rotate = interpolate(
       translateX.value,
       [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-      [-15, 0, 15],
+      [-8, 0, 8],
       Extrapolation.CLAMP
     );
 
@@ -169,81 +190,148 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile }: SwipeCa
     }
   };
 
+  const handlePromptLike = (promptId: string) => {
+    if (onLikePrompt) {
+      onLikePrompt(promptId);
+    } else {
+      onSwipe('like');
+    }
+  };
+
+  // Get prompts to display
+  const displayPrompts = profile.prompts?.length ? profile.prompts : getDefaultPrompts(profile);
+
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.card, animatedCardStyle]}>
-        {/* Full-bleed photo */}
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={(e) => handleTap(e.nativeEvent.locationX)}
-          style={styles.photoContainer}
+        <ScrollView
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          scrollEventThrottle={16}
         >
-          <Image
-            source={{ uri: profile.photos[currentPhotoIndex] }}
-            style={styles.photo}
-            contentFit="cover"
-            transition={200}
-          />
-
-          {/* Photo indicators */}
-          <View style={styles.photoIndicators}>
-            {profile.photos.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.indicator,
-                  index === currentPhotoIndex && styles.indicatorActive,
-                ]}
-              />
-            ))}
-          </View>
-
-          {/* Gradient overlay */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)']}
-            style={styles.gradient}
-          />
-
-          {/* Like overlay */}
-          <Animated.View style={[styles.actionOverlay, styles.likeOverlay, likeOverlayStyle]}>
-            <Text style={styles.overlayEmoji}>💚</Text>
-          </Animated.View>
-
-          {/* Pass overlay */}
-          <Animated.View style={[styles.actionOverlay, styles.passOverlay, passOverlayStyle]}>
-            <Text style={styles.overlayEmoji}>❌</Text>
-          </Animated.View>
-
-          {/* Superlike overlay */}
-          <Animated.View style={[styles.actionOverlay, styles.superlikeOverlay, superlikeOverlayStyle]}>
-            <Text style={styles.overlayEmoji}>⭐</Text>
-          </Animated.View>
-
-          {/* Profile info */}
+          {/* Full-bleed photo */}
           <TouchableOpacity
-            style={styles.profileInfo}
-            onPress={onExpandProfile}
-            activeOpacity={0.9}
+            activeOpacity={1}
+            onPress={(e) => handleTap(e.nativeEvent.locationX)}
+            style={styles.photoContainer}
           >
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{profile.name}, {profile.age}</Text>
-              <Text style={styles.expandArrow}>▲</Text>
+            <Image
+              source={{ uri: profile.photos[currentPhotoIndex] }}
+              style={styles.photo}
+              contentFit="cover"
+              transition={150}
+            />
+
+            {/* Photo indicators */}
+            <View style={styles.photoIndicators}>
+              {profile.photos.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.indicator,
+                    index === currentPhotoIndex && styles.indicatorActive,
+                  ]}
+                />
+              ))}
             </View>
-            <View style={styles.detailsRow}>
+
+            {/* Gradient overlay */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+              locations={[0.4, 0.7, 1]}
+              style={styles.gradient}
+            />
+
+            {/* Swipe feedback overlays */}
+            <Animated.View style={[styles.actionOverlay, styles.likeOverlay, likeOverlayStyle]}>
+              <View style={styles.feedbackBadge}>
+                <Text style={styles.feedbackText}>LIKE</Text>
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.actionOverlay, styles.passOverlay, passOverlayStyle]}>
+              <View style={[styles.feedbackBadge, styles.passBadge]}>
+                <Text style={[styles.feedbackText, styles.passText]}>NOPE</Text>
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.actionOverlay, styles.superlikeOverlay, superlikeOverlayStyle]}>
+              <View style={[styles.feedbackBadge, styles.superlikeBadge]}>
+                <Text style={[styles.feedbackText, styles.superlikeText]}>SUPER</Text>
+              </View>
+            </Animated.View>
+
+            {/* Profile header info */}
+            <TouchableOpacity
+              style={styles.profileHeader}
+              onPress={onExpandProfile}
+              activeOpacity={0.9}
+            >
+              <View style={styles.nameContainer}>
+                <Text style={styles.name}>{profile.name}</Text>
+                <Text style={styles.age}>{profile.age}</Text>
+              </View>
               {profile.location && (
                 <Text style={styles.location}>
                   {profile.location}
-                  {profile.distance && ` • ${profile.distance}mi`}
+                  {profile.distance && ` - ${profile.distance} mi`}
                 </Text>
               )}
-              {profile.kinkLevel && (
-                <Text style={styles.kinkBadge}>
-                  {getKinkEmoji(profile.kinkLevel)} {formatKinkLevel(profile.kinkLevel)}
-                </Text>
-              )}
-            </View>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+
+          {/* Profile prompts section */}
+          <View style={styles.promptsSection}>
+            {displayPrompts.slice(0, 3).map((prompt, index) => (
+              <View key={prompt.id || index} style={styles.promptCard}>
+                <Text style={styles.promptQuestion}>{prompt.question}</Text>
+                <Text style={styles.promptAnswer}>{prompt.answer}</Text>
+
+                {/* Like button on prompt */}
+                <TouchableOpacity
+                  style={styles.promptLikeButton}
+                  onPress={() => handlePromptLike(prompt.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.promptLikeIcon}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {/* Interests tags */}
+            {profile.interests && profile.interests.length > 0 && (
+              <View style={styles.interestsContainer}>
+                <Text style={styles.interestsLabel}>Interests</Text>
+                <View style={styles.interestsTags}>
+                  {profile.interests.slice(0, 6).map((interest, index) => (
+                    <View key={index} style={styles.interestTag}>
+                      <Text style={styles.interestText}>{interest}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Kink level badge */}
+            {profile.kinkLevel && (
+              <View style={styles.kinkContainer}>
+                <View style={styles.kinkBadge}>
+                  <Text style={styles.kinkLabel}>Vibe</Text>
+                  <Text style={styles.kinkValue}>{formatKinkLevel(profile.kinkLevel)}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* View full profile hint */}
+            <TouchableOpacity style={styles.viewMoreButton} onPress={onExpandProfile}>
+              <Text style={styles.viewMoreText}>View full profile</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom padding for scroll */}
+          <View style={{ height: 140 }} />
+        </ScrollView>
       </Animated.View>
     </GestureDetector>
   );
@@ -256,8 +344,12 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     backgroundColor: '#000',
   },
-  photoContainer: {
+  scrollContainer: {
     flex: 1,
+  },
+  photoContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.75,
   },
   photo: {
     width: '100%',
@@ -265,7 +357,7 @@ const styles = StyleSheet.create({
   },
   photoIndicators: {
     position: 'absolute',
-    top: 60,
+    top: 56,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -273,9 +365,9 @@ const styles = StyleSheet.create({
   },
   indicator: {
     flex: 1,
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    borderRadius: 2,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 1,
   },
   indicatorActive: {
     backgroundColor: '#FFFFFF',
@@ -285,78 +377,185 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 300,
+    height: 280,
   },
   actionOverlay: {
     position: 'absolute',
-    top: '40%',
+    top: 120,
     justifyContent: 'center',
     alignItems: 'center',
   },
   likeOverlay: {
-    left: 40,
+    left: 24,
   },
   passOverlay: {
-    right: 40,
+    right: 24,
   },
   superlikeOverlay: {
-    top: '30%',
+    top: 100,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
-  overlayEmoji: {
-    fontSize: 80,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 10,
+  feedbackBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: '#FF1493',
+    transform: [{ rotate: '-15deg' }],
   },
-  profileInfo: {
+  passBadge: {
+    borderColor: '#888888',
+    transform: [{ rotate: '15deg' }],
+  },
+  superlikeBadge: {
+    borderColor: '#FFD700',
+    transform: [{ rotate: '0deg' }],
+  },
+  feedbackText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FF1493',
+    letterSpacing: 2,
+  },
+  passText: {
+    color: '#888888',
+  },
+  superlikeText: {
+    color: '#FFD700',
+  },
+  profileHeader: {
     position: 'absolute',
-    bottom: 120,
+    bottom: 24,
     left: 20,
     right: 20,
   },
-  nameRow: {
+  nameContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 8,
   },
   name: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    letterSpacing: -0.5,
   },
-  expandArrow: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    opacity: 0.8,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 12,
+  age: {
+    fontSize: 28,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.85)',
   },
   location: {
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 4,
+    letterSpacing: 0.2,
+  },
+  promptsSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  promptCard: {
+    backgroundColor: 'rgba(30, 30, 30, 0.95)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    position: 'relative',
+  },
+  promptQuestion: {
+    fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: '#888888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  promptAnswer: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    lineHeight: 26,
+    paddingRight: 40,
+  },
+  promptLikeButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 20, 147, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promptLikeIcon: {
+    fontSize: 22,
+    fontWeight: '300',
+    color: '#FF1493',
+  },
+  interestsContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  interestsLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  interestsTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  interestTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  interestText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  kinkContainer: {
+    marginBottom: 16,
   },
   kinkBadge: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FF1493',
-    backgroundColor: 'rgba(255, 20, 147, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(255, 20, 147, 0.12)',
     borderRadius: 12,
-    overflow: 'hidden',
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kinkLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  kinkValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF1493',
+  },
+  viewMoreButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  viewMoreText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.5)',
+    letterSpacing: 0.3,
   },
 });

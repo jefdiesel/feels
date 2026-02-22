@@ -8,13 +8,14 @@ import (
 
 // Message represents a chat message
 type Message struct {
-	ID        uuid.UUID  `json:"id"`
-	MatchID   uuid.UUID  `json:"match_id"`
-	SenderID  uuid.UUID  `json:"sender_id"`
-	Content   *string    `json:"content,omitempty"`
-	ImageURL  *string    `json:"image_url,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	ReadAt    *time.Time `json:"read_at,omitempty"`
+	ID               uuid.UUID  `json:"id"`
+	MatchID          uuid.UUID  `json:"match_id"`
+	SenderID         uuid.UUID  `json:"sender_id"`
+	Content          *string    `json:"content,omitempty"`
+	EncryptedContent *string    `json:"encrypted_content,omitempty"`
+	ImageURL         *string    `json:"image_url,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	ReadAt           *time.Time `json:"read_at,omitempty"`
 }
 
 // ImagePermission tracks whether a user has enabled image sharing in a match
@@ -27,8 +28,9 @@ type ImagePermission struct {
 
 // SendMessageRequest is the request to send a message
 type SendMessageRequest struct {
-	Content  *string `json:"content,omitempty"`
-	ImageURL *string `json:"image_url,omitempty"` // For image messages
+	Content          *string `json:"content,omitempty"`
+	EncryptedContent *string `json:"encrypted_content,omitempty"` // E2E encrypted content
+	ImageURL         *string `json:"image_url,omitempty"`         // For image messages
 }
 
 // MessagesResponse is the response for getting messages

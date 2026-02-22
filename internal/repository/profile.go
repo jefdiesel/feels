@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/feels/feels/internal/domain/profile"
@@ -27,17 +28,22 @@ func NewProfileRepository(db *pgxpool.Pool) *ProfileRepository {
 }
 
 func (r *ProfileRepository) Create(ctx context.Context, p *profile.Profile) error {
+	promptsJSON, err := json.Marshal(p.Prompts)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		INSERT INTO profiles (
-			user_id, name, dob, gender, zip_code, neighborhood, bio,
+			user_id, name, dob, gender, zip_code, neighborhood, bio, prompts,
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, lat, lng, is_verified, last_active, created_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 		)
 	`
-	_, err := r.db.Exec(ctx, query,
-		p.UserID, p.Name, p.DOB, p.Gender, p.ZipCode, p.Neighborhood, p.Bio,
+	_, err = r.db.Exec(ctx, query,
+		p.UserID, p.Name, p.DOB, p.Gender, p.ZipCode, p.Neighborhood, p.Bio, promptsJSON,
 		p.KinkLevel, p.LookingFor, p.Zodiac, p.Religion, p.HasKids, p.WantsKids,
 		p.Alcohol, p.Weed, p.Lat, p.Lng, p.IsVerified, p.LastActive, p.CreatedAt,
 	)
@@ -52,14 +58,14 @@ func (r *ProfileRepository) Create(ctx context.Context, p *profile.Profile) erro
 
 func (r *ProfileRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*profile.Profile, error) {
 	query := `
-		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio,
+		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, lat, lng, is_verified, last_active, created_at
 		FROM profiles WHERE user_id = $1
 	`
 	var p profile.Profile
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio,
+		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
 		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
 		&p.Alcohol, &p.Weed, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt,
 	)
@@ -80,16 +86,21 @@ func (r *ProfileRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (
 }
 
 func (r *ProfileRepository) Update(ctx context.Context, p *profile.Profile) error {
+	promptsJSON, err := json.Marshal(p.Prompts)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		UPDATE profiles SET
-			name = $2, neighborhood = $3, bio = $4, kink_level = $5,
-			looking_for = $6, zodiac = $7, religion = $8, has_kids = $9,
-			wants_kids = $10, alcohol = $11, weed = $12, lat = $13, lng = $14,
+			name = $2, neighborhood = $3, bio = $4, prompts = $5, kink_level = $6,
+			looking_for = $7, zodiac = $8, religion = $9, has_kids = $10,
+			wants_kids = $11, alcohol = $12, weed = $13, lat = $14, lng = $15,
 			last_active = NOW()
 		WHERE user_id = $1
 	`
 	result, err := r.db.Exec(ctx, query,
-		p.UserID, p.Name, p.Neighborhood, p.Bio, p.KinkLevel,
+		p.UserID, p.Name, p.Neighborhood, p.Bio, promptsJSON, p.KinkLevel,
 		p.LookingFor, p.Zodiac, p.Religion, p.HasKids,
 		p.WantsKids, p.Alcohol, p.Weed, p.Lat, p.Lng,
 	)

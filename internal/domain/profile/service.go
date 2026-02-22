@@ -70,6 +70,11 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, req *Crea
 	}
 
 	now := time.Now()
+	prompts := Prompts{}
+	if req.Prompts != nil {
+		prompts = req.Prompts
+	}
+
 	profile := &Profile{
 		UserID:       userID,
 		Name:         req.Name,
@@ -78,6 +83,7 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, req *Crea
 		ZipCode:      req.ZipCode,
 		Neighborhood: req.Neighborhood,
 		Bio:          req.Bio,
+		Prompts:      prompts,
 		KinkLevel:    req.KinkLevel,
 		LookingFor:   req.LookingFor,
 		Zodiac:       req.Zodiac,
@@ -147,6 +153,9 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req *Upda
 	}
 	if req.Bio != nil {
 		profile.Bio = *req.Bio
+	}
+	if req.Prompts != nil {
+		profile.Prompts = req.Prompts
 	}
 	if req.KinkLevel != nil {
 		if !IsValidKinkLevel(*req.KinkLevel) {

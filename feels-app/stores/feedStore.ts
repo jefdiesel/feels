@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { feedApi } from '@/api/client';
 
+export interface ProfilePrompt {
+  question: string;
+  answer: string;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -10,6 +15,9 @@ export interface Profile {
   location?: string;
   distance?: number;
   kinkLevel?: string;
+  prompts?: ProfilePrompt[];
+  interests?: string[];
+  lookingFor?: string;
 }
 
 // Backend response types
@@ -18,6 +26,11 @@ interface BackendPhoto {
   user_id: string;
   url: string;
   position: number;
+}
+
+interface BackendPrompt {
+  question: string;
+  answer: string;
 }
 
 interface BackendProfile {
@@ -29,6 +42,9 @@ interface BackendProfile {
   neighborhood?: string;
   distance?: number;
   kink_level?: string;
+  prompts?: BackendPrompt[];
+  interests?: string[];
+  looking_for?: string;
 }
 
 interface FeedResponse {
@@ -49,6 +65,9 @@ function transformProfile(bp: BackendProfile): Profile {
     location: bp.neighborhood,
     distance: bp.distance,
     kinkLevel: bp.kink_level,
+    prompts: bp.prompts,
+    interests: bp.interests,
+    lookingFor: bp.looking_for,
   };
 }
 

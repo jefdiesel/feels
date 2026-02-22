@@ -95,3 +95,48 @@ type Setup2FAResponse struct {
 type Verify2FARequest struct {
 	Code string `json:"code"`
 }
+
+// MagicLink represents a passwordless login token
+type MagicLink struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    *uuid.UUID `json:"user_id,omitempty"`
+	Email     string     `json:"email"`
+	TokenHash string     `json:"-"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// SendMagicLinkRequest is the request to send a magic link
+type SendMagicLinkRequest struct {
+	Email string `json:"email"`
+}
+
+// VerifyMagicLinkRequest is the request to verify a magic link
+type VerifyMagicLinkRequest struct {
+	Token    string `json:"token"`
+	DeviceID string `json:"device_id"`
+	Platform string `json:"platform,omitempty"`
+}
+
+// UserPublicKey represents a user's public key for E2E encryption
+type UserPublicKey struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	PublicKey string    `json:"public_key"`
+	KeyType   string    `json:"key_type"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SetPublicKeyRequest is the request to set a user's public key
+type SetPublicKeyRequest struct {
+	PublicKey string `json:"public_key"`
+	KeyType   string `json:"key_type,omitempty"`
+}
+
+// GetPublicKeyResponse is the response containing a user's public key
+type GetPublicKeyResponse struct {
+	UserID    uuid.UUID `json:"user_id"`
+	PublicKey string    `json:"public_key"`
+	KeyType   string    `json:"key_type"`
+}

@@ -1,10 +1,34 @@
 package profile
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// Prompt represents a single profile prompt with question and answer
+type Prompt struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
+// Prompts is a slice of Prompt that implements sql.Scanner and driver.Valuer
+type Prompts []Prompt
+
+// Scan implements the sql.Scanner interface for JSONB
+func (p *Prompts) Scan(value interface{}) error {
+	if value == nil {
+		*p = []Prompt{}
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		*p = []Prompt{}
+		return nil
+	}
+	return json.Unmarshal(bytes, p)
+}
 
 type Profile struct {
 	UserID       uuid.UUID  `json:"user_id"`
@@ -14,6 +38,7 @@ type Profile struct {
 	ZipCode      string     `json:"zip_code"`
 	Neighborhood *string    `json:"neighborhood,omitempty"`
 	Bio          string     `json:"bio"`
+	Prompts      Prompts    `json:"prompts"`
 	KinkLevel    *string    `json:"kink_level,omitempty"`
 	LookingFor   *string    `json:"looking_for,omitempty"`
 	Zodiac       *string    `json:"zodiac,omitempty"`
@@ -58,6 +83,7 @@ type CreateProfileRequest struct {
 	ZipCode      string   `json:"zip_code"`
 	Neighborhood *string  `json:"neighborhood,omitempty"`
 	Bio          string   `json:"bio"`
+	Prompts      []Prompt `json:"prompts,omitempty"`
 	KinkLevel    *string  `json:"kink_level,omitempty"`
 	LookingFor   *string  `json:"looking_for,omitempty"`
 	Zodiac       *string  `json:"zodiac,omitempty"`
@@ -74,6 +100,7 @@ type UpdateProfileRequest struct {
 	Name         *string  `json:"name,omitempty"`
 	Neighborhood *string  `json:"neighborhood,omitempty"`
 	Bio          *string  `json:"bio,omitempty"`
+	Prompts      []Prompt `json:"prompts,omitempty"`
 	KinkLevel    *string  `json:"kink_level,omitempty"`
 	LookingFor   *string  `json:"looking_for,omitempty"`
 	Zodiac       *string  `json:"zodiac,omitempty"`

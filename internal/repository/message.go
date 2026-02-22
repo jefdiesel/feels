@@ -26,11 +26,11 @@ func NewMessageRepository(db *pgxpool.Pool) *MessageRepository {
 // Create creates a new message
 func (r *MessageRepository) Create(ctx context.Context, msg *message.Message) error {
 	query := `
-		INSERT INTO messages (id, match_id, sender_id, content, image_url, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO messages (id, match_id, sender_id, content, encrypted_content, image_url, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 	_, err := r.db.Exec(ctx, query,
-		msg.ID, msg.MatchID, msg.SenderID, msg.Content, msg.ImageURL, msg.CreatedAt,
+		msg.ID, msg.MatchID, msg.SenderID, msg.Content, msg.EncryptedContent, msg.ImageURL, msg.CreatedAt,
 	)
 	return err
 }
@@ -38,12 +38,12 @@ func (r *MessageRepository) Create(ctx context.Context, msg *message.Message) er
 // GetByID gets a message by ID
 func (r *MessageRepository) GetByID(ctx context.Context, msgID uuid.UUID) (*message.Message, error) {
 	query := `
-		SELECT id, match_id, sender_id, content, image_url, created_at
+		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at
 		FROM messages WHERE id = $1
 	`
 	var msg message.Message
 	err := r.db.QueryRow(ctx, query, msgID).Scan(
-		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.ImageURL, &msg.CreatedAt,
+		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -57,7 +57,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, msgID uuid.UUID) (*mess
 // GetByMatch gets messages for a match with pagination
 func (r *MessageRepository) GetByMatch(ctx context.Context, matchID uuid.UUID, limit, offset int) ([]message.Message, error) {
 	query := `
-		SELECT id, match_id, sender_id, content, image_url, created_at
+		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at
 		FROM messages
 		WHERE match_id = $1
 		ORDER BY created_at DESC
@@ -72,7 +72,7 @@ func (r *MessageRepository) GetByMatch(ctx context.Context, matchID uuid.UUID, l
 	var messages []message.Message
 	for rows.Next() {
 		var msg message.Message
-		if err := rows.Scan(&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.ImageURL, &msg.CreatedAt); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, msg)
@@ -89,7 +89,7 @@ func (r *MessageRepository) GetByMatch(ctx context.Context, matchID uuid.UUID, l
 // GetLastMessage gets the last message in a match
 func (r *MessageRepository) GetLastMessage(ctx context.Context, matchID uuid.UUID) (*message.Message, error) {
 	query := `
-		SELECT id, match_id, sender_id, content, image_url, created_at
+		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at
 		FROM messages
 		WHERE match_id = $1
 		ORDER BY created_at DESC
@@ -97,7 +97,7 @@ func (r *MessageRepository) GetLastMessage(ctx context.Context, matchID uuid.UUI
 	`
 	var msg message.Message
 	err := r.db.QueryRow(ctx, query, matchID).Scan(
-		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.ImageURL, &msg.CreatedAt,
+		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

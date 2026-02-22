@@ -270,3 +270,102 @@ func containsImpl(s, substr string) bool {
 	}
 	return false
 }
+
+// Magic Link methods
+
+func (r *UserRepository) CreateMagicLink(ctx context.Context, link *user.MagicLink) error {
+	query := `
+		INSERT INTO magic_links (id, user_id, email, token_hash, expires_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := r.db.Exec(ctx, query, link.ID, link.UserID, link.Email, link.TokenHash, link.ExpiresAt, link.CreatedAt)
+	return err
+}
+
+func (r *UserRepository) GetMagicLinkByToken(ctx context.Context, tokenHash string) (*user.MagicLink, error) {
+	query := `
+		SELECT id, user_id, email, token_hash, expires_at, used_at, created_at
+		FROM magic_links WHERE token_hash = $1
+	`
+	var link user.MagicLink
+	err := r.db.QueryRow(ctx, query, tokenHash).Scan(
+		&link.ID, &link.UserID, &link.Email, &link.TokenHash, &link.ExpiresAt, &link.UsedAt, &link.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("magic link not found")
+		}
+		return nil, err
+	}
+	return &link, nil
+}
+
+func (r *UserRepository) MarkMagicLinkUsed(ctx context.Context, id uuid.UUID) error {
+	query := `UPDATE magic_links SET used_at = NOW() WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, id)
+	return err
+}
+
+func (r *UserRepository) DeleteExpiredMagicLinks(ctx context.Context) error {
+	query := `DELETE FROM magic_links WHERE expires_at < NOW()`
+	_, err := r.db.Exec(ctx, query)
+	return err
+}
+
+// Public Key methods for E2E encryption
+
+func (r *UserRepository) UpsertPublicKey(ctx context.Context, key *user.UserPublicKey) error {
+	query := `
+		INSERT INTO user_public_keys (id, user_id, public_key, key_type, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (user_id, key_type) DO UPDATE SET
+			public_key = EXCLUDED.public_key,
+			created_at = EXCLUDED.created_at
+	`
+	_, err := r.db.Exec(ctx, query, key.ID, key.UserID, key.PublicKey, key.KeyType, key.CreatedAt)
+	return err
+}
+
+func (r *UserRepository) GetPublicKey(ctx context.Context, userID uuid.UUID, keyType string) (*user.UserPublicKey, error) {
+	query := `
+		SELECT id, user_id, public_key, key_type, created_at
+		FROM user_public_keys WHERE user_id = $1 AND key_type = $2
+	`
+	var key user.UserPublicKey
+	err := r.db.QueryRow(ctx, query, userID, keyType).Scan(
+		&key.ID, &key.UserID, &key.PublicKey, &key.KeyType, &key.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("public key not found")
+		}
+		return nil, err
+	}
+	return &key, nil
+}
+
+func (r *UserRepository) GetPublicKeysByUserIDs(ctx context.Context, userIDs []uuid.UUID, keyType string) (map[uuid.UUID]*user.UserPublicKey, error) {
+	if len(userIDs) == 0 {
+		return make(map[uuid.UUID]*user.UserPublicKey), nil
+	}
+
+	query := `
+		SELECT id, user_id, public_key, key_type, created_at
+		FROM user_public_keys WHERE user_id = ANY($1) AND key_type = $2
+	`
+	rows, err := r.db.Query(ctx, query, userIDs, keyType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]*user.UserPublicKey)
+	for rows.Next() {
+		var key user.UserPublicKey
+		if err := rows.Scan(&key.ID, &key.UserID, &key.PublicKey, &key.KeyType, &key.CreatedAt); err != nil {
+			return nil, err
+		}
+		result[key.UserID] = &key
+	}
+	return result, nil
+}

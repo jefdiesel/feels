@@ -150,6 +150,10 @@ func (r *Router) setupRoutes(
 			auth.Post("/login", authHandler.Login)
 			auth.Post("/refresh", authHandler.Refresh)
 			auth.Post("/logout", authHandler.Logout)
+
+			// Magic link (passwordless) auth
+			auth.Post("/magic/send", authHandler.SendMagicLink)
+			auth.Post("/magic/verify", authHandler.VerifyMagicLink)
 		})
 
 		// Protected routes
@@ -198,6 +202,10 @@ func (r *Router) setupRoutes(
 			// Credits routes
 			protected.Get("/credits", creditHandler.GetCredits)
 			protected.Get("/subscription", creditHandler.GetSubscription)
+
+			// Public key management for E2E encryption
+			protected.Post("/keys/public", authHandler.SetPublicKey)
+			protected.Get("/keys/public", authHandler.GetPublicKey)
 		})
 	})
 }

@@ -1,18 +1,39 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useFeedStore } from '@/stores/feedStore';
+import { useCreditsStore } from '@/stores/creditsStore';
 import SwipeCard from '@/components/SwipeCard';
-import ActionEmojis from '@/components/ActionEmojis';
+import ActionBar from '@/components/ActionBar';
 import ProfileOverlay from '@/components/ProfileOverlay';
+
+const SUPERLIKE_COST = 5;
 
 export default function FeedScreen() {
   const { profiles, currentIndex, isLoading, error, loadProfiles, swipe } = useFeedStore();
+  const {
+    balance,
+    bonusLikes,
+    isLowCredits,
+    hasEnoughCredits,
+    useBonusLike,
+    useCredits,
+    loadCredits,
+  } = useCreditsStore();
   const [showProfile, setShowProfile] = useState(false);
   const [matchAnimation, setMatchAnimation] = useState(false);
+  const [showLowCreditsWarning, setShowLowCreditsWarning] = useState(false);
 
   useEffect(() => {
     loadProfiles();
+    loadCredits();
   }, []);
 
   // Handle profile required error - redirect to onboarding
@@ -26,6 +47,30 @@ export default function FeedScreen() {
 
   const handleSwipe = useCallback(
     async (action: 'like' | 'pass' | 'superlike') => {
+      // Check credits for superlike
+      if (action === 'superlike') {
+        // First try to use bonus likes
+        if (bonusLikes > 0) {
+          useBonusLike();
+        } else if (hasEnoughCredits(SUPERLIKE_COST)) {
+          useCredits(SUPERLIKE_COST);
+        } else {
+          // Not enough credits - show warning
+          Alert.alert(
+            'Not Enough Credits',
+            `Super Likes cost ${SUPERLIKE_COST} credits. Get more credits to send Super Likes!`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Get Credits',
+                onPress: () => router.push('/(tabs)/profile'),
+              },
+            ]
+          );
+          return;
+        }
+      }
+
       setShowProfile(false);
       const isMatch = await swipe(action);
       if (isMatch) {
@@ -33,7 +78,7 @@ export default function FeedScreen() {
         setTimeout(() => setMatchAnimation(false), 2000);
       }
     },
-    [swipe]
+    [swipe, bonusLikes, hasEnoughCredits, useBonusLike, useCredits]
   );
 
   if (isLoading && profiles.length === 0) {
@@ -66,6 +111,21 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Low credits warning banner */}
+      {isLowCredits() && balance > 0 && (
+        <TouchableOpacity
+          style={styles.lowCreditsBanner}
+          onPress={() => router.push('/(tabs)/profile')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.lowCreditsIcon}>🪙</Text>
+          <Text style={styles.lowCreditsText}>
+            Credits running low ({balance} left)
+          </Text>
+          <Text style={styles.lowCreditsArrow}>›</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Render next card underneath for smooth transition */}
       {profiles[currentIndex + 1] && (
         <View style={styles.nextCard}>
@@ -85,8 +145,8 @@ export default function FeedScreen() {
         onExpandProfile={() => setShowProfile(true)}
       />
 
-      {/* Side action emojis */}
-      <ActionEmojis
+      {/* Bottom action bar */}
+      <ActionBar
         onLike={() => handleSwipe('like')}
         onPass={() => handleSwipe('pass')}
         onSuperlike={() => handleSwipe('superlike')}
@@ -97,6 +157,10 @@ export default function FeedScreen() {
         profile={currentProfile}
         isVisible={showProfile}
         onClose={() => setShowProfile(false)}
+        onLike={() => {
+          setShowProfile(false);
+          handleSwipe('like');
+        }}
       />
 
       {/* Match animation overlay */}
@@ -114,6 +178,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  lowCreditsBanner: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    zIndex: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 68, 88, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 88, 0.3)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  lowCreditsIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  lowCreditsText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF4458',
+  },
+  lowCreditsArrow: {
+    fontSize: 18,
+    color: '#FF4458',
   },
   centered: {
     flex: 1,

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,19 +8,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { matchesApi } from '@/api/client';
+import { matchesApi, api } from '@/api/client';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useCrypto } from '@/hooks/useCrypto';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Message {
   id: string;
   content: string;
+  encrypted_content?: string;
   is_mine: boolean;
   created_at: string;
+  sender_id: string;
 }
 
 interface MatchDetails {
@@ -36,31 +41,121 @@ interface MatchDetails {
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [message, setMessage] = useState('');
+  const [encryptionReady, setEncryptionReady] = useState(false);
+  const [otherUserPublicKey, setOtherUserPublicKey] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const queryClient = useQueryClient();
+  const { getPublicKey, uploadPublicKey } = useAuthStore();
+  const {
+    generateKeyPair,
+    getStoredPublicKey,
+    encryptMessage,
+    decryptMessage,
+    hasKeyPair,
+    isCryptoAvailable,
+  } = useCrypto();
+
+  // Initialize encryption keys
+  useEffect(() => {
+    const initEncryption = async () => {
+      if (!isCryptoAvailable()) {
+        console.log('WebCrypto not available, encryption disabled');
+        return;
+      }
+
+      try {
+        // Check if we have a key pair, generate if not
+        const hasKeys = await hasKeyPair();
+        let publicKey: string | null = null;
+
+        if (!hasKeys) {
+          publicKey = await generateKeyPair();
+          // Upload public key to server
+          await uploadPublicKey(publicKey);
+        } else {
+          publicKey = await getStoredPublicKey();
+        }
+
+        setEncryptionReady(true);
+      } catch (error) {
+        console.error('Failed to initialize encryption:', error);
+      }
+    };
+
+    initEncryption();
+  }, []);
 
   const { data: match } = useQuery({
     queryKey: ['match', id],
     queryFn: async () => {
       // In real app, fetch match details
-      return {
-        id,
-        user: { id: '1', name: 'Sarah', photo: 'https://example.com/photo.jpg' },
-        image_permission: false,
-      } as MatchDetails;
+      const response = await api.get(`/matches/${id}`);
+      return response.data as MatchDetails;
     },
   });
 
+  // Fetch other user's public key
+  useEffect(() => {
+    const fetchOtherUserKey = async () => {
+      if (match?.user?.id) {
+        const key = await getPublicKey(match.user.id);
+        setOtherUserPublicKey(key);
+      }
+    };
+    fetchOtherUserKey();
+  }, [match?.user?.id, getPublicKey]);
+
+  // Decrypt messages helper
+  const decryptMessages = useCallback(async (msgs: Message[]): Promise<Message[]> => {
+    if (!otherUserPublicKey || !encryptionReady) {
+      return msgs;
+    }
+
+    const decryptedMsgs = await Promise.all(
+      msgs.map(async (msg) => {
+        if (msg.encrypted_content && !msg.is_mine) {
+          try {
+            const decryptedContent = await decryptMessage(otherUserPublicKey, msg.encrypted_content);
+            return { ...msg, content: decryptedContent };
+          } catch (error) {
+            console.error('Failed to decrypt message:', error);
+            return { ...msg, content: '[Unable to decrypt message]' };
+          }
+        }
+        return msg;
+      })
+    );
+
+    return decryptedMsgs;
+  }, [otherUserPublicKey, encryptionReady, decryptMessage]);
+
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ['messages', id],
+    queryKey: ['messages', id, otherUserPublicKey],
     queryFn: async () => {
       const response = await matchesApi.getMessages(id!);
-      return response.data as Message[];
+      const msgs = response.data as Message[];
+      // Decrypt messages if encryption is available
+      return decryptMessages(msgs);
     },
+    enabled: !!id,
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: (content: string) => matchesApi.sendMessage(id!, content),
+    mutationFn: async (content: string) => {
+      // Encrypt message if encryption is available
+      if (encryptionReady && otherUserPublicKey) {
+        try {
+          const encryptedContent = await encryptMessage(otherUserPublicKey, content);
+          return api.post(`/matches/${id}/messages`, {
+            content: content, // Also send plaintext for now (server can choose to store either)
+            encrypted_content: encryptedContent,
+          });
+        } catch (error) {
+          console.error('Encryption failed, sending unencrypted:', error);
+        }
+      }
+      return matchesApi.sendMessage(id!, content);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', id] });
     },
@@ -120,11 +215,18 @@ export default function ChatScreen() {
           <Text style={styles.headerName}>{match?.user.name || 'Chat'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.imageToggle}>
-          <Text style={styles.imageToggleEmoji}>
-            {match?.image_permission ? '📷' : '🔒'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.statusIcons}>
+          {encryptionReady && otherUserPublicKey && (
+            <View style={styles.encryptionBadge}>
+              <Text style={styles.encryptionBadgeText}>E2E</Text>
+            </View>
+          )}
+          <TouchableOpacity style={styles.imageToggle}>
+            <Text style={styles.imageToggleEmoji}>
+              {match?.image_permission ? '📷' : '🔒'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Messages */}
@@ -209,6 +311,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  statusIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  encryptionBadge: {
+    backgroundColor: '#00AA00',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  encryptionBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   imageToggle: {
     width: 44,
