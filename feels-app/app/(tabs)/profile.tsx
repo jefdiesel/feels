@@ -26,16 +26,16 @@ interface ProfilePrompt {
 }
 
 const AVAILABLE_PROMPTS = [
-  "My ideal first date...",
-  "I'm looking for...",
-  "Two truths and a lie...",
-  "My love language is...",
-  "On weekends you'll find me...",
-  "The way to my heart is...",
-  "I get excited about...",
-  "My biggest flex is...",
-  "I'm convinced that...",
-  "A random fact about me...",
+  "I'm done playing it safe, now I want...",
+  "The energy I'm looking for is...",
+  "I'll try anything once, especially...",
+  "What I'm curious about exploring...",
+  "The vibe that pulls me in is...",
+  "I'm at my best when someone...",
+  "Don't be boring, be...",
+  "I know what I want, and it's...",
+  "The thing I haven't tried yet but will...",
+  "Green flags that make me say yes...",
 ];
 
 export default function ProfileScreen() {
