@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	FreeDailyPicks    = 3
+	FreeDailyPicks    = 10
 	PremiumDailyPicks = 10
 )
 
@@ -37,12 +37,10 @@ type DailyPicksRepository interface {
 }
 
 // GetDailyPicks returns curated daily picks for a user
+// Order: pending likes first, then curated daily picks
 func (s *Service) GetDailyPicks(ctx context.Context, userID uuid.UUID, isPremium bool) (*DailyPicksResponse, error) {
-	// Determine max picks based on subscription
+	// All users get 10 daily picks
 	maxPicks := FreeDailyPicks
-	if isPremium {
-		maxPicks = PremiumDailyPicks
-	}
 
 	// Get user's preferences
 	prefs, err := s.profileRepo.GetPreferences(ctx, userID)
@@ -56,39 +54,37 @@ func (s *Service) GetDailyPicks(ctx context.Context, userID uuid.UUID, isPremium
 
 	// Get feed profiles using compatibility algorithm
 	// We request more profiles than needed to ensure we have good picks
-	profiles, err := s.feedRepo.GetFeedProfiles(ctx, userID, prefs, maxPicks*2)
+	profiles, err := s.feedRepo.GetFeedProfiles(ctx, userID, prefs, maxPicks*3)
 	if err != nil {
 		return nil, err
 	}
 
-	// Select top picks based on priority (qualified likes first, then high compatibility)
-	var picks []FeedProfile
+	// Separate profiles into likes (go first) and browse profiles (daily picks)
+	var pendingLikes []FeedProfile
+	var dailyPicks []FeedProfile
+
 	for _, p := range profiles {
-		if len(picks) >= maxPicks {
-			break
-		}
-		// Prioritize users who liked us first
+		// People who liked us go first
 		if p.Priority == PriorityQualifiedSuperlike || p.Priority == PriorityQualifiedLike {
-			picks = append(picks, p)
+			pendingLikes = append(pendingLikes, p)
+		} else {
+			dailyPicks = append(dailyPicks, p)
 		}
 	}
 
-	// Fill remaining slots with high-quality browse profiles
-	for _, p := range profiles {
-		if len(picks) >= maxPicks {
-			break
+	// Build final list: likes first, then daily picks, up to maxPicks total
+	var picks []FeedProfile
+
+	// Add all pending likes first (these always show)
+	picks = append(picks, pendingLikes...)
+
+	// Fill remaining slots with daily picks
+	remaining := maxPicks - len(picks)
+	if remaining > 0 && len(dailyPicks) > 0 {
+		if len(dailyPicks) > remaining {
+			dailyPicks = dailyPicks[:remaining]
 		}
-		// Check if not already added
-		alreadyPicked := false
-		for _, existing := range picks {
-			if existing.UserID == p.UserID {
-				alreadyPicked = true
-				break
-			}
-		}
-		if !alreadyPicked {
-			picks = append(picks, p)
-		}
+		picks = append(picks, dailyPicks...)
 	}
 
 	return &DailyPicksResponse{
