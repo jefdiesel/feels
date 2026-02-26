@@ -1,10 +1,12 @@
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withSequence,
 } from 'react-native-reanimated';
+import { XIcon, StarFilledIcon, HeartFilledIcon } from '@/components/Icons';
+import { colors, shadows, animations } from '@/constants/theme';
 
 interface ActionBarProps {
   onLike: () => void;
@@ -21,8 +23,8 @@ export default function ActionBar({ onLike, onPass, onSuperlike }: ActionBarProp
 
   const animatePress = (scale: Animated.SharedValue<number>, callback: () => void) => {
     scale.value = withSequence(
-      withSpring(0.85, { damping: 15, stiffness: 400 }),
-      withSpring(1, { damping: 15, stiffness: 400 })
+      withSpring(0.85, animations.spring),
+      withSpring(1, animations.spring)
     );
     callback();
   };
@@ -49,7 +51,7 @@ export default function ActionBar({ onLike, onPass, onSuperlike }: ActionBarProp
             onPress={() => animatePress(passScale, onPass)}
             activeOpacity={0.9}
           >
-            <Text style={styles.passIcon}>X</Text>
+            <XIcon size={26} color={colors.pass} />
           </AnimatedTouchable>
 
           {/* Superlike Button */}
@@ -58,7 +60,7 @@ export default function ActionBar({ onLike, onPass, onSuperlike }: ActionBarProp
             onPress={() => animatePress(superlikeScale, onSuperlike)}
             activeOpacity={0.9}
           >
-            <Text style={styles.starIcon}>*</Text>
+            <StarFilledIcon size={22} color={colors.superlike} />
           </AnimatedTouchable>
 
           {/* Like Button */}
@@ -67,7 +69,7 @@ export default function ActionBar({ onLike, onPass, onSuperlike }: ActionBarProp
             onPress={() => animatePress(likeScale, onLike)}
             activeOpacity={0.9}
           >
-            <Text style={styles.heartIcon}>+</Text>
+            <HeartFilledIcon size={28} color={colors.like} />
           </AnimatedTouchable>
         </View>
       </View>
@@ -78,7 +80,7 @@ export default function ActionBar({ onLike, onPass, onSuperlike }: ActionBarProp
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 32,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -86,19 +88,15 @@ const styles = StyleSheet.create({
   glassContainer: {
     borderRadius: 40,
     overflow: 'hidden',
-    backgroundColor: 'rgba(20, 20, 20, 0.85)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
+    backgroundColor: colors.glass,
+    ...shadows.xl,
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 16,
   },
   button: {
     width: 60,
@@ -108,36 +106,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   passButton: {
-    backgroundColor: 'rgba(100, 100, 100, 0.4)',
+    backgroundColor: 'rgba(107, 114, 128, 0.2)',
     borderWidth: 2,
-    borderColor: 'rgba(150, 150, 150, 0.3)',
+    borderColor: 'rgba(107, 114, 128, 0.3)',
   },
   superlikeButton: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: 'rgba(100, 100, 100, 0.4)',
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
     borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
+    borderColor: 'rgba(245, 166, 35, 0.35)',
   },
   likeButton: {
-    backgroundColor: 'rgba(255, 20, 147, 0.2)',
+    backgroundColor: 'rgba(74, 222, 128, 0.15)',
     borderWidth: 2,
-    borderColor: 'rgba(255, 20, 147, 0.4)',
-  },
-  passIcon: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#888888',
-  },
-  starIcon: {
-    fontSize: 28,
-    fontWeight: '400',
-    color: '#FFD700',
-  },
-  heartIcon: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: '#FF1493',
+    borderColor: 'rgba(74, 222, 128, 0.35)',
   },
 });

@@ -97,6 +97,9 @@ export const feedApi = {
 export const matchesApi = {
   getMatches: () => api.get('/matches'),
 
+  getMatch: (matchId: string) =>
+    api.get(`/matches/${matchId}`),
+
   getMessages: (matchId: string) =>
     api.get(`/matches/${matchId}/messages`),
 
@@ -106,8 +109,34 @@ export const matchesApi = {
       encrypted_content: encryptedContent,
     }),
 
-  toggleImagePermission: (matchId: string, allowed: boolean) =>
-    api.patch(`/matches/${matchId}/image-permission`, { allowed }),
+  unmatch: (matchId: string) =>
+    api.delete(`/matches/${matchId}`),
+
+  enableImages: (matchId: string) =>
+    api.post(`/matches/${matchId}/images/enable`),
+
+  disableImages: (matchId: string) =>
+    api.post(`/matches/${matchId}/images/disable`),
+
+  sendTyping: (matchId: string, isTyping: boolean) =>
+    api.post(`/matches/${matchId}/typing`, { is_typing: isTyping }),
+
+  // Upload an image for chat (requires both users to have images enabled)
+  uploadImage: (matchId: string, formData: FormData) =>
+    api.post<{ url: string }>(`/matches/${matchId}/images/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+};
+
+export const safetyApi = {
+  block: (userId: string) =>
+    api.post(`/block/${userId}`),
+
+  unblock: (userId: string) =>
+    api.delete(`/block/${userId}`),
+
+  report: (userId: string, reason: string, details?: string) =>
+    api.post(`/report/${userId}`, { reason, details }),
 };
 
 export const userApi = {
@@ -157,6 +186,20 @@ export const profileApi = {
     distance_miles?: number;
     visible_to_genders?: string[];
   }) => api.put('/profile/preferences', data),
+
+  uploadPhoto: (formData: FormData) =>
+    api.post('/profile/photos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  deletePhoto: (photoId: string) =>
+    api.delete(`/profile/photos/${photoId}`),
+
+  reorderPhotos: (photoIds: string[]) =>
+    api.put('/profile/photos/reorder', { photo_ids: photoIds }),
+
+  // Request profile verification (requires quarterly or annual subscription)
+  verify: () => api.post<{ verified: boolean }>('/profile/verify'),
 };
 
 export const creditsApi = {
@@ -171,4 +214,51 @@ export const keysApi = {
 
   getPublicKey: (userId: string) =>
     api.get('/keys/public', { params: { user_id: userId } }),
+};
+
+export type PlanType = 'monthly' | 'quarterly' | 'annual';
+
+export interface Plan {
+  type: PlanType;
+  name: string;
+  price_id: string;
+  amount: number; // in cents
+  currency: string;
+  interval: string;
+  interval_count: number;
+  description: string;
+}
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan_type: PlanType;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  canceled_at?: string;
+}
+
+export const paymentsApi = {
+  // Get available subscription plans
+  getPlans: () => api.get<Record<PlanType, Plan>>('/payments/plans'),
+
+  // Create a Stripe checkout session (returns checkout URL)
+  createCheckout: (planType: PlanType, successUrl: string, cancelUrl: string) =>
+    api.post<{ checkout_url: string; session_id: string }>('/payments/checkout', {
+      plan_type: planType,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    }),
+
+  // Create a Stripe billing portal session (for managing subscription)
+  createPortal: (returnUrl: string) =>
+    api.post<{ url: string }>('/payments/portal', { return_url: returnUrl }),
+
+  // Get user's current subscription
+  getSubscription: () =>
+    api.get<{ subscription: Subscription | null }>('/payments/subscription'),
+
+  // Cancel subscription (will cancel at period end)
+  cancelSubscription: () => api.delete('/payments/subscription'),
 };

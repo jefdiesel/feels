@@ -21,7 +21,19 @@
       },
       "package": "com.feels.app",
       "navigationBarColor": "#000000",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#000000",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "feels"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "plugins": [
       "expo-router",

@@ -10,34 +10,36 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Profile } from '@/stores/feedStore';
+import { ChevronDownIcon, HeartFilledIcon, MapPinIcon, SparkleIcon } from '@/components/Icons';
+import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Helper functions for kink level display
-const formatKinkLevel = (level: string): string => {
+// Helper functions for vibe level display
+const formatVibeLevel = (level: string): string => {
   const labels: Record<string, string> = {
     vanilla: 'Vanilla',
     curious: 'Curious',
     sensual: 'Sensual',
     experienced: 'Experienced',
-    kinky: 'Kinky',
+    kinky: 'Adventurous',
   };
   return labels[level] || level;
 };
 
 const formatLookingFor = (value: string): string => {
   const labels: Record<string, string> = {
-    relationship: 'A real relationship',
-    partner: 'Life partner / family',
-    dating: 'Dating around',
-    exploring: 'Exploring new experiences',
-    casual: 'Something casual',
-    open: 'Open to anything',
+    serious: 'Something serious',
+    relationship: 'Relationship minded',
+    dating: 'Dating',
+    meeting_people: 'Meeting new people',
+    friends_and_more: 'Friends and more',
   };
   return labels[value] || value;
 };
 
 // Default prompts when profile doesn't have any
+// Note: lookingFor and kinkLevel are shown in Basics section, so don't duplicate them here
 const getDefaultPrompts = (profile: Profile) => {
   const prompts = [];
 
@@ -46,22 +48,6 @@ const getDefaultPrompts = (profile: Profile) => {
       id: 'bio',
       question: 'About me',
       answer: profile.bio,
-    });
-  }
-
-  if (profile.lookingFor) {
-    prompts.push({
-      id: 'looking',
-      question: "I'm looking for",
-      answer: formatLookingFor(profile.lookingFor),
-    });
-  }
-
-  if (profile.kinkLevel) {
-    prompts.push({
-      id: 'kink',
-      question: 'My vibe',
-      answer: formatKinkLevel(profile.kinkLevel),
     });
   }
 
@@ -124,7 +110,7 @@ export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: 
         {/* Close button */}
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <View style={styles.closeButtonInner}>
-            <Text style={styles.closeButtonIcon}>v</Text>
+            <ChevronDownIcon size={20} color={colors.text.primary} />
           </View>
         </TouchableOpacity>
 
@@ -142,10 +128,13 @@ export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: 
                 <Text style={styles.age}>, {profile.age}</Text>
               </View>
               {profile.location && (
-                <Text style={styles.location}>
-                  {profile.location}
-                  {profile.distance && ` - ${profile.distance} mi away`}
-                </Text>
+                <View style={styles.locationRow}>
+                  <MapPinIcon size={14} color={colors.text.tertiary} />
+                  <Text style={styles.location}>
+                    {profile.location}
+                    {profile.distance && ` - ${profile.distance} mi away`}
+                  </Text>
+                </View>
               )}
             </View>
           </View>
@@ -162,9 +151,12 @@ export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: 
               )}
               {profile.kinkLevel && (
                 <View style={styles.basicItem}>
-                  <Text style={styles.basicLabel}>Vibe</Text>
+                  <View style={styles.basicLabelRow}>
+                    <SparkleIcon size={12} color={colors.text.tertiary} />
+                    <Text style={styles.basicLabel}>Vibe</Text>
+                  </View>
                   <Text style={[styles.basicValue, styles.accentText]}>
-                    {formatKinkLevel(profile.kinkLevel)}
+                    {formatVibeLevel(profile.kinkLevel)}
                   </Text>
                 </View>
               )}
@@ -227,7 +219,7 @@ export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: 
               onPress={onLike}
               activeOpacity={0.9}
             >
-              <Text style={styles.floatingButtonIcon}>+</Text>
+              <HeartFilledIcon size={22} color={colors.primary.DEFAULT} />
               <Text style={styles.floatingButtonText}>Like {profile.name}</Text>
             </TouchableOpacity>
           </View>
@@ -244,7 +236,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   headerGradient: {
     position: 'absolute',
@@ -257,7 +249,7 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
     top: 56,
-    left: 20,
+    left: spacing.xl,
     zIndex: 20,
   },
   closeButtonInner: {
@@ -266,117 +258,121 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(40, 40, 40, 0.85)',
-  },
-  closeButtonIcon: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    transform: [{ rotate: '0deg' }],
+    backgroundColor: colors.glass,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingTop: 100,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
   },
   profileHeader: {
-    marginBottom: 32,
+    marginBottom: spacing['2xl'],
   },
   nameSection: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   name: {
-    fontSize: 36,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: typography.sizes['3xl'],
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
     letterSpacing: -0.5,
   },
   age: {
-    fontSize: 36,
-    fontWeight: '400',
+    fontSize: typography.sizes['3xl'],
+    fontWeight: typography.weights.normal as any,
     color: 'rgba(255, 255, 255, 0.8)',
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
   location: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginTop: 8,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.tertiary,
     letterSpacing: 0.2,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: spacing['2xl'],
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.tertiary,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   basicsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.md,
   },
   basicItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: colors.bg.secondary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
     minWidth: '45%',
   },
+  basicLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   basicLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 4,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.tertiary,
+    marginBottom: spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   basicValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
   },
   accentText: {
-    color: '#FF1493',
+    color: colors.primary.DEFAULT,
   },
   promptCard: {
-    backgroundColor: 'rgba(30, 30, 30, 0.95)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    marginBottom: spacing.md,
   },
   promptQuestion: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.tertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   promptAnswer: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.primary,
     lineHeight: 26,
   },
   photoGallery: {
-    gap: 12,
+    gap: spacing.md,
   },
   galleryPhotoContainer: {
     width: '100%',
     aspectRatio: 3 / 4,
-    borderRadius: 16,
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   galleryPhoto: {
     width: '100%',
@@ -385,45 +381,40 @@ const styles = StyleSheet.create({
   interestsTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: spacing.sm,
   },
   interestTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+    backgroundColor: colors.bg.secondary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
   },
   interestText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.secondary,
   },
   floatingButtonContainer: {
     position: 'absolute',
     bottom: 40,
-    left: 20,
-    right: 20,
+    left: spacing.xl,
+    right: spacing.xl,
   },
   floatingLikeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 10,
-    backgroundColor: 'rgba(255, 20, 147, 0.25)',
-    borderRadius: 28,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+    backgroundColor: colors.primary.muted,
+    borderRadius: borderRadius['2xl'],
     borderWidth: 1,
-    borderColor: 'rgba(255, 20, 147, 0.4)',
-  },
-  floatingButtonIcon: {
-    fontSize: 24,
-    fontWeight: '300',
-    color: '#FF1493',
+    borderColor: colors.primary.DEFAULT,
   },
   floatingButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
     letterSpacing: 0.3,
   },
 });

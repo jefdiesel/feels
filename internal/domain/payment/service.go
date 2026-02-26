@@ -61,6 +61,7 @@ type Repository interface {
 	UpdateSubscription(ctx context.Context, sub *Subscription) error
 	GetStripeCustomerID(ctx context.Context, userID uuid.UUID) (string, error)
 	SaveStripeCustomerID(ctx context.Context, userID uuid.UUID, customerID string) error
+	AddBonusDays(ctx context.Context, userID uuid.UUID, days int, reason string) error
 }
 
 type UserRepository interface {
@@ -140,6 +141,11 @@ func (s *Service) HasActiveSubscription(ctx context.Context, userID uuid.UUID) (
 		return false, err
 	}
 	return sub.Status == "active", nil
+}
+
+// AddPremiumDays adds bonus premium days to a user (for referrals, promotions, etc.)
+func (s *Service) AddPremiumDays(ctx context.Context, userID uuid.UUID, days int, reason string) error {
+	return s.repo.AddBonusDays(ctx, userID, days, reason)
 }
 
 // CreateCheckoutSession creates a Stripe checkout session

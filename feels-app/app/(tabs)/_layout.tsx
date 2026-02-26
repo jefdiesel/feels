@@ -1,10 +1,44 @@
 import { Tabs } from 'expo-router';
-import { Text, View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { FlameIcon, FlameFilledIcon, MessageIcon, MessageFilledIcon, UserIcon, UserFilledIcon } from '@/components/Icons';
+import { colors, layout } from '@/constants/theme';
 
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+interface TabIconProps {
+  focused: boolean;
+  icon: 'flame' | 'message' | 'user';
+}
+
+function TabIcon({ focused, icon }: TabIconProps) {
+  const color = focused ? colors.primary.DEFAULT : colors.text.tertiary;
+  const size = layout.tabBar.iconSize;
+
+  const renderIcon = () => {
+    switch (icon) {
+      case 'flame':
+        return focused ? (
+          <FlameFilledIcon size={size} color={color} />
+        ) : (
+          <FlameIcon size={size} color={color} />
+        );
+      case 'message':
+        return focused ? (
+          <MessageFilledIcon size={size} color={color} />
+        ) : (
+          <MessageIcon size={size} color={color} />
+        );
+      case 'user':
+        return focused ? (
+          <UserFilledIcon size={size} color={color} />
+        ) : (
+          <UserIcon size={size} color={color} />
+        );
+    }
+  };
+
   return (
-    <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-      <Text style={[styles.emoji, focused && styles.emojiFocused]}>{emoji}</Text>
+    <View style={[styles.tabIconContainer, focused && styles.tabIconFocused]}>
+      {renderIcon()}
+      {focused && <View style={styles.indicator} />}
     </View>
   );
 }
@@ -16,26 +50,26 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: '#FF1493',
-        tabBarInactiveTintColor: '#888888',
+        tabBarActiveTintColor: colors.primary.DEFAULT,
+        tabBarInactiveTintColor: colors.text.tertiary,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🔥" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="flame" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="💬" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="message" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="user" focused={focused} />,
         }}
       />
     </Tabs>
@@ -44,28 +78,29 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#000000',
-    borderTopColor: '#222222',
+    backgroundColor: colors.bg.primary,
+    borderTopColor: colors.border.DEFAULT,
     borderTopWidth: 1,
-    height: 80,
-    paddingTop: 8,
-    paddingBottom: 24,
+    height: layout.tabBar.height,
+    paddingTop: layout.tabBar.paddingTop,
+    paddingBottom: layout.tabBar.paddingBottom,
   },
-  tabIcon: {
+  tabIconContainer: {
     width: 48,
-    height: 48,
-    borderRadius: 24,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 18,
   },
   tabIconFocused: {
-    backgroundColor: 'rgba(255, 20, 147, 0.2)',
+    backgroundColor: colors.primary.muted,
   },
-  emoji: {
-    fontSize: 24,
-    opacity: 0.6,
-  },
-  emojiFocused: {
-    opacity: 1,
+  indicator: {
+    position: 'absolute',
+    bottom: -8,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primary.DEFAULT,
   },
 });

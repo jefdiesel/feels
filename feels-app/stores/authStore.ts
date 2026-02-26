@@ -20,6 +20,7 @@ interface User {
   age?: number;
   location?: string;
   prompts?: ProfilePrompt[];
+  is_verified?: boolean;
 }
 
 interface AuthState {

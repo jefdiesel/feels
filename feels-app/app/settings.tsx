@@ -12,9 +12,23 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { profileApi } from '@/api/client';
+import { ArrowLeftIcon, MinusIcon, PlusIcon, CheckIcon } from '@/components/Icons';
+import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
-const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Trans'];
-const KINK_LEVEL_OPTIONS = ['Vanilla', 'Curious', 'Sensual', 'Experienced', 'Kinky'];
+const GENDER_OPTIONS = [
+  { label: 'Woman', value: 'woman' },
+  { label: 'Man', value: 'man' },
+  { label: 'Non-binary', value: 'non_binary' },
+  { label: 'Trans', value: 'trans' },
+];
+
+const VIBE_LEVEL_OPTIONS = [
+  { label: 'Vanilla', value: 'vanilla' },
+  { label: 'Curious', value: 'curious' },
+  { label: 'Sensual', value: 'sensual' },
+  { label: 'Experienced', value: 'experienced' },
+  { label: 'Adventurous', value: 'kinky' },
+];
 
 interface Preferences {
   age_min: number;
@@ -37,7 +51,6 @@ export default function SettingsScreen() {
     visible_to_genders: [],
   });
 
-  // Load preferences on mount
   useEffect(() => {
     loadPreferences();
   }, []);
@@ -56,14 +69,12 @@ export default function SettingsScreen() {
       });
     } catch (error: any) {
       console.error('Failed to load preferences:', error);
-      // Use defaults if loading fails
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    // Validate age range
     if (preferences.age_min > preferences.age_max) {
       Alert.alert('Invalid Age Range', 'Minimum age cannot be greater than maximum age.');
       return;
@@ -78,11 +89,10 @@ export default function SettingsScreen() {
         genders_seeking: preferences.genders_seeking,
         visible_to_genders: preferences.visible_to_genders,
       });
-      Alert.alert('Success', 'Your preferences have been saved.');
+      router.back();
     } catch (error: any) {
       console.error('Failed to save preferences:', error);
       Alert.alert('Error', error.response?.data?.error || 'Failed to save preferences.');
-    } finally {
       setSaving(false);
     }
   };
@@ -131,7 +141,7 @@ export default function SettingsScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF1493" />
+          <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
           <Text style={styles.loadingText}>Loading preferences...</Text>
         </View>
       </SafeAreaView>
@@ -144,9 +154,9 @@ export default function SettingsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backText}>Back</Text>
+            <ArrowLeftIcon size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Search Settings</Text>
+          <Text style={styles.title}>Search Filters</Text>
           <View style={styles.backButton} />
         </View>
 
@@ -162,7 +172,7 @@ export default function SettingsScreen() {
                 onChangeText={(text) => handleAgeChange('age_min', text)}
                 keyboardType="number-pad"
                 placeholder="18"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.text.disabled}
                 maxLength={2}
               />
             </View>
@@ -175,7 +185,7 @@ export default function SettingsScreen() {
                 onChangeText={(text) => handleAgeChange('age_max', text)}
                 keyboardType="number-pad"
                 placeholder="99"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.text.disabled}
                 maxLength={2}
               />
             </View>
@@ -190,7 +200,7 @@ export default function SettingsScreen() {
               style={styles.distanceButton}
               onPress={() => adjustDistance(-5)}
             >
-              <Text style={styles.distanceButtonText}>-</Text>
+              <MinusIcon size={20} color={colors.primary.DEFAULT} />
             </TouchableOpacity>
             <View style={styles.distanceInputWrapper}>
               <TextInput
@@ -199,7 +209,7 @@ export default function SettingsScreen() {
                 onChangeText={handleDistanceChange}
                 keyboardType="number-pad"
                 placeholder="25"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.text.disabled}
                 maxLength={3}
               />
               <Text style={styles.distanceUnit}>miles</Text>
@@ -208,7 +218,7 @@ export default function SettingsScreen() {
               style={styles.distanceButton}
               onPress={() => adjustDistance(5)}
             >
-              <Text style={styles.distanceButtonText}>+</Text>
+              <PlusIcon size={20} color={colors.primary.DEFAULT} />
             </TouchableOpacity>
           </View>
           <Text style={styles.distanceHint}>Range: 1-100 miles</Text>
@@ -216,82 +226,76 @@ export default function SettingsScreen() {
 
         {/* Genders Seeking Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Genders Seeking</Text>
+          <Text style={styles.sectionTitle}>Interested In</Text>
           <Text style={styles.sectionHint}>Select all that apply</Text>
           <View style={styles.optionsContainer}>
-            {GENDER_OPTIONS.map((gender) => (
-              <TouchableOpacity
-                key={gender}
-                style={[
-                  styles.optionButton,
-                  preferences.genders_seeking.includes(gender) && styles.optionButtonSelected,
-                ]}
-                onPress={() => toggleSelection('genders_seeking', gender)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    preferences.genders_seeking.includes(gender) && styles.optionTextSelected,
-                  ]}
+            {GENDER_OPTIONS.map((gender) => {
+              const isSelected = preferences.genders_seeking.includes(gender.value);
+              return (
+                <TouchableOpacity
+                  key={gender.value}
+                  style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+                  onPress={() => toggleSelection('genders_seeking', gender.value)}
                 >
-                  {gender}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  {isSelected && (
+                    <CheckIcon size={16} color={colors.primary.DEFAULT} />
+                  )}
+                  <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                    {gender.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
-        {/* Kink Levels Section */}
+        {/* Vibe Levels Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kink Levels</Text>
+          <Text style={styles.sectionTitle}>Vibe Levels</Text>
           <Text style={styles.sectionHint}>Select all that apply</Text>
           <View style={styles.optionsContainer}>
-            {KINK_LEVEL_OPTIONS.map((level) => (
-              <TouchableOpacity
-                key={level}
-                style={[
-                  styles.optionButton,
-                  preferences.kink_levels.includes(level) && styles.optionButtonSelected,
-                ]}
-                onPress={() => toggleSelection('kink_levels', level)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    preferences.kink_levels.includes(level) && styles.optionTextSelected,
-                  ]}
+            {VIBE_LEVEL_OPTIONS.map((level) => {
+              const isSelected = preferences.kink_levels.includes(level.value);
+              return (
+                <TouchableOpacity
+                  key={level.value}
+                  style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+                  onPress={() => toggleSelection('kink_levels', level.value)}
                 >
-                  {level}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  {isSelected && (
+                    <CheckIcon size={16} color={colors.primary.DEFAULT} />
+                  )}
+                  <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                    {level.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* Visibility Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Visibility</Text>
+          <Text style={styles.sectionTitle}>Profile Visibility</Text>
           <Text style={styles.sectionHint}>Who can see your profile</Text>
           <View style={styles.optionsContainer}>
-            {GENDER_OPTIONS.map((gender) => (
-              <TouchableOpacity
-                key={gender}
-                style={[
-                  styles.optionButton,
-                  preferences.visible_to_genders.includes(gender) && styles.optionButtonSelected,
-                ]}
-                onPress={() => toggleSelection('visible_to_genders', gender)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    preferences.visible_to_genders.includes(gender) && styles.optionTextSelected,
-                  ]}
+            {GENDER_OPTIONS.map((gender) => {
+              const isSelected = preferences.visible_to_genders.includes(gender.value);
+              return (
+                <TouchableOpacity
+                  key={gender.value}
+                  style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+                  onPress={() => toggleSelection('visible_to_genders', gender.value)}
                 >
-                  {gender}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  {isSelected && (
+                    <CheckIcon size={16} color={colors.primary.DEFAULT} />
+                  )}
+                  <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                    {gender.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -303,7 +307,7 @@ export default function SettingsScreen() {
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.text.primary} />
             ) : (
               <Text style={styles.saveButtonText}>Save Preferences</Text>
             )}
@@ -319,7 +323,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -327,168 +331,164 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#888888',
+    marginTop: spacing.lg,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
   },
   backButton: {
-    width: 60,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#FF1493',
-    fontWeight: '600',
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
     textAlign: 'center',
   },
   section: {
-    paddingHorizontal: 20,
-    marginTop: 24,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing['2xl'],
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   sectionHint: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 12,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: spacing.md,
   },
   // Age inputs
   ageInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: spacing.lg,
   },
   ageInputWrapper: {
     alignItems: 'center',
   },
   inputLabel: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 8,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: spacing.sm,
   },
   ageInput: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
     textAlign: 'center',
     width: 80,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
   },
   ageSeparator: {
-    fontSize: 18,
-    color: '#666666',
-    marginTop: 24,
+    fontSize: typography.sizes.lg,
+    color: colors.text.tertiary,
+    marginTop: spacing['2xl'],
   },
   // Distance controls
   distanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: spacing.lg,
   },
   distanceButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#111111',
+    backgroundColor: colors.bg.secondary,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  distanceButtonText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FF1493',
   },
   distanceInputWrapper: {
     alignItems: 'center',
   },
   distanceInput: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
     textAlign: 'center',
     width: 100,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
   },
   distanceUnit: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
   },
   distanceHint: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   // Multi-select options
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: spacing.sm,
   },
   optionButton: {
-    backgroundColor: '#111111',
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
+    gap: spacing.xs,
   },
   optionButtonSelected: {
-    backgroundColor: 'rgba(255, 20, 147, 0.2)',
-    borderColor: '#FF1493',
+    backgroundColor: colors.primary.muted,
+    borderColor: colors.primary.DEFAULT,
   },
   optionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888888',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.secondary,
   },
   optionTextSelected: {
-    color: '#FF1493',
+    color: colors.primary.DEFAULT,
   },
   // Save button
   saveButton: {
-    backgroundColor: '#FF1493',
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: colors.primary.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
 });

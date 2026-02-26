@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,78 +6,194 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
+  Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface Subscription {
-  id: string;
-  tier: 'basic' | 'plus' | 'premium';
-  status: 'active' | 'canceled' | 'expired';
-  expiresAt: string;
-  features: string[];
-}
+import { CheckIcon, CrownIcon, StarFilledIcon, SparkleIcon } from '@/components/Icons';
+import { colors, typography, borderRadius, spacing } from '@/constants/theme';
+import { paymentsApi, Plan, PlanType, Subscription } from '@/api/client';
 
 interface PremiumModalProps {
   visible: boolean;
   onClose: () => void;
-  currentSubscription: Subscription | null;
 }
 
-const TIERS = [
-  {
-    id: 'basic',
-    name: 'Basic',
-    price: '$9.99/mo',
+// Map plan types to display info
+const PLAN_DISPLAY = {
+  monthly: {
+    icon: 'sparkle',
+    color: colors.tertiary.DEFAULT,
     features: [
-      '50 bonus likes per month',
+      'Unlimited likes',
       'See who liked you',
       'Rewind last swipe',
       'Priority support',
     ],
-    color: '#4A90D9',
   },
-  {
-    id: 'plus',
-    name: 'Plus',
-    price: '$19.99/mo',
+  quarterly: {
+    icon: 'star',
+    color: colors.primary.DEFAULT,
     popular: true,
     features: [
-      '150 bonus likes per month',
+      'Unlimited likes',
       'See who liked you',
       'Unlimited rewinds',
       '5 Super Likes per day',
+      'Profile verification badge',
       'Boost your profile weekly',
       'Priority support',
     ],
-    color: '#FF1493',
   },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: '$29.99/mo',
+  annual: {
+    icon: 'crown',
+    color: colors.secondary.DEFAULT,
     features: [
       'Unlimited likes',
       'See who liked you',
       'Unlimited rewinds',
       'Unlimited Super Likes',
+      'Profile verification badge',
       'Boost your profile daily',
       'Message before matching',
       'Incognito mode',
       'Priority support',
     ],
-    color: '#FFD700',
   },
-];
+};
 
 export default function PremiumModal({
   visible,
   onClose,
-  currentSubscription,
 }: PremiumModalProps) {
-  const handleSelectTier = (tierId: string) => {
-    // TODO: Implement subscription purchase flow
-    console.log('Selected tier:', tierId);
+  const [plans, setPlans] = useState<Record<PlanType, Plan> | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<PlanType | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      loadData();
+    }
+  }, [visible]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [plansRes, subRes] = await Promise.all([
+        paymentsApi.getPlans(),
+        paymentsApi.getSubscription(),
+      ]);
+      setPlans(plansRes.data);
+      setSubscription(subRes.data.subscription);
+    } catch (error) {
+      console.error('Failed to load payment data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSelectPlan = async (planType: PlanType) => {
+    setCheckoutLoading(planType);
+    try {
+      // Use deep link URLs for Stripe to redirect back to the app
+      const successUrl = 'feels://payment/success';
+      const cancelUrl = 'feels://payment/cancel';
+
+      const response = await paymentsApi.createCheckout(planType, successUrl, cancelUrl);
+      const { checkout_url } = response.data;
+
+      // Open Stripe checkout in browser
+      const supported = await Linking.canOpenURL(checkout_url);
+      if (supported) {
+        await Linking.openURL(checkout_url);
+        onClose();
+      } else {
+        Alert.alert('Error', 'Unable to open payment page. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('Failed to create checkout:', error);
+      if (error.response?.status === 409) {
+        Alert.alert('Already Subscribed', 'You already have an active subscription.');
+      } else {
+        Alert.alert('Error', 'Failed to start checkout. Please try again.');
+      }
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      const returnUrl = 'feels://payment/portal';
+      const response = await paymentsApi.createPortal(returnUrl);
+      const { url } = response.data;
+
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Error', 'Unable to open billing portal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to create portal session:', error);
+      Alert.alert('Error', 'Failed to open billing portal. Please try again.');
+    }
+  };
+
+  const formatPrice = (amount: number, currency: string, interval: string, intervalCount: number) => {
+    const price = (amount / 100).toFixed(2);
+    const currencySymbol = currency === 'usd' ? '$' : currency.toUpperCase();
+    const periodLabel = intervalCount === 1
+      ? `/${interval}`
+      : `/${intervalCount} ${interval}s`;
+    return `${currencySymbol}${price}${periodLabel}`;
+  };
+
+  const formatMonthlyPrice = (amount: number, intervalCount: number, interval: string) => {
+    let monthlyAmount: number;
+    if (interval === 'year') {
+      monthlyAmount = amount / 12;
+    } else if (interval === 'month' && intervalCount > 1) {
+      monthlyAmount = amount / intervalCount;
+    } else {
+      return null;
+    }
+    return `$${(monthlyAmount / 100).toFixed(2)}/mo`;
+  };
+
+  const renderTierIcon = (icon: string, color: string) => {
+    switch (icon) {
+      case 'sparkle':
+        return <SparkleIcon size={24} color={color} />;
+      case 'star':
+        return <StarFilledIcon size={24} color={color} />;
+      case 'crown':
+        return <CrownIcon size={24} color={color} />;
+      default:
+        return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <SafeAreaView style={styles.container} edges={['top']}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
+          </View>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
+
+  const planOrder: PlanType[] = ['monthly', 'quarterly', 'annual'];
 
   return (
     <Modal
@@ -104,51 +220,74 @@ export default function PremiumModal({
             Get more matches and stand out from the crowd
           </Text>
 
-          {currentSubscription && currentSubscription.status === 'active' && (
+          {subscription && subscription.status === 'active' && (
             <View style={styles.currentPlan}>
               <Text style={styles.currentPlanLabel}>Current Plan</Text>
               <Text style={styles.currentPlanName}>
-                {currentSubscription.tier.charAt(0).toUpperCase() +
-                  currentSubscription.tier.slice(1)}
+                {subscription.plan_type.charAt(0).toUpperCase() +
+                  subscription.plan_type.slice(1)}
               </Text>
               <Text style={styles.currentPlanExpiry}>
-                Renews{' '}
-                {new Date(currentSubscription.expiresAt).toLocaleDateString()}
+                {subscription.canceled_at
+                  ? `Expires ${new Date(subscription.current_period_end).toLocaleDateString()}`
+                  : `Renews ${new Date(subscription.current_period_end).toLocaleDateString()}`}
               </Text>
+              <TouchableOpacity
+                style={styles.manageButton}
+                onPress={handleManageSubscription}
+              >
+                <Text style={styles.manageButtonText}>Manage Subscription</Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          {TIERS.map((tier) => {
-            const isCurrentTier =
-              currentSubscription?.tier === tier.id &&
-              currentSubscription?.status === 'active';
+          {planOrder.map((planType) => {
+            const plan = plans?.[planType];
+            if (!plan) return null;
+
+            const display = PLAN_DISPLAY[planType];
+            const isCurrentPlan =
+              subscription?.plan_type === planType &&
+              subscription?.status === 'active';
+            const isLoading = checkoutLoading === planType;
+            const monthlyPrice = formatMonthlyPrice(plan.amount, plan.interval_count, plan.interval);
 
             return (
               <View
-                key={tier.id}
+                key={planType}
                 style={[
                   styles.tierCard,
-                  tier.popular && styles.popularTierCard,
-                  isCurrentTier && styles.currentTierCard,
+                  display.popular && styles.popularTierCard,
+                  isCurrentPlan && styles.currentTierCard,
                 ]}
               >
-                {tier.popular && (
+                {display.popular && (
                   <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
+                    <Text style={styles.popularBadgeText}>BEST VALUE</Text>
                   </View>
                 )}
 
                 <View style={styles.tierHeader}>
-                  <Text style={[styles.tierName, { color: tier.color }]}>
-                    {tier.name}
-                  </Text>
-                  <Text style={styles.tierPrice}>{tier.price}</Text>
+                  <View style={styles.tierNameContainer}>
+                    {renderTierIcon(display.icon, display.color)}
+                    <Text style={[styles.tierName, { color: display.color }]}>
+                      {plan.name}
+                    </Text>
+                  </View>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.tierPrice}>
+                      {formatPrice(plan.amount, plan.currency, plan.interval, plan.interval_count)}
+                    </Text>
+                    {monthlyPrice && (
+                      <Text style={styles.monthlyPrice}>{monthlyPrice}</Text>
+                    )}
+                  </View>
                 </View>
 
                 <View style={styles.featuresList}>
-                  {tier.features.map((feature, index) => (
+                  {display.features.map((feature, index) => (
                     <View key={index} style={styles.featureRow}>
-                      <Text style={styles.featureCheck}>+</Text>
+                      <CheckIcon size={16} color={colors.success} />
                       <Text style={styles.featureText}>{feature}</Text>
                     </View>
                   ))}
@@ -157,24 +296,28 @@ export default function PremiumModal({
                 <TouchableOpacity
                   style={[
                     styles.selectButton,
-                    { backgroundColor: tier.color },
-                    isCurrentTier && styles.currentButton,
+                    { backgroundColor: display.color },
+                    isCurrentPlan && styles.currentButton,
                   ]}
-                  onPress={() => !isCurrentTier && handleSelectTier(tier.id)}
-                  disabled={isCurrentTier}
+                  onPress={() => !isCurrentPlan && handleSelectPlan(planType)}
+                  disabled={isCurrentPlan || isLoading}
                 >
-                  <Text style={styles.selectButtonText}>
-                    {isCurrentTier ? 'Current Plan' : 'Select'}
-                  </Text>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={colors.text.primary} />
+                  ) : (
+                    <Text style={styles.selectButtonText}>
+                      {isCurrentPlan ? 'Current Plan' : 'Subscribe'}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             );
           })}
 
           <Text style={styles.disclaimer}>
-            Subscriptions automatically renew unless canceled at least 24 hours
-            before the end of the current period. Manage your subscription in
-            your device settings.
+            Payment is processed securely via Stripe. Subscriptions automatically
+            renew unless canceled at least 24 hours before the end of the current
+            period. You can manage or cancel your subscription anytime.
           </Text>
         </ScrollView>
       </SafeAreaView>
@@ -185,81 +328,99 @@ export default function PremiumModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#222222',
+    borderBottomColor: colors.border.DEFAULT,
   },
   headerSpacer: {
     width: 50,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   closeButton: {
     width: 50,
     alignItems: 'flex-end',
   },
   closeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF1493',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing['3xl'],
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   currentPlan: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
     alignItems: 'center',
   },
   currentPlanLabel: {
-    fontSize: 12,
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   currentPlanName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FF1493',
-    marginBottom: 4,
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
+    marginBottom: spacing.xs,
   },
   currentPlanExpiry: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    marginBottom: spacing.md,
+  },
+  manageButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary.DEFAULT,
+  },
+  manageButtonText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
   },
   tierCard: {
-    backgroundColor: '#111111',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
     borderWidth: 2,
-    borderColor: '#222222',
+    borderColor: colors.border.DEFAULT,
   },
   popularTierCard: {
-    borderColor: '#FF1493',
+    borderColor: colors.primary.DEFAULT,
   },
   currentTierCard: {
     opacity: 0.7,
@@ -269,72 +430,78 @@ const styles = StyleSheet.create({
     top: -12,
     left: '50%',
     transform: [{ translateX: -50 }],
-    backgroundColor: '#FF1493',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: colors.primary.DEFAULT,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
   },
   popularBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
     letterSpacing: 1,
   },
   tierHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  tierNameContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 8,
+    gap: spacing.sm,
   },
   tierName: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.extrabold as any,
+  },
+  priceContainer: {
+    alignItems: 'flex-end',
   },
   tierPrice: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
+  },
+  monthlyPrice: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    marginTop: 2,
   },
   featuresList: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  featureCheck: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4CAF50',
-    marginRight: 12,
-    width: 20,
-    textAlign: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.md,
   },
   featureText: {
-    fontSize: 14,
-    color: '#CCCCCC',
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
     flex: 1,
   },
   selectButton: {
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
   },
   currentButton: {
-    backgroundColor: '#333333',
+    backgroundColor: colors.bg.tertiary,
   },
   selectButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   disclaimer: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: spacing.lg,
     lineHeight: 18,
   },
 });

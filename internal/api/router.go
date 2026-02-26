@@ -16,8 +16,9 @@ import (
 	"github.com/feels/feels/internal/domain/moderation"
 	"github.com/feels/feels/internal/domain/notification"
 	"github.com/feels/feels/internal/domain/payment"
-	"github.com/google/uuid"
 	"github.com/feels/feels/internal/domain/profile"
+	"github.com/feels/feels/internal/domain/referral"
+	"github.com/google/uuid"
 	"github.com/feels/feels/internal/domain/settings"
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
@@ -70,6 +71,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	analyticsRepo := repository.NewAnalyticsRepository(db)
 	moderationRepo := repository.NewModerationRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
+	referralRepo := repository.NewReferralRepository(db)
 
 	// Ensure passes table exists
 	if err := feedRepo.EnsurePassesTable(context.Background()); err != nil {
@@ -152,6 +154,10 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	// Set payment service as subscription checker for profile verification
 	profileService.SetSubscriptionChecker(paymentService)
 
+	// Initialize referral service
+	referralService := referral.NewService(referralRepo)
+	referralService.SetSubscriptionService(paymentService)
+
 	// Initialize email service
 	emailService := email.NewService(email.Config{
 		APIKey:    cfg.Email.APIKey,
@@ -175,6 +181,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	notificationHandler := handlers.NewNotificationHandler(notificationService)
 	paymentHandler := handlers.NewPaymentHandler(paymentService, cfg.Stripe.WebhookSecret)
+	referralHandler := handlers.NewReferralHandler(referralService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, paymentService)
 	adminHandler := handlers.NewAdminHandler(adminRepo, userRepo)
 
@@ -188,7 +195,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	}
 
 	r.setupMiddleware()
-	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw)
+	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler)
 
 	return r
 }
@@ -224,6 +231,7 @@ func (r *Router) setupRoutes(
 	analyticsHandler *handlers.AnalyticsHandler,
 	adminHandler *handlers.AdminHandler,
 	adminMw *middleware.AdminMiddleware,
+	referralHandler *handlers.ReferralHandler,
 ) {
 	// Health check routes (no auth required)
 	r.mux.Get("/health", healthHandler.Health)
@@ -327,6 +335,13 @@ func (r *Router) setupRoutes(
 				pay.Post("/portal", paymentHandler.CreatePortal)
 				pay.Get("/subscription", paymentHandler.GetSubscription)
 				pay.Delete("/subscription", paymentHandler.CancelSubscription)
+			})
+
+			// Referral routes
+			protected.Route("/referral", func(ref chi.Router) {
+				ref.Get("/code", referralHandler.GetCode)
+				ref.Post("/redeem", referralHandler.RedeemCode)
+				ref.Get("/stats", referralHandler.GetStats)
 			})
 
 			// Admin routes (protected + admin check)

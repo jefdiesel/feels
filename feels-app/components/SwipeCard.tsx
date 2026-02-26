@@ -13,6 +13,8 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { Profile } from '@/stores/feedStore';
+import { HeartFilledIcon, ChevronDownIcon } from '@/components/Icons';
+import { colors, typography, borderRadius, spacing, gradients } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -25,24 +27,24 @@ const formatKinkLevel = (level: string): string => {
     curious: 'Curious',
     sensual: 'Sensual',
     experienced: 'Experienced',
-    kinky: 'Kinky',
+    kinky: 'Adventurous',
   };
   return labels[level] || level;
 };
 
 const formatLookingFor = (value: string): string => {
   const labels: Record<string, string> = {
-    relationship: 'A real relationship',
-    partner: 'Life partner / family',
-    dating: 'Dating around',
-    exploring: 'Exploring new experiences',
-    casual: 'Something casual',
-    open: 'Open to anything',
+    serious: 'Something serious',
+    relationship: 'Relationship minded',
+    dating: 'Dating',
+    meeting_people: 'Meeting new people',
+    friends_and_more: 'Friends and more',
   };
   return labels[value] || value;
 };
 
 // Default prompts when profile doesn't have any
+// Note: lookingFor and kinkLevel are shown as badges, so don't duplicate them here
 const getDefaultPrompts = (profile: Profile) => {
   const prompts = [];
 
@@ -51,22 +53,6 @@ const getDefaultPrompts = (profile: Profile) => {
       id: 'bio',
       question: 'About me',
       answer: profile.bio,
-    });
-  }
-
-  if (profile.lookingFor) {
-    prompts.push({
-      id: 'looking',
-      question: "I'm looking for",
-      answer: formatLookingFor(profile.lookingFor),
-    });
-  }
-
-  if (profile.kinkLevel) {
-    prompts.push({
-      id: 'kink',
-      question: 'My vibe',
-      answer: formatKinkLevel(profile.kinkLevel),
     });
   }
 
@@ -250,7 +236,7 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
 
             {/* Gradient overlay */}
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+              colors={gradients.dark as string[]}
               locations={[0.4, 0.7, 1]}
               style={styles.gradient}
             />
@@ -287,7 +273,7 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
               {profile.location && (
                 <Text style={styles.location}>
                   {profile.location}
-                  {profile.distance && ` - ${profile.distance} mi`}
+                  {profile.distance && ` · ${profile.distance} mi`}
                 </Text>
               )}
             </TouchableOpacity>
@@ -306,7 +292,7 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
                   onPress={() => handlePromptLike(prompt.id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.promptLikeIcon}>+</Text>
+                  <HeartFilledIcon size={18} color={colors.primary.DEFAULT} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -325,11 +311,26 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
               </View>
             )}
 
-            {/* Looking For badge */}
+            {/* Looking For badge with alignment indicator */}
             {profile.lookingFor && (
               <View style={styles.lookingForContainer}>
-                <View style={styles.lookingForBadge}>
-                  <Text style={styles.lookingForBadgeLabel}>Looking for</Text>
+                <View style={[
+                  styles.lookingForBadge,
+                  profile.lookingForAlignment === 'perfect' && styles.lookingForPerfect,
+                  profile.lookingForAlignment === 'similar' && styles.lookingForSimilar,
+                ]}>
+                  <View>
+                    <Text style={styles.lookingForBadgeLabel}>Looking for</Text>
+                    {profile.lookingForAlignment && (
+                      <Text style={[
+                        styles.alignmentIndicator,
+                        profile.lookingForAlignment === 'perfect' && styles.alignmentPerfect,
+                        profile.lookingForAlignment === 'similar' && styles.alignmentSimilar,
+                      ]}>
+                        {profile.lookingForAlignment === 'perfect' ? 'Same as you' : 'Similar to you'}
+                      </Text>
+                    )}
+                  </View>
                   <Text style={styles.lookingForBadgeValue}>{formatLookingFor(profile.lookingFor)}</Text>
                 </View>
               </View>
@@ -347,6 +348,7 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
 
             {/* View full profile hint */}
             <TouchableOpacity style={styles.viewMoreButton} onPress={onExpandProfile}>
+              <ChevronDownIcon size={18} color={colors.text.tertiary} />
               <Text style={styles.viewMoreText}>View full profile</Text>
             </TouchableOpacity>
           </View>
@@ -364,7 +366,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: '#000',
+    backgroundColor: colors.bg.primary,
   },
   scrollContainer: {
     flex: 1,
@@ -380,19 +382,19 @@ const styles = StyleSheet.create({
   photoIndicators: {
     position: 'absolute',
     top: 56,
-    left: 16,
-    right: 16,
+    left: spacing.lg,
+    right: spacing.lg,
     flexDirection: 'row',
-    gap: 4,
+    gap: spacing.xs,
   },
   indicator: {
     flex: 1,
-    height: 2,
+    height: 3,
     backgroundColor: 'rgba(255,255,255,0.35)',
-    borderRadius: 1,
+    borderRadius: 1.5,
   },
   indicatorActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.text.primary,
   },
   gradient: {
     position: 'absolute',
@@ -408,10 +410,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   likeOverlay: {
-    left: 24,
+    left: spacing['2xl'],
   },
   passOverlay: {
-    right: 24,
+    right: spacing['2xl'],
   },
   superlikeOverlay: {
     top: 100,
@@ -420,187 +422,206 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   feedbackBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
     borderWidth: 3,
-    borderColor: '#FF1493',
+    borderColor: colors.like,
     transform: [{ rotate: '-15deg' }],
   },
   passBadge: {
-    borderColor: '#888888',
+    borderColor: colors.pass,
     transform: [{ rotate: '15deg' }],
   },
   superlikeBadge: {
-    borderColor: '#FFD700',
+    borderColor: colors.superlike,
     transform: [{ rotate: '0deg' }],
   },
   feedbackText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FF1493',
+    fontSize: typography.sizes['3xl'],
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.like,
     letterSpacing: 2,
   },
   passText: {
-    color: '#888888',
+    color: colors.pass,
   },
   superlikeText: {
-    color: '#FFD700',
+    color: colors.superlike,
   },
   profileHeader: {
     position: 'absolute',
-    bottom: 24,
-    left: 20,
-    right: 20,
+    bottom: spacing['2xl'],
+    left: spacing.xl,
+    right: spacing.xl,
   },
   nameContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 8,
+    gap: spacing.sm,
   },
   name: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: typography.sizes['4xl'],
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
     letterSpacing: -0.5,
   },
   age: {
-    fontSize: 28,
-    fontWeight: '400',
+    fontSize: typography.sizes['3xl'],
+    fontWeight: typography.weights.normal as any,
     color: 'rgba(255,255,255,0.85)',
   },
   location: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
     color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
+    marginTop: spacing.xs,
     letterSpacing: 0.2,
   },
   promptsSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   promptCard: {
-    backgroundColor: 'rgba(30, 30, 30, 0.95)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    marginBottom: spacing.md,
     position: 'relative',
   },
   promptQuestion: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   promptAnswer: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.primary,
     lineHeight: 26,
-    paddingRight: 40,
+    paddingRight: spacing['4xl'],
   },
   promptLikeButton: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: spacing.lg,
+    right: spacing.lg,
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 20, 147, 0.15)',
+    backgroundColor: colors.primary.muted,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  promptLikeIcon: {
-    fontSize: 22,
-    fontWeight: '300',
-    color: '#FF1493',
-  },
   interestsContainer: {
-    marginTop: 8,
-    marginBottom: 16,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
   interestsLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 12,
-    paddingHorizontal: 4,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
   },
   interestsTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   interestTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.bg.tertiary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
   },
   interestText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium as any,
     color: 'rgba(255, 255, 255, 0.85)',
   },
   kinkContainer: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   kinkBadge: {
-    backgroundColor: 'rgba(255, 20, 147, 0.12)',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.primary.muted,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   kinkLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   kinkValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF1493',
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
   },
   lookingForContainer: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   lookingForBadge: {
-    backgroundColor: 'rgba(0, 212, 255, 0.12)',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.tertiary.muted,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   lookingForBadgeLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   lookingForBadgeValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#00D4FF',
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.tertiary.DEFAULT,
+  },
+  lookingForPerfect: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)', // green tint
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  lookingForSimilar: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)', // blue tint
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  alignmentIndicator: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.medium as any,
+    marginTop: 2,
+  },
+  alignmentPerfect: {
+    color: 'rgb(34, 197, 94)', // green
+  },
+  alignmentSimilar: {
+    color: 'rgb(59, 130, 246)', // blue
   },
   viewMoreButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
   },
   viewMoreText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.tertiary,
     letterSpacing: 0.3,
   },
 });

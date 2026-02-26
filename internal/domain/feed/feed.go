@@ -10,9 +10,57 @@ import (
 // FeedProfile is a profile as shown in the feed
 type FeedProfile struct {
 	profile.Profile
-	Age      int    `json:"age"`
-	Distance *int   `json:"distance,omitempty"` // miles, nil if location not available
-	Priority string `json:"priority,omitempty"` // for debugging: qualified_superlike, qualified_like, gap_superlike, browse
+	Age                 int     `json:"age"`
+	Distance            *int    `json:"distance,omitempty"`             // miles, nil if location not available
+	Priority            string  `json:"priority,omitempty"`             // for debugging: qualified_superlike, qualified_like, gap_superlike, browse
+	LookingForAlignment *string `json:"looking_for_alignment,omitempty"` // alignment with viewer's intentions
+}
+
+// LookingFor alignment values
+const (
+	AlignmentPerfect = "perfect"  // exact match
+	AlignmentSimilar = "similar"  // adjacent categories
+)
+
+// ComputeLookingForAlignment computes alignment between two looking_for values
+func ComputeLookingForAlignment(viewerLookingFor, profileLookingFor string) *string {
+	if viewerLookingFor == "" || profileLookingFor == "" {
+		return nil
+	}
+
+	// Exact match
+	if viewerLookingFor == profileLookingFor {
+		alignment := AlignmentPerfect
+		return &alignment
+	}
+
+	// Define compatibility groups (ordered from serious to casual)
+	compatibilityIndex := map[string]int{
+		"serious":         0,
+		"relationship":    1,
+		"dating":          2,
+		"meeting_people":  3,
+		"friends_and_more": 4,
+	}
+
+	viewerIdx, viewerOk := compatibilityIndex[viewerLookingFor]
+	profileIdx, profileOk := compatibilityIndex[profileLookingFor]
+
+	if !viewerOk || !profileOk {
+		return nil
+	}
+
+	// Adjacent categories (within 1 step) = similar
+	diff := viewerIdx - profileIdx
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff <= 1 {
+		alignment := AlignmentSimilar
+		return &alignment
+	}
+
+	return nil
 }
 
 // Like represents a like action

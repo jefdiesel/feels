@@ -19,6 +19,34 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCreditsStore } from '@/stores/creditsStore';
 import { api, profileApi } from '@/api/client';
 import PremiumModal from '@/components/PremiumModal';
+import PhotoGrid from '@/components/PhotoGrid';
+import {
+  SettingsIcon,
+  UserIcon,
+  EditIcon,
+  MapPinIcon,
+  CoinIcon,
+  HeartFilledIcon,
+  CrownIcon,
+  SlidersIcon,
+  BellIcon,
+  ShieldIcon,
+  HelpCircleIcon,
+  LogOutIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  PlusIcon,
+  XIcon,
+  CheckIcon,
+} from '@/components/Icons';
+import { colors, typography, borderRadius, spacing, shadows } from '@/constants/theme';
+
+interface Photo {
+  id: string;
+  url: string;
+  position: number;
+}
 
 interface ProfilePrompt {
   question: string;
@@ -26,16 +54,41 @@ interface ProfilePrompt {
 }
 
 const AVAILABLE_PROMPTS = [
+  // Intentions & Energy
   "I'm done playing it safe, now I want...",
   "The energy I'm looking for is...",
-  "I'll try anything once, especially...",
-  "What I'm curious about exploring...",
-  "The vibe that pulls me in is...",
-  "I'm at my best when someone...",
-  "Don't be boring, be...",
   "I know what I want, and it's...",
-  "The thing I haven't tried yet but will...",
   "Green flags that make me say yes...",
+
+  // Conversation starters
+  "Ask me about the time I...",
+  "The story I love telling is...",
+  "You should message me if...",
+  "Together we could...",
+
+  // Personality reveals
+  "I'm at my best when someone...",
+  "My friends would say I'm...",
+  "The hill I'll die on is...",
+  "I'm weirdly attracted to...",
+
+  // Fun & quirky
+  "Don't be boring, be...",
+  "I'll try anything once, especially...",
+  "My most controversial opinion...",
+  "The way to my heart is...",
+
+  // Interests & adventures
+  "What I'm curious about exploring...",
+  "The thing I haven't tried yet but will...",
+  "My happy place is...",
+  "On a Sunday you'll find me...",
+
+  // Connection style
+  "The vibe that pulls me in is...",
+  "I feel most connected when...",
+  "What I bring to the table...",
+  "Let's skip small talk and...",
 ];
 
 export default function ProfileScreen() {
@@ -64,9 +117,26 @@ export default function ProfileScreen() {
   const [promptAnswer, setPromptAnswer] = useState('');
   const [savingPrompts, setSavingPrompts] = useState(false);
 
+  // Photos state
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(true);
+
+  const loadPhotos = async () => {
+    try {
+      const response = await profileApi.get();
+      const profilePhotos = response.data?.profile?.photos || [];
+      setPhotos(profilePhotos);
+    } catch (error) {
+      console.error('Failed to load photos:', error);
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
+
   useEffect(() => {
     loadCredits();
     loadSubscription();
+    loadPhotos();
   }, []);
 
   const handleLogout = () => {
@@ -106,7 +176,6 @@ export default function ProfileScreen() {
       await api.put('/profile', { [editField]: editValue.trim() });
       setUser({ ...user!, [editField]: editValue.trim() });
       setSaveSuccess(true);
-      // Show success briefly then close
       setTimeout(() => {
         setEditModalVisible(false);
         setSaveSuccess(false);
@@ -160,14 +229,12 @@ export default function ProfileScreen() {
       let updatedPrompts: ProfilePrompt[];
 
       if (editingPromptIndex !== null && editingPromptIndex < currentPrompts.length) {
-        // Editing existing prompt
         updatedPrompts = [...currentPrompts];
         updatedPrompts[editingPromptIndex] = {
           question: editingPrompt!.question,
           answer: promptAnswer.trim()
         };
       } else {
-        // Adding new prompt
         updatedPrompts = [...currentPrompts, {
           question: editingPrompt!.question,
           answer: promptAnswer.trim()
@@ -227,7 +294,7 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
           <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
-            <Text style={styles.settingsEmoji}>⚙️</Text>
+            <SettingsIcon size={22} color={colors.text.primary} />
           </TouchableOpacity>
         </View>
 
@@ -242,22 +309,30 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarEmoji}>&#128100;</Text>
+                <UserIcon size={48} color={colors.text.tertiary} />
               </View>
             )}
             <TouchableOpacity style={styles.editBadge}>
-              <Text style={styles.editEmoji}>&#9999;</Text>
+              <EditIcon size={14} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => openEditModal('name')}>
+          <TouchableOpacity onPress={() => openEditModal('name')} style={styles.nameRow}>
             <Text style={styles.name}>
               {user?.name || 'Tap to add name'}
               {user?.age && `, ${user.age}`}
             </Text>
+            {user?.is_verified && (
+              <View style={styles.verifiedBadge}>
+                <CheckIcon size={12} color={colors.text.primary} />
+              </View>
+            )}
           </TouchableOpacity>
           {user?.location && (
-            <Text style={styles.location}>&#128205; {user.location}</Text>
+            <View style={styles.locationRow}>
+              <MapPinIcon size={14} color={colors.text.secondary} />
+              <Text style={styles.location}>{user.location}</Text>
+            </View>
           )}
         </View>
 
@@ -270,7 +345,7 @@ export default function ProfileScreen() {
           <View style={styles.creditsHeader}>
             <View style={styles.creditsMainRow}>
               <View style={styles.creditsItem}>
-                <Text style={styles.creditsEmoji}>&#129689;</Text>
+                <CoinIcon size={22} color={colors.secondary.DEFAULT} />
                 <View>
                   <Text style={styles.creditsValue}>{balance}</Text>
                   <Text style={styles.creditsLabel}>Credits</Text>
@@ -285,7 +360,7 @@ export default function ProfileScreen() {
               <View style={styles.creditsDivider} />
 
               <View style={styles.creditsItem}>
-                <Text style={styles.creditsEmoji}>&#128150;</Text>
+                <HeartFilledIcon size={22} color={colors.primary.DEFAULT} />
                 <View>
                   <Text style={styles.creditsValue}>{bonusLikes}</Text>
                   <Text style={styles.creditsLabel}>Bonus Likes</Text>
@@ -296,7 +371,7 @@ export default function ProfileScreen() {
                 <>
                   <View style={styles.creditsDivider} />
                   <View style={styles.creditsItem}>
-                    <Text style={styles.creditsEmoji}>&#128142;</Text>
+                    <CrownIcon size={22} color={colors.secondary.light} />
                     <View>
                       <Text style={styles.creditsValuePremium}>
                         {subscription.tier.charAt(0).toUpperCase() +
@@ -309,9 +384,11 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            <Text style={styles.expandIcon}>
-              {creditsExpanded ? '^' : 'v'}
-            </Text>
+            {creditsExpanded ? (
+              <ChevronUpIcon size={18} color={colors.text.tertiary} />
+            ) : (
+              <ChevronDownIcon size={18} color={colors.text.tertiary} />
+            )}
           </View>
 
           {creditsExpanded && (
@@ -350,31 +427,28 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Photos</Text>
-            <TouchableOpacity>
-              <Text style={styles.editText}>Edit</Text>
-            </TouchableOpacity>
+            <Text style={styles.photoHint}>{photos.length}/6</Text>
           </View>
-          <View style={styles.photoGrid}>
-            {[0, 1, 2, 3, 4, 5].map((index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.photoSlot}
-                activeOpacity={0.8}
-              >
-                {user?.photos?.[index] ? (
-                  <Image
-                    source={{ uri: user.photos[index] }}
-                    style={styles.photo}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Text style={styles.addEmoji}>+</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
+          {loadingPhotos ? (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator color={colors.primary.DEFAULT} />
+            </View>
+          ) : (
+            <PhotoGrid
+              photos={photos}
+              onPhotosChange={(updatedPhotos) => {
+                setPhotos(updatedPhotos);
+                // Also update user photos in authStore for avatar
+                if (user) {
+                  setUser({
+                    ...user,
+                    photos: updatedPhotos.map((p) => p.url),
+                  });
+                }
+              }}
+              maxPhotos={6}
+            />
+          )}
         </View>
 
         {/* Bio Section */}
@@ -401,15 +475,16 @@ export default function ProfileScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Prompts</Text>
             {(user?.prompts?.length || 0) < 3 && (
-              <TouchableOpacity onPress={openPromptSelector}>
-                <Text style={styles.editText}>+ Add</Text>
+              <TouchableOpacity onPress={openPromptSelector} style={styles.addButton}>
+                <PlusIcon size={16} color={colors.primary.DEFAULT} />
+                <Text style={styles.editText}>Add</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {savingPrompts && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator color="#FF1493" />
+              <ActivityIndicator color={colors.primary.DEFAULT} />
             </View>
           )}
 
@@ -426,7 +501,7 @@ export default function ProfileScreen() {
                     onPress={() => deletePrompt(index)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Text style={styles.promptDelete}>X</Text>
+                    <XIcon size={16} color={colors.text.tertiary} />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.promptAnswer}>{prompt.answer}</Text>
@@ -451,43 +526,54 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings')}
           >
             <View style={styles.searchFiltersContent}>
-              <Text style={styles.searchFiltersEmoji}>🔍</Text>
+              <View style={styles.searchFiltersIcon}>
+                <SlidersIcon size={22} color={colors.primary.DEFAULT} />
+              </View>
               <View>
                 <Text style={styles.searchFiltersTitle}>Search Filters</Text>
-                <Text style={styles.searchFiltersSubtitle}>Age, gender, kink level, distance</Text>
+                <Text style={styles.searchFiltersSubtitle}>Age, gender, vibe level, distance</Text>
               </View>
             </View>
-            <Text style={styles.actionArrow}>›</Text>
+            <ChevronRightIcon size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
         {/* Actions */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionEmoji}>🔔</Text>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/settings/notifications')}
+          >
+            <BellIcon size={20} color={colors.text.secondary} />
             <Text style={styles.actionText}>Notifications</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <ChevronRightIcon size={18} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionEmoji}>🔒</Text>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/settings/privacy')}
+          >
+            <ShieldIcon size={20} color={colors.text.secondary} />
             <Text style={styles.actionText}>Privacy</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <ChevronRightIcon size={18} color={colors.text.tertiary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setPremiumModalVisible(true)}
           >
-            <Text style={styles.actionEmoji}>💎</Text>
+            <CrownIcon size={20} color={colors.secondary.DEFAULT} />
             <Text style={styles.actionText}>Premium</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <ChevronRightIcon size={18} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionEmoji}>❓</Text>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/settings/help')}
+          >
+            <HelpCircleIcon size={20} color={colors.text.secondary} />
             <Text style={styles.actionText}>Help & Support</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <ChevronRightIcon size={18} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
@@ -497,6 +583,7 @@ export default function ProfileScreen() {
             style={[styles.actionButton, styles.logoutButton]}
             onPress={handleLogout}
           >
+            <LogOutIcon size={20} color={colors.error} />
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
         </View>
@@ -525,7 +612,7 @@ export default function ProfileScreen() {
               </Text>
               <TouchableOpacity onPress={handleSave} disabled={saving}>
                 {saving ? (
-                  <ActivityIndicator size="small" color="#FF1493" />
+                  <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
                 ) : saveSuccess ? (
                   <Text style={styles.modalSaveSuccess}>Saved!</Text>
                 ) : (
@@ -542,7 +629,7 @@ export default function ProfileScreen() {
               value={editValue}
               onChangeText={setEditValue}
               placeholder={editField === 'name' ? 'Your name' : 'Tell us about yourself...'}
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.text.disabled}
               multiline={editField === 'bio'}
               numberOfLines={editField === 'bio' ? 4 : 1}
               autoFocus
@@ -582,7 +669,7 @@ export default function ProfileScreen() {
                   onPress={() => selectPrompt(prompt)}
                 >
                   <Text style={styles.promptSelectText}>{prompt}</Text>
-                  <Text style={styles.promptSelectAdd}>+</Text>
+                  <PlusIcon size={22} color={colors.primary.DEFAULT} />
                 </TouchableOpacity>
               ))}
               {availablePrompts.length === 0 && (
@@ -619,7 +706,7 @@ export default function ProfileScreen() {
               <Text style={styles.modalTitle}>Your Answer</Text>
               <TouchableOpacity onPress={savePrompt} disabled={savingPrompts}>
                 {savingPrompts ? (
-                  <ActivityIndicator size="small" color="#FF1493" />
+                  <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
                 ) : (
                   <Text style={styles.modalSave}>Save</Text>
                 )}
@@ -633,7 +720,7 @@ export default function ProfileScreen() {
               value={promptAnswer}
               onChangeText={setPromptAnswer}
               placeholder="Write your answer..."
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.text.disabled}
               multiline
               numberOfLines={4}
               autoFocus
@@ -652,7 +739,6 @@ export default function ProfileScreen() {
       <PremiumModal
         visible={premiumModalVisible}
         onClose={() => setPremiumModalVisible(false)}
-        currentSubscription={subscription}
       />
     </SafeAreaView>
   );
@@ -661,56 +747,50 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: typography.sizes['3xl'],
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.text.primary,
   },
   settingsButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#111111',
+    backgroundColor: colors.bg.secondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  settingsEmoji: {
-    fontSize: 20,
-  },
   profileCard: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: spacing['2xl'],
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   avatar: {
     width: 120,
     height: 120,
     borderRadius: 60,
     borderWidth: 3,
-    borderColor: '#FF1493',
+    borderColor: colors.primary.DEFAULT,
   },
   avatarPlaceholder: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#222222',
+    backgroundColor: colors.bg.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarEmoji: {
-    fontSize: 48,
   },
   editBadge: {
     position: 'absolute',
@@ -719,34 +799,49 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FF1493',
+    backgroundColor: colors.primary.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#000000',
+    borderColor: colors.bg.primary,
   },
-  editEmoji: {
-    fontSize: 16,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   name: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
+  },
+  verifiedBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.info,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   location: {
-    fontSize: 16,
-    color: '#888888',
-    marginTop: 4,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
   // Credits Card styles
   creditsCard: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    backgroundColor: '#111111',
-    borderRadius: 16,
-    padding: 16,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: '#222222',
+    borderColor: colors.border.DEFAULT,
   },
   creditsHeader: {
     flexDirection: 'row',
@@ -761,111 +856,113 @@ const styles = StyleSheet.create({
   creditsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  creditsEmoji: {
-    fontSize: 24,
+    gap: spacing.sm,
   },
   creditsValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.text.primary,
   },
   creditsValuePremium: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FF1493',
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold as any,
+    color: colors.secondary.light,
   },
   creditsLabel: {
-    fontSize: 12,
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
   },
   creditsDivider: {
     width: 1,
     height: 32,
-    backgroundColor: '#333333',
-    marginHorizontal: 16,
+    backgroundColor: colors.border.light,
+    marginHorizontal: spacing.lg,
   },
   lowCreditsIndicator: {
-    backgroundColor: 'rgba(255, 68, 88, 0.2)',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: 10,
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   lowCreditsText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#FF4458',
+    fontWeight: typography.weights.bold as any,
+    color: colors.error,
     textTransform: 'uppercase',
   },
-  expandIcon: {
-    fontSize: 12,
-    color: '#666666',
-  },
   creditsBreakdown: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#222222',
+    borderTopColor: colors.border.DEFAULT,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   breakdownLabel: {
-    fontSize: 14,
-    color: '#888888',
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   breakdownValue: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    fontWeight: typography.weights.semibold as any,
   },
   getMoreButton: {
-    backgroundColor: '#FF1493',
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: colors.primary.DEFAULT,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   getMoreText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   section: {
-    paddingHorizontal: 20,
-    marginTop: 24,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing['2xl'],
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   editText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FF1493',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
+  },
+  photoHint: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   photoSlot: {
     width: '31%',
     aspectRatio: 3 / 4,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     overflow: 'hidden',
   },
   photo: {
@@ -874,250 +971,228 @@ const styles = StyleSheet.create({
   },
   photoPlaceholder: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: colors.bg.secondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#333333',
+    borderColor: colors.border.light,
     borderStyle: 'dashed',
-    borderRadius: 12,
-  },
-  addEmoji: {
-    fontSize: 24,
-    opacity: 0.5,
-    color: '#888888',
+    borderRadius: borderRadius.md,
   },
   bioCard: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     minHeight: 80,
   },
   bioText: {
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
     lineHeight: 24,
   },
   bioPlaceholder: {
-    fontSize: 16,
-    color: '#666666',
+    fontSize: typography.sizes.base,
+    color: colors.text.disabled,
     fontStyle: 'italic',
   },
   // Prompts styles
   loadingOverlay: {
-    padding: 20,
+    padding: spacing.xl,
     alignItems: 'center',
   },
   promptCard: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
   },
   promptHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   promptQuestion: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FF1493',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
     flex: 1,
   },
-  promptDelete: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#666666',
-    paddingLeft: 12,
-  },
   promptAnswer: {
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
     lineHeight: 22,
   },
   emptyPrompts: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 24,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing['2xl'],
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#333333',
+    borderColor: colors.border.light,
     borderStyle: 'dashed',
   },
   emptyPromptsText: {
-    fontSize: 16,
-    color: '#888888',
-    marginBottom: 4,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
   },
   emptyPromptsHint: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
   },
   promptEditQuestion: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FF1493',
-    marginBottom: 16,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
+    marginBottom: spacing.lg,
   },
   promptList: {
     flex: 1,
   },
   promptSelectOption: {
-    backgroundColor: '#222222',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   promptSelectText: {
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
     flex: 1,
   },
-  promptSelectAdd: {
-    fontSize: 24,
-    color: '#FF1493',
-    fontWeight: '700',
-    marginLeft: 12,
-  },
   promptSelectContent: {
-    backgroundColor: '#111111',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: colors.bg.secondary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xl,
     paddingBottom: 40,
     maxHeight: '70%',
     marginTop: 'auto',
   },
   noPromptsText: {
-    fontSize: 16,
-    color: '#666666',
+    fontSize: typography.sizes.base,
+    color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: spacing.xl,
   },
   searchFiltersButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 20, 147, 0.15)',
+    backgroundColor: colors.primary.muted,
     borderWidth: 1,
-    borderColor: '#FF1493',
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    borderColor: colors.primary.DEFAULT,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
   },
   searchFiltersContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: spacing.md,
   },
-  searchFiltersEmoji: {
-    fontSize: 28,
+  searchFiltersIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(232, 93, 117, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchFiltersTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   searchFiltersSubtitle: {
-    fontSize: 13,
-    color: '#FF1493',
+    fontSize: typography.sizes.sm,
+    color: colors.primary.light,
     marginTop: 2,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  actionEmoji: {
-    fontSize: 20,
-    marginRight: 12,
+    backgroundColor: colors.bg.secondary,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    gap: spacing.md,
   },
   actionText: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  actionArrow: {
-    fontSize: 24,
-    color: '#666666',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
   },
   logoutButton: {
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 68, 88, 0.1)',
+    justifyContent: 'flex-start',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
   logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF4458',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.error,
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#111111',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: colors.bg.secondary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xl,
     paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   modalCancel: {
-    fontSize: 16,
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   modalSave: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF1493',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
   },
   modalSaveSuccess: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#00C853',
-  },
-  modalSaveDisabled: {
-    opacity: 0.5,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.success,
   },
   modalInput: {
-    backgroundColor: '#222222',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
   },
   modalInputMultiline: {
     minHeight: 120,
     textAlignVertical: 'top',
   },
   charCount: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
     textAlign: 'right',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
 });

@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useFeedStore } from '@/stores/feedStore';
 import { useCreditsStore } from '@/stores/creditsStore';
 import SwipeCard from '@/components/SwipeCard';
 import ActionBar from '@/components/ActionBar';
 import ProfileOverlay from '@/components/ProfileOverlay';
+import { CoinIcon, AlertCircleIcon, SparkleIcon, PartyPopperIcon, ChevronRightIcon } from '@/components/Icons';
+import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 const SUPERLIKE_COST = 5;
 
@@ -29,12 +31,14 @@ export default function FeedScreen() {
   } = useCreditsStore();
   const [showProfile, setShowProfile] = useState(false);
   const [matchAnimation, setMatchAnimation] = useState(false);
-  const [showLowCreditsWarning, setShowLowCreditsWarning] = useState(false);
 
-  useEffect(() => {
-    loadProfiles();
-    loadCredits();
-  }, []);
+  // Reload profiles when screen gains focus (e.g., after settings change)
+  useFocusEffect(
+    useCallback(() => {
+      loadProfiles();
+      loadCredits();
+    }, [])
+  );
 
   // Handle profile required error - redirect to onboarding
   useEffect(() => {
@@ -71,6 +75,11 @@ export default function FeedScreen() {
         }
       }
 
+      // For regular likes, use bonus likes (backend also tracks daily likes)
+      if (action === 'like' && bonusLikes > 0) {
+        useBonusLike();
+      }
+
       setShowProfile(false);
       const isMatch = await swipe(action);
       if (isMatch) {
@@ -84,7 +93,7 @@ export default function FeedScreen() {
   if (isLoading && profiles.length === 0) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF1493" />
+        <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
         <Text style={styles.loadingText}>Finding people near you...</Text>
       </View>
     );
@@ -93,7 +102,9 @@ export default function FeedScreen() {
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorEmoji}>😢</Text>
+        <View style={styles.errorIconContainer}>
+          <AlertCircleIcon size={48} color={colors.error} />
+        </View>
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
@@ -102,7 +113,9 @@ export default function FeedScreen() {
   if (!currentProfile) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.emptyEmoji}>🌟</Text>
+        <View style={styles.emptyIconContainer}>
+          <SparkleIcon size={48} color={colors.secondary.DEFAULT} />
+        </View>
         <Text style={styles.emptyTitle}>No more profiles</Text>
         <Text style={styles.emptyText}>Check back later for new people</Text>
       </View>
@@ -118,11 +131,11 @@ export default function FeedScreen() {
           onPress={() => router.push('/(tabs)/profile')}
           activeOpacity={0.8}
         >
-          <Text style={styles.lowCreditsIcon}>🪙</Text>
+          <CoinIcon size={18} color={colors.warning} />
           <Text style={styles.lowCreditsText}>
             Credits running low ({balance} left)
           </Text>
-          <Text style={styles.lowCreditsArrow}>›</Text>
+          <ChevronRightIcon size={18} color={colors.warning} />
         </TouchableOpacity>
       )}
 
@@ -166,8 +179,11 @@ export default function FeedScreen() {
       {/* Match animation overlay */}
       {matchAnimation && (
         <View style={styles.matchOverlay}>
-          <Text style={styles.matchEmoji}>🎉</Text>
+          <View style={styles.matchIconContainer}>
+            <PartyPopperIcon size={64} color={colors.primary.DEFAULT} />
+          </View>
           <Text style={styles.matchText}>It's a Match!</Text>
+          <Text style={styles.matchSubtext}>Start a conversation now</Text>
         </View>
       )}
     </View>
@@ -177,71 +193,74 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   lowCreditsBanner: {
     position: 'absolute',
-    top: 60,
-    left: 16,
-    right: 16,
+    top: 56,
+    left: spacing.lg,
+    right: spacing.lg,
     zIndex: 100,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 68, 88, 0.15)',
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 68, 88, 0.3)',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-  },
-  lowCreditsIcon: {
-    fontSize: 16,
-    marginRight: 8,
+    borderColor: 'rgba(251, 191, 36, 0.25)',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
   },
   lowCreditsText: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FF4458',
-  },
-  lowCreditsArrow: {
-    fontSize: 18,
-    color: '#FF4458',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.warning,
   },
   centered: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing['4xl'],
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#888888',
+    marginTop: spacing.lg,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
-  errorEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
+  errorIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   errorText: {
-    fontSize: 16,
-    color: '#FF4458',
+    fontSize: typography.sizes.base,
+    color: colors.error,
     textAlign: 'center',
   },
-  emptyEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.secondary.muted,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
     textAlign: 'center',
   },
   nextCard: {
@@ -259,17 +278,27 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  matchEmoji: {
-    fontSize: 100,
-    marginBottom: 24,
+  matchIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primary.muted,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing['2xl'],
   },
   matchText: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#FF1493',
+    fontSize: typography.sizes['4xl'],
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.primary.DEFAULT,
+    marginBottom: spacing.sm,
+  },
+  matchSubtext: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
 });

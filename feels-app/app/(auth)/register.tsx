@@ -13,6 +13,7 @@ import {
 import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/stores/authStore';
+import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 export default function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
@@ -105,7 +106,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="First Name"
-                placeholderTextColor="#888888"
+                placeholderTextColor={colors.text.tertiary}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
@@ -114,11 +115,11 @@ export default function RegisterScreen() {
 
             <View style={styles.inputContainer}>
               <View style={styles.phoneInputContainer}>
-                <Text style={styles.phonePrefix}>🇺🇸 +1</Text>
+                <Text style={styles.phonePrefix}>US +1</Text>
                 <TextInput
                   style={styles.phoneInput}
                   placeholder="(555) 555-5555"
-                  placeholderTextColor="#888888"
+                  placeholderTextColor={colors.text.tertiary}
                   value={phone}
                   onChangeText={handlePhoneChange}
                   keyboardType="phone-pad"
@@ -131,7 +132,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Email"
-                placeholderTextColor="#888888"
+                placeholderTextColor={colors.text.tertiary}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -144,7 +145,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Password"
-                placeholderTextColor="#888888"
+                placeholderTextColor={colors.text.tertiary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -155,7 +156,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Confirm Password"
-                placeholderTextColor="#888888"
+                placeholderTextColor={colors.text.tertiary}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
@@ -174,7 +175,7 @@ export default function RegisterScreen() {
               activeOpacity={0.8}
             >
               {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.text.primary} />
               ) : (
                 <Text style={styles.buttonText}>Create Account</Text>
               )}
@@ -198,7 +199,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   keyboardView: {
     flex: 1,
@@ -211,90 +212,90 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: 32,
-    paddingVertical: 48,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing['3xl'],
   },
   title: {
     fontSize: 48,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 48,
+    marginBottom: spacing['3xl'],
   },
   errorBox: {
-    backgroundColor: 'rgba(255, 68, 88, 0.2)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
   },
   errorText: {
-    color: '#FF4458',
+    color: colors.error,
     textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   input: {
-    backgroundColor: '#111111',
-    color: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    fontSize: 16,
+    backgroundColor: colors.bg.secondary,
+    color: colors.text.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.md,
+    fontSize: typography.sizes.base,
   },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.lg,
   },
   phonePrefix: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginRight: 8,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    marginRight: spacing.sm,
   },
   phoneInput: {
     flex: 1,
-    color: '#FFFFFF',
-    paddingVertical: 16,
-    fontSize: 16,
+    color: colors.text.primary,
+    paddingVertical: spacing.lg,
+    fontSize: typography.sizes.base,
   },
   disclaimer: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
     lineHeight: 18,
   },
   button: {
-    backgroundColor: '#FF1493',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 8,
-    marginBottom: 16,
+    backgroundColor: colors.primary.DEFAULT,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.text.primary,
     textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
   footerText: {
-    color: '#888888',
+    color: colors.text.secondary,
   },
   linkText: {
-    color: '#FF1493',
-    fontWeight: '600',
+    color: colors.primary.DEFAULT,
+    fontWeight: typography.weights.semibold as any,
   },
 });

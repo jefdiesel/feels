@@ -53,6 +53,25 @@ func (r *PaymentRepository) EnsureTables(ctx context.Context) error {
 	)`
 
 	_, err = r.db.Exec(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	// Create bonus_days table for referrals and promotions
+	query = `CREATE TABLE IF NOT EXISTS bonus_days (
+		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		days INT NOT NULL,
+		reason TEXT NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`
+
+	_, err = r.db.Exec(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_bonus_days_user_id ON bonus_days(user_id)`)
 	return err
 }
 
@@ -154,4 +173,20 @@ func (r *PaymentRepository) SaveStripeCustomerID(ctx context.Context, userID uui
 
 	_, err := r.db.Exec(ctx, query, userID, customerID)
 	return err
+}
+
+// AddBonusDays adds bonus premium days to a user
+func (r *PaymentRepository) AddBonusDays(ctx context.Context, userID uuid.UUID, days int, reason string) error {
+	query := `INSERT INTO bonus_days (id, user_id, days, reason, created_at)
+		VALUES (uuid_generate_v4(), $1, $2, $3, NOW())`
+	_, err := r.db.Exec(ctx, query, userID, days, reason)
+	return err
+}
+
+// GetBonusDays returns total bonus days for a user
+func (r *PaymentRepository) GetBonusDays(ctx context.Context, userID uuid.UUID) (int, error) {
+	query := `SELECT COALESCE(SUM(days), 0) FROM bonus_days WHERE user_id = $1`
+	var total int
+	err := r.db.QueryRow(ctx, query, userID).Scan(&total)
+	return total, err
 }

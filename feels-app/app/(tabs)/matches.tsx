@@ -13,6 +13,8 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { matchesApi } from '@/api/client';
 import { useAuthStore } from '@/stores/authStore';
+import { HeartFilledIcon, MessageIcon } from '@/components/Icons';
+import { colors, typography, borderRadius, spacing, shadows } from '@/constants/theme';
 
 // Backend response types
 interface BackendPhoto {
@@ -128,10 +130,10 @@ export default function MatchesScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.title}>Matches</Text>
+          <Text style={styles.title}>Messages</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF1493" />
+          <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
         </View>
       </SafeAreaView>
     );
@@ -140,11 +142,11 @@ export default function MatchesScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Matches</Text>
+        <Text style={styles.title}>Messages</Text>
         {matches.length > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{matches.length}</Text>
-            <Text style={styles.badgeEmoji}>❤️</Text>
+            <HeartFilledIcon size={14} color={colors.primary.DEFAULT} />
           </View>
         )}
       </View>
@@ -156,7 +158,7 @@ export default function MatchesScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor="#FF1493"
+            tintColor={colors.primary.DEFAULT}
           />
         }
       >
@@ -195,10 +197,12 @@ export default function MatchesScreen() {
 
         {/* Messages Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Messages</Text>
+          <Text style={styles.sectionTitle}>Conversations</Text>
           {conversations.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>💬</Text>
+              <View style={styles.emptyIconContainer}>
+                <MessageIcon size={32} color={colors.text.tertiary} />
+              </View>
               <Text style={styles.emptyText}>
                 No messages yet. Start a conversation!
               </Text>
@@ -240,7 +244,7 @@ export default function MatchesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -251,51 +255,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#222222',
+    borderBottomColor: colors.border.DEFAULT,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: typography.sizes['3xl'],
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.text.primary,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
+    backgroundColor: colors.bg.secondary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    gap: spacing.xs,
   },
   badgeText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  badgeEmoji: {
-    fontSize: 14,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   scrollView: {
     flex: 1,
   },
   section: {
-    paddingTop: 20,
+    paddingTop: spacing.xl,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.md,
   },
   newMatchesContainer: {
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
   newMatchCard: {
     alignItems: 'center',
@@ -309,51 +310,56 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     borderWidth: 2,
-    borderColor: '#FF1493',
+    borderColor: colors.primary.DEFAULT,
   },
   newBadge: {
     position: 'absolute',
     bottom: 2,
     right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#00FF88',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.success,
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: colors.bg.primary,
   },
   newMatchName: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    marginTop: spacing.sm,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
     textAlign: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingVertical: spacing['5xl'],
+    paddingHorizontal: spacing['4xl'],
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
+  emptyIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.bg.tertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
     textAlign: 'center',
   },
   messageCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
   },
   messageAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   messageContent: {
     flex: 1,
@@ -362,19 +368,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   messageName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   messageTime: {
-    fontSize: 12,
-    color: '#888888',
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
   },
   messagePreview: {
-    fontSize: 14,
-    color: '#888888',
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
 });

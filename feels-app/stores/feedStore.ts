@@ -18,6 +18,7 @@ export interface Profile {
   prompts?: ProfilePrompt[];
   interests?: string[];
   lookingFor?: string;
+  lookingForAlignment?: 'perfect' | 'similar'; // alignment with your intentions
 }
 
 // Backend response types
@@ -45,6 +46,7 @@ interface BackendProfile {
   prompts?: BackendPrompt[];
   interests?: string[];
   looking_for?: string;
+  looking_for_alignment?: 'perfect' | 'similar';
 }
 
 interface FeedResponse {
@@ -68,6 +70,7 @@ function transformProfile(bp: BackendProfile): Profile {
     prompts: bp.prompts,
     interests: bp.interests,
     lookingFor: bp.looking_for,
+    lookingForAlignment: bp.looking_for_alignment,
   };
 }
 

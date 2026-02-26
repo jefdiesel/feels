@@ -14,6 +14,16 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { profileApi } from '@/api/client';
 import { useAuthStore } from '@/stores/authStore';
+import {
+  SparkleIcon,
+  FlameIcon,
+  HeartFilledIcon,
+  StarFilledIcon,
+  PlusIcon,
+  XIcon,
+  CheckIcon,
+} from '@/components/Icons';
+import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 const GENDERS = [
   { value: 'woman', label: 'Woman' },
@@ -22,21 +32,20 @@ const GENDERS = [
   { value: 'trans', label: 'Trans' },
 ];
 
-const KINK_LEVELS = [
-  { value: 'vanilla', label: 'Vanilla', emoji: '🍦' },
-  { value: 'curious', label: 'Curious', emoji: '🤔' },
-  { value: 'sensual', label: 'Sensual', emoji: '🔥' },
-  { value: 'experienced', label: 'Experienced', emoji: '⛓️' },
-  { value: 'kinky', label: 'Kinky AF', emoji: '😈' },
+const VIBE_LEVELS = [
+  { value: 'vanilla', label: 'Vanilla', icon: 'sparkle' },
+  { value: 'curious', label: 'Curious', icon: 'sparkle' },
+  { value: 'sensual', label: 'Sensual', icon: 'flame' },
+  { value: 'experienced', label: 'Experienced', icon: 'star' },
+  { value: 'kinky', label: 'Adventurous', icon: 'heart' },
 ];
 
 const LOOKING_FOR = [
-  { value: 'relationship', label: 'A real relationship', desc: 'Looking for my person' },
-  { value: 'partner', label: 'Life partner / family', desc: 'Ready for the real thing' },
-  { value: 'dating', label: 'Dating around', desc: 'Seeing what\'s out there' },
-  { value: 'exploring', label: 'Exploring new experiences', desc: 'Curious and open-minded' },
-  { value: 'casual', label: 'Something casual', desc: 'Fun without the pressure' },
-  { value: 'open', label: 'Open to anything', desc: 'Let\'s see where it goes' },
+  { value: 'serious', label: 'Something serious' },
+  { value: 'relationship', label: 'Relationship minded' },
+  { value: 'dating', label: 'Dating' },
+  { value: 'meeting_people', label: 'Meeting new people' },
+  { value: 'friends_and_more', label: 'Friends and more' },
 ];
 
 const AVAILABLE_PROMPTS = [
@@ -66,7 +75,7 @@ export default function OnboardingScreen() {
   const [name, setName] = useState(user?.name || '');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
-  const [kinkLevel, setKinkLevel] = useState('');
+  const [vibeLevel, setVibeLevel] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [bio, setBio] = useState('');
   const [seekingGenders, setSeekingGenders] = useState<string[]>([]);
@@ -121,7 +130,7 @@ export default function OnboardingScreen() {
       Alert.alert('Error', 'Please select your gender');
       return false;
     }
-    if (!kinkLevel) {
+    if (!vibeLevel) {
       Alert.alert('Error', 'Please select your vibe');
       return false;
     }
@@ -216,7 +225,7 @@ export default function OnboardingScreen() {
         gender,
         zip_code: zipCode.trim(),
         bio: bio.trim(),
-        kink_level: kinkLevel,
+        kink_level: vibeLevel,
         looking_for: lookingFor,
         prompts: selectedPrompts.filter(p => p.answer.trim()),
       });
@@ -347,22 +356,27 @@ export default function OnboardingScreen() {
 
               <Text style={styles.label}>My vibe is...</Text>
               <View style={styles.optionsGrid}>
-                {KINK_LEVELS.map((k) => (
-                  <TouchableOpacity
-                    key={k.value}
-                    style={[styles.option, kinkLevel === k.value && styles.optionSelected]}
-                    onPress={() => setKinkLevel(k.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        kinkLevel === k.value && styles.optionTextSelected,
-                      ]}
+                {VIBE_LEVELS.map((k) => {
+                  const isSelected = vibeLevel === k.value;
+                  const iconColor = isSelected ? colors.primary.DEFAULT : colors.text.tertiary;
+                  return (
+                    <TouchableOpacity
+                      key={k.value}
+                      style={[styles.option, isSelected && styles.optionSelected]}
+                      onPress={() => setVibeLevel(k.value)}
                     >
-                      {k.emoji} {k.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <View style={styles.vibeOption}>
+                        {k.icon === 'sparkle' && <SparkleIcon size={16} color={iconColor} />}
+                        {k.icon === 'flame' && <FlameIcon size={16} color={iconColor} />}
+                        {k.icon === 'star' && <StarFilledIcon size={16} color={iconColor} />}
+                        {k.icon === 'heart' && <HeartFilledIcon size={16} color={iconColor} />}
+                        <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                          {k.label}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <Text style={styles.label}>I want to meet...</Text>
@@ -390,31 +404,23 @@ export default function OnboardingScreen() {
               <Text style={styles.hint}>Select all that apply</Text>
 
               <Text style={[styles.label, { marginTop: 24 }]}>I'm looking for...</Text>
-              <View style={styles.lookingForGrid}>
+              <View style={styles.optionsGrid}>
                 {LOOKING_FOR.map((l) => (
                   <TouchableOpacity
                     key={l.value}
                     style={[
-                      styles.lookingForOption,
-                      lookingFor === l.value && styles.lookingForSelected,
+                      styles.option,
+                      lookingFor === l.value && styles.optionSelected,
                     ]}
                     onPress={() => setLookingFor(l.value)}
                   >
                     <Text
                       style={[
-                        styles.lookingForLabel,
-                        lookingFor === l.value && styles.lookingForLabelSelected,
+                        styles.optionText,
+                        lookingFor === l.value && styles.optionTextSelected,
                       ]}
                     >
                       {l.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.lookingForDesc,
-                        lookingFor === l.value && styles.lookingForDescSelected,
-                      ]}
-                    >
-                      {l.desc}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -467,8 +473,8 @@ export default function OnboardingScreen() {
                 <View key={index} style={styles.selectedPrompt}>
                   <View style={styles.promptHeader}>
                     <Text style={styles.promptQuestion}>{prompt.question}</Text>
-                    <TouchableOpacity onPress={() => removePrompt(index)}>
-                      <Text style={styles.removePrompt}>X</Text>
+                    <TouchableOpacity onPress={() => removePrompt(index)} style={styles.removePrompt}>
+                      <XIcon size={18} color={colors.text.tertiary} />
                     </TouchableOpacity>
                   </View>
                   {editingPromptIndex === index ? (
@@ -517,7 +523,9 @@ export default function OnboardingScreen() {
                       onPress={() => selectPrompt(prompt)}
                     >
                       <Text style={styles.promptOptionText}>{prompt}</Text>
-                      <Text style={styles.promptAdd}>+</Text>
+                      <View style={styles.promptAdd}>
+                        <PlusIcon size={22} color={colors.primary.DEFAULT} />
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -555,199 +563,170 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg.primary,
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 24,
+    padding: spacing.xl,
   },
   progress: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    marginBottom: 32,
+    gap: spacing.sm,
+    marginBottom: spacing['2xl'],
   },
   progressDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#333',
+    backgroundColor: colors.bg.tertiary,
   },
   progressDotActive: {
-    backgroundColor: '#FF1493',
+    backgroundColor: colors.primary.DEFAULT,
   },
   stepContent: {
     flex: 1,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888888',
-    marginBottom: 32,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    marginBottom: spacing['2xl'],
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888888',
-    marginBottom: 8,
-    marginTop: 16,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.lg,
   },
   input: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
     borderWidth: 1,
-    borderColor: '#222222',
+    borderColor: colors.border.DEFAULT,
   },
   bioInput: {
     minHeight: 120,
-    paddingTop: 16,
+    paddingTop: spacing.lg,
   },
   dobContainer: {
     position: 'relative',
   },
   dobFormat: {
     position: 'absolute',
-    right: 16,
+    right: spacing.lg,
     top: 18,
-    fontSize: 14,
-    color: '#666666',
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
   },
   hint: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 8,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.sm,
   },
   charCount: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
     textAlign: 'right',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   option: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 24,
-    backgroundColor: '#111111',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.bg.secondary,
     borderWidth: 2,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
   },
   optionSelected: {
-    backgroundColor: 'rgba(255, 20, 147, 0.2)',
-    borderColor: '#FF1493',
+    backgroundColor: colors.primary.muted,
+    borderColor: colors.primary.DEFAULT,
   },
   optionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.secondary,
   },
   optionTextSelected: {
-    color: '#FF1493',
+    color: colors.primary.DEFAULT,
   },
-  lookingForGrid: {
-    gap: 10,
-  },
-  lookingForOption: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    backgroundColor: '#111111',
-    borderWidth: 2,
-    borderColor: '#333333',
-  },
-  lookingForSelected: {
-    backgroundColor: 'rgba(255, 20, 147, 0.15)',
-    borderColor: '#FF1493',
-  },
-  lookingForLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  lookingForLabelSelected: {
-    color: '#FF1493',
-  },
-  lookingForDesc: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  lookingForDescSelected: {
-    color: '#CC1177',
+  vibeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   navigation: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 32,
+    gap: spacing.md,
+    marginTop: spacing['2xl'],
   },
   backButton: {
     flex: 1,
-    backgroundColor: '#222222',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   backButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#888888',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
   },
   nextButton: {
     flex: 2,
-    backgroundColor: '#FF1493',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.primary.DEFAULT,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   nextButtonDisabled: {
     opacity: 0.5,
   },
   nextButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   // Prompts styles
   selectedPrompt: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#FF1493',
+    borderColor: colors.primary.DEFAULT,
   },
   promptHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   promptQuestion: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FF1493',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
     flex: 1,
   },
   removePrompt: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#666666',
-    paddingLeft: 12,
+    paddingLeft: spacing.md,
   },
   promptInput: {
     minHeight: 80,
@@ -757,52 +736,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   savePromptButton: {
-    backgroundColor: '#FF1493',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: colors.primary.DEFAULT,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.sm,
   },
   savePromptText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontWeight: typography.weights.semibold as any,
+    fontSize: typography.sizes.sm,
   },
   promptAnswer: {
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
     lineHeight: 22,
   },
   promptPlaceholder: {
-    fontSize: 16,
-    color: '#666666',
+    fontSize: typography.sizes.base,
+    color: colors.text.tertiary,
     fontStyle: 'italic',
   },
   availablePrompts: {
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   promptOption: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: colors.border.DEFAULT,
   },
   promptOptionText: {
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
     flex: 1,
   },
   promptAdd: {
-    fontSize: 24,
-    color: '#FF1493',
-    fontWeight: '700',
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
 });
