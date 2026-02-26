@@ -11,12 +11,29 @@ import (
 
 	"github.com/feels/feels/internal/api"
 	"github.com/feels/feels/internal/config"
+	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
 func main() {
 	cfg := config.Load()
+
+	// Initialize Sentry
+	if cfg.Sentry.DSN != "" {
+		err := sentry.Init(sentry.ClientOptions{
+			Dsn:              cfg.Sentry.DSN,
+			Environment:      cfg.Sentry.Environment,
+			TracesSampleRate: 0.1,
+			EnableTracing:    true,
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Sentry: %v", err)
+		} else {
+			log.Println("Sentry initialized")
+			defer sentry.Flush(2 * time.Second)
+		}
+	}
 
 	log.Printf("Starting Feels server in %s mode", cfg.Server.Env)
 

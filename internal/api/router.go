@@ -13,8 +13,14 @@ import (
 	"github.com/feels/feels/internal/domain/feed"
 	"github.com/feels/feels/internal/domain/match"
 	"github.com/feels/feels/internal/domain/message"
+	"github.com/feels/feels/internal/domain/moderation"
+	"github.com/feels/feels/internal/domain/notification"
+	"github.com/feels/feels/internal/domain/payment"
+	"github.com/google/uuid"
 	"github.com/feels/feels/internal/domain/profile"
+	"github.com/feels/feels/internal/domain/settings"
 	"github.com/feels/feels/internal/domain/user"
+	"github.com/feels/feels/internal/email"
 	"github.com/feels/feels/internal/repository"
 	"github.com/feels/feels/internal/storage"
 	"github.com/feels/feels/internal/websocket"
@@ -34,6 +40,16 @@ type Router struct {
 	hub    *websocket.Hub
 }
 
+// moderationAdapter adapts the moderation.Service to the message.ModerationService interface
+type moderationAdapter struct {
+	svc *moderation.Service
+}
+
+func (a *moderationAdapter) CheckContent(ctx context.Context, userID uuid.UUID, messageID *uuid.UUID, content string) error {
+	_, err := a.svc.CheckContent(ctx, userID, messageID, content)
+	return err
+}
+
 func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Router {
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -47,10 +63,32 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	blockRepo := repository.NewBlockRepository(db)
 	messageRepo := repository.NewMessageRepository(db)
 	creditRepo := repository.NewCreditRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
+	notificationSettingsRepo := repository.NewNotificationSettingsRepository(db)
+	paymentRepo := repository.NewPaymentRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(db)
+	moderationRepo := repository.NewModerationRepository(db)
+	adminRepo := repository.NewAdminRepository(db)
 
 	// Ensure passes table exists
 	if err := feedRepo.EnsurePassesTable(context.Background()); err != nil {
 		log.Printf("Warning: Failed to ensure passes table: %v", err)
+	}
+
+	// Ensure settings tables exist
+	if err := settingsRepo.EnsureTables(context.Background()); err != nil {
+		log.Printf("Warning: Failed to ensure settings tables: %v", err)
+	}
+
+	// Ensure notification tables exist
+	if err := notificationRepo.EnsureTables(context.Background()); err != nil {
+		log.Printf("Warning: Failed to ensure notification tables: %v", err)
+	}
+
+	// Ensure payment tables exist
+	if err := paymentRepo.EnsureTables(context.Background()); err != nil {
+		log.Printf("Warning: Failed to ensure payment tables: %v", err)
 	}
 
 	// Initialize S3 storage
@@ -78,23 +116,67 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	)
 
 	profileService := profile.NewService(profileRepo, s3Client)
+	// Payment service is initialized later and will be set on profile service
 	creditService := credit.NewService(creditRepo)
+	notificationService := notification.NewService(notificationRepo, notificationSettingsRepo)
+
 	feedService := feed.NewService(feedRepo, profileRepo, matchRepo, 100)
 	feedService.SetCreditService(creditService)
+	feedService.SetHub(hub)
+	feedService.SetNotificationService(notificationService)
+	feedService.SetAnalyticsRepository(analyticsRepo)
 	matchService := match.NewService(matchRepo, blockRepo)
+	matchService.SetMessageRepository(messageRepo)
+	matchService.SetHub(hub)
 	messageService := message.NewService(messageRepo, matchRepo, hub)
+	messageService.SetNotificationService(notificationService)
+	messageService.SetProfileRepository(profileRepo)
+
+	// Initialize moderation service
+	moderationService := moderation.NewService(moderationRepo, moderation.Config{
+		Enabled:         cfg.Moderation.Enabled,
+		APIKey:          cfg.OpenAI.APIKey,
+		BlockThreshold:  cfg.Moderation.BlockThreshold,
+		ReviewThreshold: cfg.Moderation.ReviewThreshold,
+	})
+	messageService.SetModerationService(&moderationAdapter{svc: moderationService})
+	settingsService := settings.NewService(settingsRepo)
+	paymentService := payment.NewService(paymentRepo, userRepo, payment.Config{
+		SecretKey:        cfg.Stripe.SecretKey,
+		WebhookSecret:    cfg.Stripe.WebhookSecret,
+		MonthlyPriceID:   cfg.Stripe.MonthlyPriceID,
+		QuarterlyPriceID: cfg.Stripe.QuarterlyPriceID,
+		AnnualPriceID:    cfg.Stripe.AnnualPriceID,
+	})
+
+	// Set payment service as subscription checker for profile verification
+	profileService.SetSubscriptionChecker(paymentService)
+
+	// Initialize email service
+	emailService := email.NewService(email.Config{
+		APIKey:    cfg.Email.APIKey,
+		FromEmail: cfg.Email.FromEmail,
+		FromName:  cfg.Email.FromName,
+	})
 
 	// Initialize middleware
 	authMw := middleware.NewAuthMiddleware(userService)
+	adminMw := middleware.NewAdminMiddleware(userRepo)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
-	authHandler := handlers.NewAuthHandler(userService)
+	authHandler := handlers.NewAuthHandler(userService, emailService, cfg.IsDevelopment())
 	profileHandler := handlers.NewProfileHandler(profileService)
 	feedHandler := handlers.NewFeedHandler(feedService)
+	feedHandler.SetSubscriptionChecker(paymentService)
 	matchHandler := handlers.NewMatchHandler(matchService)
-	messageHandler := handlers.NewMessageHandler(messageService, hub)
+	messageHandler := handlers.NewMessageHandler(messageService, hub, s3Client)
 	creditHandler := handlers.NewCreditHandler(creditService)
+	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	notificationHandler := handlers.NewNotificationHandler(notificationService)
+	paymentHandler := handlers.NewPaymentHandler(paymentService, cfg.Stripe.WebhookSecret)
+	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, paymentService)
+	adminHandler := handlers.NewAdminHandler(adminRepo, userRepo)
 
 	r := &Router{
 		mux:    chi.NewRouter(),
@@ -106,7 +188,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	}
 
 	r.setupMiddleware()
-	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler)
+	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw)
 
 	return r
 }
@@ -119,7 +201,7 @@ func (r *Router) setupMiddleware() {
 	r.mux.Use(chimiddleware.Timeout(30 * time.Second))
 
 	r.mux.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:8082", "http://localhost:8081", "http://localhost:19006", "http://127.0.0.1:*", "https://*.feels.app"},
+		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*", "https://*.feels.app"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
 		ExposedHeaders:   []string{"Link"},
@@ -136,6 +218,12 @@ func (r *Router) setupRoutes(
 	matchHandler *handlers.MatchHandler,
 	messageHandler *handlers.MessageHandler,
 	creditHandler *handlers.CreditHandler,
+	settingsHandler *handlers.SettingsHandler,
+	notificationHandler *handlers.NotificationHandler,
+	paymentHandler *handlers.PaymentHandler,
+	analyticsHandler *handlers.AnalyticsHandler,
+	adminHandler *handlers.AdminHandler,
+	adminMw *middleware.AdminMiddleware,
 ) {
 	// Health check routes (no auth required)
 	r.mux.Get("/health", healthHandler.Health)
@@ -156,6 +244,12 @@ func (r *Router) setupRoutes(
 			auth.Post("/magic/verify", authHandler.VerifyMagicLink)
 		})
 
+		// Payment webhook (public - called by Stripe)
+		router.Post("/payments/webhook", paymentHandler.Webhook)
+
+		// Public payment routes (plans list)
+		router.Get("/payments/plans", paymentHandler.GetPlans)
+
 		// Protected routes
 		router.Group(func(protected chi.Router) {
 			protected.Use(r.authMw.Authenticate)
@@ -169,15 +263,21 @@ func (r *Router) setupRoutes(
 				p.Put("/preferences", profileHandler.UpdatePreferences)
 				p.Post("/photos", profileHandler.UploadPhoto)
 				p.Delete("/photos/{id}", profileHandler.DeletePhoto)
-				p.Post("/verify", notImplemented)
+				p.Put("/photos/reorder", profileHandler.ReorderPhotos)
+				p.Post("/verify", profileHandler.VerifyProfile)
+				p.Post("/verify/submit", profileHandler.SubmitVerification)
+				p.Get("/analytics", analyticsHandler.GetProfileAnalytics)
 			})
 
 			// Feed routes
 			protected.Route("/feed", func(f chi.Router) {
 				f.Get("/", feedHandler.GetFeed)
+				f.Get("/daily-picks", feedHandler.GetDailyPicks)
 				f.Post("/like/{id}", feedHandler.Like)
 				f.Post("/superlike/{id}", feedHandler.Superlike)
+				f.Post("/superlike/{id}/message", feedHandler.SuperlikeWithMessage)
 				f.Post("/pass/{id}", feedHandler.Pass)
+				f.Post("/rewind", feedHandler.Rewind)
 			})
 
 			// Match routes
@@ -189,6 +289,8 @@ func (r *Router) setupRoutes(
 				m.Post("/{id}/messages", messageHandler.SendMessage)
 				m.Post("/{id}/images/enable", messageHandler.EnableImages)
 				m.Post("/{id}/images/disable", messageHandler.DisableImages)
+				m.Post("/{id}/images/upload", messageHandler.UploadImage)
+				m.Post("/{id}/typing", messageHandler.Typing)
 			})
 
 			// Safety routes
@@ -206,6 +308,47 @@ func (r *Router) setupRoutes(
 			// Public key management for E2E encryption
 			protected.Post("/keys/public", authHandler.SetPublicKey)
 			protected.Get("/keys/public", authHandler.GetPublicKey)
+
+			// Settings routes
+			protected.Route("/settings", func(s chi.Router) {
+				s.Get("/notifications", settingsHandler.GetNotificationSettings)
+				s.Put("/notifications", settingsHandler.UpdateNotificationSettings)
+				s.Get("/privacy", settingsHandler.GetPrivacySettings)
+				s.Put("/privacy", settingsHandler.UpdatePrivacySettings)
+			})
+
+			// Push notification routes
+			protected.Post("/push/register", notificationHandler.RegisterToken)
+			protected.Delete("/push/register", notificationHandler.UnregisterToken)
+
+			// Payment routes (protected)
+			protected.Route("/payments", func(pay chi.Router) {
+				pay.Post("/checkout", paymentHandler.CreateCheckout)
+				pay.Post("/portal", paymentHandler.CreatePortal)
+				pay.Get("/subscription", paymentHandler.GetSubscription)
+				pay.Delete("/subscription", paymentHandler.CancelSubscription)
+			})
+
+			// Admin routes (protected + admin check)
+			protected.Route("/admin", func(admin chi.Router) {
+				admin.Use(adminMw.RequireAdmin)
+
+				// Reports management
+				admin.Get("/reports", adminHandler.GetPendingReports)
+				admin.Post("/reports/{id}", adminHandler.ActionOnReport)
+
+				// User management
+				admin.Get("/users/{id}", adminHandler.GetUserDetails)
+				admin.Post("/users/{id}/moderate", adminHandler.ModerateUser)
+
+				// Verification queue
+				admin.Get("/verification-queue", adminHandler.GetVerificationQueue)
+				admin.Post("/verification/{id}", adminHandler.ActionOnVerification)
+
+				// Content moderation queue
+				admin.Get("/moderation-queue", adminHandler.GetModerationQueue)
+				admin.Post("/moderation/{id}", adminHandler.ActionOnModeration)
+			})
 		})
 	})
 }

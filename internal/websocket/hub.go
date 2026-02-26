@@ -98,7 +98,8 @@ func (h *Hub) Run() {
 }
 
 // SendToUser sends a message to all connections for a user
-func (h *Hub) SendToUser(userID uuid.UUID, msg message.WSMessage) {
+// Accepts any message type that can be marshaled to JSON
+func (h *Hub) SendToUser(userID uuid.UUID, msg interface{}) {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Error marshaling message: %v", err)

@@ -59,3 +59,20 @@ const (
 	DefaultFeedLimit       = 10  // default number of profiles per request
 	MaxFeedLimit           = 50  // max profiles per request
 )
+
+// WebSocket event types
+const (
+	EventMatchCreated = "match_created"
+)
+
+// WSMessage is a WebSocket message envelope
+type WSMessage struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
+// MatchCreatedPayload is sent when a new match is created
+type MatchCreatedPayload struct {
+	MatchID     uuid.UUID `json:"match_id"`
+	OtherUserID uuid.UUID `json:"other_user_id"`
+}

@@ -88,3 +88,9 @@ type ImagePermissionPayload struct {
 	UserID  uuid.UUID `json:"user_id"`
 	Enabled bool      `json:"enabled"`
 }
+
+// MessageReadPayload is the payload for message read events
+type MessageReadPayload struct {
+	MatchID  uuid.UUID `json:"match_id"`
+	ReaderID uuid.UUID `json:"reader_id"`
+}

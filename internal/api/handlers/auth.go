@@ -6,16 +6,23 @@ import (
 	"net/http"
 
 	"github.com/feels/feels/internal/domain/user"
+	"github.com/feels/feels/internal/email"
 	"github.com/feels/feels/internal/repository"
 	"github.com/google/uuid"
 )
 
 type AuthHandler struct {
-	userService *user.Service
+	userService  *user.Service
+	emailService *email.Service
+	isDev        bool
 }
 
-func NewAuthHandler(userService *user.Service) *AuthHandler {
-	return &AuthHandler{userService: userService}
+func NewAuthHandler(userService *user.Service, emailService *email.Service, isDev bool) *AuthHandler {
+	return &AuthHandler{
+		userService:  userService,
+		emailService: emailService,
+		isDev:        isDev,
+	}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -211,15 +218,25 @@ func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// In development, log the token. In production, send via email service.
-	// For now, we return a success message and log the token for testing.
-	// TODO: Integrate with email service (SendGrid, SES, etc.)
-	_ = token // log.Printf("Magic link token for %s: %s", req.Email, token)
+	// Send the magic link email
+	if h.emailService != nil {
+		if err := h.emailService.SendMagicLink(r.Context(), req.Email, token, "Feels"); err != nil {
+			// Log error but don't fail - user can retry
+			// In dev mode, email service logs to console anyway
+		}
+	}
+
+	// In development, return the token for testing
+	if h.isDev {
+		jsonResponse(w, map[string]string{
+			"message": "magic link sent",
+			"token":   token, // Only in dev mode
+		}, http.StatusOK)
+		return
+	}
 
 	jsonResponse(w, map[string]string{
 		"message": "magic link sent",
-		// In development only - remove in production:
-		"token": token,
 	}, http.StatusOK)
 }
 

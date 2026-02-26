@@ -10,13 +10,16 @@ import (
 )
 
 var (
-	ErrInvalidGender    = errors.New("invalid gender")
-	ErrInvalidDOB       = errors.New("invalid date of birth")
-	ErrTooYoung         = errors.New("must be 18 or older")
-	ErrInvalidKinkLevel = errors.New("invalid kink level")
-	ErrProfileRequired  = errors.New("profile required")
-	ErrInvalidPhotoType = errors.New("invalid photo type, must be jpeg, png, gif, or webp")
-	ErrPhotoTooLarge    = errors.New("photo too large, max 10MB")
+	ErrInvalidGender              = errors.New("invalid gender")
+	ErrInvalidDOB                 = errors.New("invalid date of birth")
+	ErrTooYoung                   = errors.New("must be 18 or older")
+	ErrInvalidKinkLevel           = errors.New("invalid kink level")
+	ErrProfileRequired            = errors.New("profile required")
+	ErrInvalidPhotoType           = errors.New("invalid photo type, must be jpeg, png, gif, or webp")
+	ErrPhotoTooLarge              = errors.New("photo too large, max 10MB")
+	ErrVerificationUnavailable    = errors.New("verification requires quarterly or annual subscription")
+	ErrAlreadyVerified            = errors.New("profile is already verified")
+	ErrVerificationAlreadyPending = errors.New("verification already submitted and pending review")
 )
 
 type Repository interface {
@@ -31,6 +34,18 @@ type Repository interface {
 	CreatePreferences(ctx context.Context, p *Preferences) error
 	GetPreferences(ctx context.Context, userID uuid.UUID) (*Preferences, error)
 	UpdatePreferences(ctx context.Context, p *Preferences) error
+	SetVerified(ctx context.Context, userID uuid.UUID, verified bool) error
+	// Photo verification
+	SetVerificationPhoto(ctx context.Context, userID uuid.UUID, photoURL, status string) error
+	GetVerificationStatus(ctx context.Context, userID uuid.UUID) (string, error)
+	GetPendingVerifications(ctx context.Context, limit int) ([]VerificationRequest, error)
+	ApproveVerification(ctx context.Context, userID, adminID uuid.UUID) error
+	RejectVerification(ctx context.Context, userID, adminID uuid.UUID) error
+}
+
+// SubscriptionChecker checks if a user has a qualifying subscription for verification
+type SubscriptionChecker interface {
+	HasQualifyingSubscription(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
 type Storage interface {
@@ -39,8 +54,9 @@ type Storage interface {
 }
 
 type Service struct {
-	repo    Repository
-	storage Storage
+	repo        Repository
+	storage     Storage
+	subChecker  SubscriptionChecker
 }
 
 func NewService(repo Repository, storage Storage) *Service {
@@ -48,6 +64,11 @@ func NewService(repo Repository, storage Storage) *Service {
 		repo:    repo,
 		storage: storage,
 	}
+}
+
+// SetSubscriptionChecker sets the subscription checker for verification
+func (s *Service) SetSubscriptionChecker(checker SubscriptionChecker) {
+	s.subChecker = checker
 }
 
 func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, req *CreateProfileRequest) (*Profile, error) {
@@ -284,6 +305,69 @@ func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) er
 	}
 
 	return nil
+}
+
+// ReorderPhotos reorders the user's photos based on the provided photo IDs
+func (s *Service) ReorderPhotos(ctx context.Context, userID uuid.UUID, photoIDs []uuid.UUID) error {
+	return s.repo.ReorderPhotos(ctx, userID, photoIDs)
+}
+
+// VerifyProfile sets the verified badge on a user's profile if they have a qualifying subscription
+func (s *Service) VerifyProfile(ctx context.Context, userID uuid.UUID) error {
+	if s.subChecker == nil {
+		return ErrVerificationUnavailable
+	}
+
+	// Check if already verified
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if profile.IsVerified {
+		return ErrAlreadyVerified
+	}
+
+	// Check subscription eligibility (quarterly or annual)
+	eligible, err := s.subChecker.HasQualifyingSubscription(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !eligible {
+		return ErrVerificationUnavailable
+	}
+
+	return s.repo.SetVerified(ctx, userID, true)
+}
+
+// SubmitVerification submits a verification photo for review
+func (s *Service) SubmitVerification(ctx context.Context, userID uuid.UUID, reader io.Reader, size int64, contentType string) error {
+	// Check current verification status
+	status, err := s.repo.GetVerificationStatus(ctx, userID)
+	if err == nil && status == "pending" {
+		return ErrVerificationAlreadyPending
+	}
+
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if profile.IsVerified {
+		return ErrAlreadyVerified
+	}
+
+	// Upload the verification photo
+	url, err := s.storage.UploadPhoto(ctx, userID, reader, size, contentType)
+	if err != nil {
+		return err
+	}
+
+	// Set verification status to pending
+	return s.repo.SetVerificationPhoto(ctx, userID, url, "pending")
+}
+
+// GetVerificationStatus returns the user's verification status
+func (s *Service) GetVerificationStatus(ctx context.Context, userID uuid.UUID) (string, error) {
+	return s.repo.GetVerificationStatus(ctx, userID)
 }
 
 func calculateAge(dob time.Time) int {

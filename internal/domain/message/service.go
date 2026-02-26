@@ -9,10 +9,14 @@ import (
 )
 
 var (
-	ErrNotInMatch        = errors.New("not in match")
-	ErrEmptyMessage      = errors.New("message content or image required")
-	ErrImageNotEnabled   = errors.New("image sharing not enabled by both users")
+	ErrNotInMatch           = errors.New("not in match")
+	ErrEmptyMessage         = errors.New("message content or image required")
+	ErrImageNotEnabled      = errors.New("image sharing not enabled by both users")
+	ErrNotEnoughMessages    = errors.New("need at least 5 messages before enabling photos")
 )
+
+// MinMessagesForPhotos is the minimum number of messages required before photos can be enabled
+const MinMessagesForPhotos = 5
 
 type Repository interface {
 	Create(ctx context.Context, msg *Message) error
@@ -23,6 +27,9 @@ type Repository interface {
 	GetImagePermission(ctx context.Context, matchID, userID uuid.UUID) (*ImagePermission, error)
 	GetBothImagePermissions(ctx context.Context, matchID, userID, otherUserID uuid.UUID) (youEnabled, theyEnabled bool, err error)
 	SetImagePermission(ctx context.Context, matchID, userID uuid.UUID, enabled bool) error
+	MarkMessagesRead(ctx context.Context, matchID, readerID uuid.UUID) (int, error)
+	CountUnreadMessages(ctx context.Context, matchID, userID uuid.UUID) (int, error)
+	GetUnreadCountsForUser(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int, error)
 }
 
 type MatchRepository interface {
@@ -32,13 +39,31 @@ type MatchRepository interface {
 
 // Hub interface for real-time messaging
 type Hub interface {
-	SendToUser(userID uuid.UUID, msg WSMessage)
+	SendToUser(userID uuid.UUID, msg interface{})
+}
+
+// NotificationService interface for push notifications
+type NotificationService interface {
+	SendNewMessageNotification(ctx context.Context, userID uuid.UUID, senderName, messagePreview string, matchID uuid.UUID) error
+}
+
+// ProfileRepository interface for getting sender info
+type ProfileRepository interface {
+	GetNameByUserID(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
+// ModerationService interface for content moderation
+type ModerationService interface {
+	CheckContent(ctx context.Context, userID uuid.UUID, messageID *uuid.UUID, content string) error
 }
 
 type Service struct {
-	repo      Repository
-	matchRepo MatchRepository
-	hub       Hub
+	repo                Repository
+	matchRepo           MatchRepository
+	hub                 Hub
+	notificationService NotificationService
+	profileRepo         ProfileRepository
+	moderationService   ModerationService
 }
 
 func NewService(repo Repository, matchRepo MatchRepository, hub Hub) *Service {
@@ -49,7 +74,22 @@ func NewService(repo Repository, matchRepo MatchRepository, hub Hub) *Service {
 	}
 }
 
-// GetMessages gets messages for a match
+// SetNotificationService sets the push notification service
+func (s *Service) SetNotificationService(ns NotificationService) {
+	s.notificationService = ns
+}
+
+// SetProfileRepository sets the profile repository for sender info
+func (s *Service) SetProfileRepository(pr ProfileRepository) {
+	s.profileRepo = pr
+}
+
+// SetModerationService sets the content moderation service
+func (s *Service) SetModerationService(ms ModerationService) {
+	s.moderationService = ms
+}
+
+// GetMessages gets messages for a match and marks them as read
 func (s *Service) GetMessages(ctx context.Context, userID, matchID uuid.UUID, limit, offset int) (*MessagesResponse, error) {
 	// Verify user is in match
 	inMatch, err := s.matchRepo.IsUserInMatch(ctx, matchID, userID)
@@ -101,6 +141,24 @@ func (s *Service) GetMessages(ctx context.Context, userID, matchID uuid.UUID, li
 		resp.Messages = []Message{}
 	}
 
+	// Mark messages as read (messages from the other user)
+	markedCount, err := s.repo.MarkMessagesRead(ctx, matchID, userID)
+	if err != nil {
+		// Log but don't fail the request
+		// log.Printf("failed to mark messages read: %v", err)
+	}
+
+	// Notify sender that their messages were read
+	if markedCount > 0 && s.hub != nil {
+		s.hub.SendToUser(otherUserID, WSMessage{
+			Type: EventMessageRead,
+			Payload: MessageReadPayload{
+				MatchID:  matchID,
+				ReaderID: userID,
+			},
+		})
+	}
+
 	return resp, nil
 }
 
@@ -118,6 +176,13 @@ func (s *Service) SendMessage(ctx context.Context, userID, matchID uuid.UUID, re
 	// Validate message
 	if (req.Content == nil || *req.Content == "") && (req.ImageURL == nil || *req.ImageURL == "") {
 		return nil, ErrEmptyMessage
+	}
+
+	// Check content with moderation service (only for text content)
+	if s.moderationService != nil && req.Content != nil && *req.Content != "" {
+		if err := s.moderationService.CheckContent(ctx, userID, nil, *req.Content); err != nil {
+			return nil, err
+		}
 	}
 
 	// If sending image, check permissions
@@ -152,8 +217,8 @@ func (s *Service) SendMessage(ctx context.Context, userID, matchID uuid.UUID, re
 	}
 
 	// Notify other user via WebSocket
+	otherUserID, _ := s.matchRepo.GetOtherUserID(ctx, matchID, userID)
 	if s.hub != nil {
-		otherUserID, _ := s.matchRepo.GetOtherUserID(ctx, matchID, userID)
 		s.hub.SendToUser(otherUserID, WSMessage{
 			Type: EventNewMessage,
 			Payload: NewMessagePayload{
@@ -162,10 +227,30 @@ func (s *Service) SendMessage(ctx context.Context, userID, matchID uuid.UUID, re
 		})
 	}
 
+	// Send push notification for new message
+	if s.notificationService != nil && otherUserID != uuid.Nil {
+		senderName := "Someone"
+		if s.profileRepo != nil {
+			if name, err := s.profileRepo.GetNameByUserID(ctx, userID); err == nil && name != "" {
+				senderName = name
+			}
+		}
+
+		messagePreview := ""
+		if msg.Content != nil {
+			messagePreview = *msg.Content
+		} else if msg.ImageURL != nil {
+			messagePreview = "Sent an image"
+		}
+
+		go s.notificationService.SendNewMessageNotification(ctx, otherUserID, senderName, messagePreview, matchID)
+	}
+
 	return msg, nil
 }
 
 // EnableImages enables image sharing for a user in a match
+// Requires at least MinMessagesForPhotos messages in the conversation
 func (s *Service) EnableImages(ctx context.Context, userID, matchID uuid.UUID) error {
 	inMatch, err := s.matchRepo.IsUserInMatch(ctx, matchID, userID)
 	if err != nil {
@@ -173,6 +258,15 @@ func (s *Service) EnableImages(ctx context.Context, userID, matchID uuid.UUID) e
 	}
 	if !inMatch {
 		return ErrNotInMatch
+	}
+
+	// Check message count requirement
+	msgCount, err := s.repo.CountMessages(ctx, matchID)
+	if err != nil {
+		return err
+	}
+	if msgCount < MinMessagesForPhotos {
+		return ErrNotEnoughMessages
 	}
 
 	if err := s.repo.SetImagePermission(ctx, matchID, userID, true); err != nil {
@@ -223,6 +317,29 @@ func (s *Service) DisableImages(ctx context.Context, userID, matchID uuid.UUID) 
 	}
 
 	return nil
+}
+
+// CanSendImages checks if both users have images enabled
+func (s *Service) CanSendImages(ctx context.Context, userID, matchID uuid.UUID) (bool, error) {
+	inMatch, err := s.matchRepo.IsUserInMatch(ctx, matchID, userID)
+	if err != nil {
+		return false, err
+	}
+	if !inMatch {
+		return false, ErrNotInMatch
+	}
+
+	otherUserID, err := s.matchRepo.GetOtherUserID(ctx, matchID, userID)
+	if err != nil {
+		return false, err
+	}
+
+	youEnabled, theyEnabled, err := s.repo.GetBothImagePermissions(ctx, matchID, userID, otherUserID)
+	if err != nil {
+		return false, err
+	}
+
+	return youEnabled && theyEnabled, nil
 }
 
 // SendTypingIndicator sends a typing indicator to the other user

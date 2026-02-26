@@ -7,11 +7,45 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
-	S3       S3Config
+	Server     ServerConfig
+	Database   DatabaseConfig
+	Redis      RedisConfig
+	JWT        JWTConfig
+	S3         S3Config
+	Stripe     StripeConfig
+	Email      EmailConfig
+	Sentry     SentryConfig
+	OpenAI     OpenAIConfig
+	Moderation ModerationConfig
+}
+
+type SentryConfig struct {
+	DSN         string
+	Environment string
+}
+
+type OpenAIConfig struct {
+	APIKey string
+}
+
+type ModerationConfig struct {
+	Enabled             bool
+	BlockThreshold      float64
+	ReviewThreshold     float64
+}
+
+type EmailConfig struct {
+	APIKey    string
+	FromEmail string
+	FromName  string
+}
+
+type StripeConfig struct {
+	SecretKey        string
+	WebhookSecret    string
+	MonthlyPriceID   string
+	QuarterlyPriceID string
+	AnnualPriceID    string
 }
 
 type ServerConfig struct {
@@ -65,6 +99,30 @@ func Load() *Config {
 			Bucket:    getEnv("S3_BUCKET", "feels-photos"),
 			UseSSL:    getEnvBool("S3_USE_SSL", false),
 		},
+		Stripe: StripeConfig{
+			SecretKey:        getEnv("STRIPE_SECRET_KEY", ""),
+			WebhookSecret:    getEnv("STRIPE_WEBHOOK_SECRET", ""),
+			MonthlyPriceID:   getEnv("STRIPE_MONTHLY_PRICE_ID", ""),
+			QuarterlyPriceID: getEnv("STRIPE_QUARTERLY_PRICE_ID", ""),
+			AnnualPriceID:    getEnv("STRIPE_ANNUAL_PRICE_ID", ""),
+		},
+		Email: EmailConfig{
+			APIKey:    getEnv("RESEND_API_KEY", ""),
+			FromEmail: getEnv("EMAIL_FROM", ""),
+			FromName:  getEnv("EMAIL_FROM_NAME", "Feels"),
+		},
+		Sentry: SentryConfig{
+			DSN:         getEnv("SENTRY_DSN", ""),
+			Environment: getEnv("SENTRY_ENVIRONMENT", "development"),
+		},
+		OpenAI: OpenAIConfig{
+			APIKey: getEnv("OPENAI_API_KEY", ""),
+		},
+		Moderation: ModerationConfig{
+			Enabled:         getEnvBool("MODERATION_ENABLED", false),
+			BlockThreshold:  getEnvFloat("MODERATION_BLOCK_THRESHOLD", 0.9),
+			ReviewThreshold: getEnvFloat("MODERATION_REVIEW_THRESHOLD", 0.7),
+		},
 	}
 }
 
@@ -86,6 +144,17 @@ func getEnv(key, defaultValue string) string {
 func getEnvBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return defaultValue
+		}
+		return parsed
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		parsed, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			return defaultValue
 		}

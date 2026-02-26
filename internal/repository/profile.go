@@ -119,6 +119,31 @@ func (r *ProfileRepository) UpdateLastActive(ctx context.Context, userID uuid.UU
 	return err
 }
 
+func (r *ProfileRepository) GetNameByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
+	query := `SELECT COALESCE(name, '') FROM profiles WHERE user_id = $1`
+	var name string
+	err := r.db.QueryRow(ctx, query, userID).Scan(&name)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return name, nil
+}
+
+func (r *ProfileRepository) SetVerified(ctx context.Context, userID uuid.UUID, verified bool) error {
+	query := `UPDATE profiles SET is_verified = $2 WHERE user_id = $1`
+	result, err := r.db.Exec(ctx, query, userID, verified)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrProfileNotFound
+	}
+	return nil
+}
+
 // Photos
 
 func (r *ProfileRepository) GetPhotos(ctx context.Context, userID uuid.UUID) ([]profile.Photo, error) {
@@ -262,4 +287,80 @@ func (r *ProfileRepository) UpdatePreferences(ctx context.Context, p *profile.Pr
 		return ErrPreferencesNotFound
 	}
 	return nil
+}
+
+// Photo Verification Methods
+
+func (r *ProfileRepository) SetVerificationPhoto(ctx context.Context, userID uuid.UUID, photoURL, status string) error {
+	query := `
+		UPDATE profiles SET
+			verification_photo_url = $2,
+			verification_status = $3,
+			verification_submitted_at = NOW()
+		WHERE user_id = $1
+	`
+	_, err := r.db.Exec(ctx, query, userID, photoURL, status)
+	return err
+}
+
+func (r *ProfileRepository) GetVerificationStatus(ctx context.Context, userID uuid.UUID) (string, error) {
+	query := `SELECT COALESCE(verification_status, 'none') FROM profiles WHERE user_id = $1`
+	var status string
+	err := r.db.QueryRow(ctx, query, userID).Scan(&status)
+	return status, err
+}
+
+func (r *ProfileRepository) GetPendingVerifications(ctx context.Context, limit int) ([]profile.VerificationRequest, error) {
+	query := `
+		SELECT p.user_id, p.name, (SELECT url FROM photos WHERE user_id = p.user_id ORDER BY position LIMIT 1) as photo_url,
+			p.verification_photo_url, p.verification_submitted_at
+		FROM profiles p
+		WHERE p.verification_status = 'pending'
+		ORDER BY p.verification_submitted_at
+		LIMIT $1
+	`
+	rows, err := r.db.Query(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var requests []profile.VerificationRequest
+	for rows.Next() {
+		var req profile.VerificationRequest
+		var photoURL, verifyURL *string
+		if err := rows.Scan(&req.UserID, &req.Name, &photoURL, &verifyURL, &req.SubmittedAt); err != nil {
+			return nil, err
+		}
+		if photoURL != nil {
+			req.PhotoURL = *photoURL
+		}
+		if verifyURL != nil {
+			req.VerifyURL = *verifyURL
+		}
+		requests = append(requests, req)
+	}
+	return requests, rows.Err()
+}
+
+func (r *ProfileRepository) ApproveVerification(ctx context.Context, userID, adminID uuid.UUID) error {
+	query := `
+		UPDATE profiles SET
+			verification_status = 'approved',
+			is_verified = true
+		WHERE user_id = $1
+	`
+	_, err := r.db.Exec(ctx, query, userID)
+	return err
+}
+
+func (r *ProfileRepository) RejectVerification(ctx context.Context, userID, adminID uuid.UUID) error {
+	query := `
+		UPDATE profiles SET
+			verification_status = 'rejected',
+			verification_photo_url = NULL
+		WHERE user_id = $1
+	`
+	_, err := r.db.Exec(ctx, query, userID)
+	return err
 }

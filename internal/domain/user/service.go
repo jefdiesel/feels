@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -182,17 +183,33 @@ func (s *Service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, 
 		if req.TOTPCode == "" {
 			return nil, ErrTOTPRequired
 		}
-		// TODO: Validate TOTP code against user.TOTPSecret
-		// For now, also check backup codes
+
 		validCode := false
-		for _, code := range user.TOTPBackupCodes {
-			if code == req.TOTPCode {
-				validCode = true
-				break
+
+		// First try TOTP validation if we have a secret
+		if user.TOTPSecret != nil && *user.TOTPSecret != "" {
+			validCode = totp.Validate(req.TOTPCode, *user.TOTPSecret)
+		}
+
+		// If TOTP didn't work, check backup codes
+		if !validCode {
+			for i, code := range user.TOTPBackupCodes {
+				if code == req.TOTPCode {
+					validCode = true
+					// Remove used backup code
+					user.TOTPBackupCodes = append(user.TOTPBackupCodes[:i], user.TOTPBackupCodes[i+1:]...)
+					// Save updated user (async, don't block login)
+					go func() {
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+						s.repo.Update(ctx, user)
+					}()
+					break
+				}
 			}
 		}
+
 		if !validCode {
-			// TODO: Implement actual TOTP validation
 			return nil, ErrInvalidTOTP
 		}
 	}
@@ -459,8 +476,16 @@ func (s *Service) Setup2FA(ctx context.Context, userID uuid.UUID) (*Setup2FAResp
 		return nil, err
 	}
 
-	// Generate secret (32 bytes base32 encoded)
-	secret := generateTOTPSecret()
+	// Generate TOTP key using the proper library
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "Feels",
+		AccountName: user.Email,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	secret := key.Secret()
 	backupCodes := generateBackupCodes(8)
 
 	user.TOTPSecret = &secret
@@ -471,8 +496,8 @@ func (s *Service) Setup2FA(ctx context.Context, userID uuid.UUID) (*Setup2FAResp
 		return nil, err
 	}
 
-	// Generate QR code URL (otpauth:// format)
-	qrCode := "otpauth://totp/Feels:" + user.Email + "?secret=" + secret + "&issuer=Feels"
+	// The key.URL() already provides proper otpauth:// format
+	qrCode := key.URL()
 
 	return &Setup2FAResponse{
 		Secret:      secret,

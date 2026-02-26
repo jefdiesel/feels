@@ -40,6 +40,9 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 			UNION
 			SELECT user2_id FROM matches WHERE user1_id = $1
 		),
+		shadowbanned_users AS (
+			SELECT id FROM users WHERE moderation_status = 'shadowbanned'
+		),
 		candidates AS (
 			SELECT
 				p.*,
@@ -72,6 +75,7 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 				AND p.user_id NOT IN (SELECT * FROM blocked_users)
 				AND p.user_id NOT IN (SELECT * FROM already_seen)
 				AND p.user_id NOT IN (SELECT * FROM matched_users)
+				AND p.user_id NOT IN (SELECT * FROM shadowbanned_users)
 				-- Visibility: user must be visible to our gender
 				AND (target_prefs.visible_to_genders IS NULL OR up.gender = ANY(target_prefs.visible_to_genders))
 				-- Hard blocks: user hasn't hard-blocked our gender
@@ -194,6 +198,17 @@ func (r *FeedRepository) CreateLike(ctx context.Context, like *feed.Like) error 
 	return err
 }
 
+// CreateLikeWithMessage creates a like record with an attached message (superlike only)
+func (r *FeedRepository) CreateLikeWithMessage(ctx context.Context, like *feed.Like, message string) error {
+	query := `
+		INSERT INTO likes (id, liker_id, liked_id, is_superlike, attached_message, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (liker_id, liked_id) DO NOTHING
+	`
+	_, err := r.db.Exec(ctx, query, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, message, like.CreatedAt)
+	return err
+}
+
 // GetLike checks if a like exists
 func (r *FeedRepository) GetLike(ctx context.Context, likerID, likedID uuid.UUID) (*feed.Like, error) {
 	query := `SELECT id, liker_id, liked_id, is_superlike, created_at FROM likes WHERE liker_id = $1 AND liked_id = $2`
@@ -221,6 +236,39 @@ func (r *FeedRepository) CreatePass(ctx context.Context, pass *feed.Pass) error 
 		ON CONFLICT DO NOTHING
 	`
 	_, err := r.db.Exec(ctx, query, pass.PasserID, pass.PassedID, pass.CreatedAt)
+	return err
+}
+
+// GetLastPass returns the most recent pass for a user
+func (r *FeedRepository) GetLastPass(ctx context.Context, userID uuid.UUID) (*feed.Pass, error) {
+	query := `
+		SELECT passer_id, passed_id, created_at FROM passes
+		WHERE passer_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	var pass feed.Pass
+	err := r.db.QueryRow(ctx, query, userID).Scan(&pass.PasserID, &pass.PassedID, &pass.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &pass, nil
+}
+
+// DeletePass deletes a pass record (for rewind)
+func (r *FeedRepository) DeletePass(ctx context.Context, userID, targetID uuid.UUID) error {
+	query := `DELETE FROM passes WHERE passer_id = $1 AND passed_id = $2`
+	_, err := r.db.Exec(ctx, query, userID, targetID)
+	return err
+}
+
+// RecordRewind records a rewind action
+func (r *FeedRepository) RecordRewind(ctx context.Context, userID, targetID uuid.UUID, originalAction string) error {
+	query := `
+		INSERT INTO rewinds (user_id, target_id, original_action, created_at)
+		VALUES ($1, $2, $3, NOW())
+	`
+	_, err := r.db.Exec(ctx, query, userID, targetID, originalAction)
 	return err
 }
 

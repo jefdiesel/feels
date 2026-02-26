@@ -77,7 +77,8 @@ func (r *MatchRepository) GetUserMatches(ctx context.Context, userID uuid.UUID) 
 			(SELECT content FROM messages WHERE match_id = m.id ORDER BY created_at DESC LIMIT 1) AS last_message,
 			(SELECT sender_id FROM messages WHERE match_id = m.id ORDER BY created_at DESC LIMIT 1) AS last_sender,
 			(SELECT created_at FROM messages WHERE match_id = m.id ORDER BY created_at DESC LIMIT 1) AS last_msg_time,
-			COALESCE(ip.enabled, false) AS image_enabled
+			COALESCE(ip.enabled, false) AS image_enabled,
+			(SELECT COUNT(*) FROM messages WHERE match_id = m.id AND sender_id != $1 AND read_at IS NULL) AS unread_count
 		FROM matches m
 		JOIN profiles p ON p.user_id = CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END
 		LEFT JOIN image_permissions ip ON ip.match_id = m.id AND ip.user_id = $1
@@ -111,6 +112,7 @@ func (r *MatchRepository) GetUserMatches(ctx context.Context, userID uuid.UUID) 
 			&mwp.OtherUser.IsVerified, &mwp.OtherUser.LastActive, &mwp.OtherUser.CreatedAt,
 			&lastMsgContent, &lastMsgSender, &lastMsgTime,
 			&mwp.ImageEnabled,
+			&mwp.UnreadCount,
 		)
 		if err != nil {
 			return nil, err

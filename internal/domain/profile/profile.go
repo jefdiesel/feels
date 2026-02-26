@@ -130,6 +130,15 @@ type ProfileResponse struct {
 	Preferences *Preferences `json:"preferences,omitempty"`
 }
 
+// VerificationRequest represents a pending photo verification
+type VerificationRequest struct {
+	UserID      uuid.UUID `json:"user_id"`
+	Name        string    `json:"name"`
+	PhotoURL    string    `json:"photo_url"`
+	VerifyURL   string    `json:"verify_url"`
+	SubmittedAt time.Time `json:"submitted_at"`
+}
+
 // Valid values
 var (
 	ValidGenders    = []string{"man", "woman", "trans", "non_binary"}

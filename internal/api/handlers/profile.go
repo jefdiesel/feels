@@ -212,3 +212,99 @@ func (h *ProfileHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *ProfileHandler) ReorderPhotos(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		PhotoIDs []uuid.UUID `json:"photo_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.PhotoIDs) == 0 {
+		jsonError(w, "photo_ids required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.profileService.ReorderPhotos(r.Context(), userID, req.PhotoIDs); err != nil {
+		jsonError(w, "failed to reorder photos", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// VerifyProfile sets the verification badge on a user's profile
+// Requires a quarterly or annual subscription
+func (h *ProfileHandler) VerifyProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.profileService.VerifyProfile(r.Context(), userID); err != nil {
+		switch {
+		case errors.Is(err, profile.ErrVerificationUnavailable):
+			jsonError(w, "verification requires a quarterly or annual subscription", http.StatusPaymentRequired)
+		case errors.Is(err, profile.ErrAlreadyVerified):
+			jsonError(w, "profile is already verified", http.StatusConflict)
+		case errors.Is(err, repository.ErrProfileNotFound):
+			jsonError(w, "profile not found", http.StatusNotFound)
+		default:
+			jsonError(w, "failed to verify profile", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonResponse(w, map[string]bool{"verified": true}, http.StatusOK)
+}
+
+// SubmitVerification uploads a verification selfie for manual review
+func (h *ProfileHandler) SubmitVerification(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse multipart form (max 10MB)
+	if err := r.ParseMultipartForm(storage.MaxPhotoSize); err != nil {
+		jsonError(w, "file too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	file, header, err := r.FormFile("photo")
+	if err != nil {
+		jsonError(w, "photo file required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if !storage.IsAllowedContentType(contentType) {
+		jsonError(w, "invalid file type, must be jpeg, png, gif, or webp", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.profileService.SubmitVerification(r.Context(), userID, file, header.Size, contentType); err != nil {
+		switch {
+		case errors.Is(err, profile.ErrAlreadyVerified):
+			jsonError(w, "profile is already verified", http.StatusConflict)
+		case errors.Is(err, profile.ErrVerificationAlreadyPending):
+			jsonError(w, "verification already submitted and pending review", http.StatusConflict)
+		default:
+			jsonError(w, "failed to submit verification", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonResponse(w, map[string]string{"status": "pending"}, http.StatusOK)
+}

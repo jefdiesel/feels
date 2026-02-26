@@ -13,6 +13,20 @@ var (
 	ErrCannotBlock   = errors.New("cannot block yourself")
 )
 
+// WebSocket event type
+const EventMatchDeleted = "match_deleted"
+
+// WSMessage is a WebSocket message envelope
+type WSMessage struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
+// MatchDeletedPayload is sent when a match is deleted
+type MatchDeletedPayload struct {
+	MatchID uuid.UUID `json:"match_id"`
+}
+
 type MatchRepository interface {
 	GetByID(ctx context.Context, matchID uuid.UUID) (*Match, error)
 	GetUserMatches(ctx context.Context, userID uuid.UUID) ([]MatchWithProfile, error)
@@ -30,9 +44,20 @@ type BlockRepository interface {
 	DeleteLikesBetweenUsers(ctx context.Context, user1ID, user2ID uuid.UUID) error
 }
 
+type MessageRepository interface {
+	DeleteByMatch(ctx context.Context, matchID uuid.UUID) error
+}
+
+// Hub interface for real-time notifications
+type Hub interface {
+	SendToUser(userID uuid.UUID, msg interface{})
+}
+
 type Service struct {
-	matchRepo MatchRepository
-	blockRepo BlockRepository
+	matchRepo   MatchRepository
+	blockRepo   BlockRepository
+	messageRepo MessageRepository
+	hub         Hub
 }
 
 func NewService(matchRepo MatchRepository, blockRepo BlockRepository) *Service {
@@ -40,6 +65,16 @@ func NewService(matchRepo MatchRepository, blockRepo BlockRepository) *Service {
 		matchRepo: matchRepo,
 		blockRepo: blockRepo,
 	}
+}
+
+// SetMessageRepository sets the message repository for cleanup on unmatch
+func (s *Service) SetMessageRepository(repo MessageRepository) {
+	s.messageRepo = repo
+}
+
+// SetHub sets the WebSocket hub for notifications
+func (s *Service) SetHub(hub Hub) {
+	s.hub = hub
 }
 
 // GetMatches returns all matches for a user
@@ -62,9 +97,37 @@ func (s *Service) GetMatch(ctx context.Context, matchID, userID uuid.UUID) (*Mat
 	return match, nil
 }
 
-// Unmatch removes a match
+// Unmatch removes a match, deletes messages, and notifies the other user
 func (s *Service) Unmatch(ctx context.Context, matchID, userID uuid.UUID) error {
-	return s.matchRepo.Delete(ctx, matchID, userID)
+	// Get the other user before deleting
+	otherUserID, err := s.matchRepo.GetOtherUserID(ctx, matchID, userID)
+	if err != nil {
+		return err
+	}
+
+	// Delete the match
+	if err := s.matchRepo.Delete(ctx, matchID, userID); err != nil {
+		return err
+	}
+
+	// Delete all messages in this match
+	if s.messageRepo != nil {
+		if err := s.messageRepo.DeleteByMatch(ctx, matchID); err != nil {
+			// Log but don't fail - match is already deleted
+		}
+	}
+
+	// Notify the other user
+	if s.hub != nil {
+		s.hub.SendToUser(otherUserID, WSMessage{
+			Type: EventMatchDeleted,
+			Payload: MatchDeletedPayload{
+				MatchID: matchID,
+			},
+		})
+	}
+
+	return nil
 }
 
 // Block blocks a user

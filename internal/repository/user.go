@@ -62,6 +62,19 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User,
 	return &u, nil
 }
 
+func (r *UserRepository) GetEmail(ctx context.Context, userID uuid.UUID) (string, error) {
+	query := `SELECT email FROM users WHERE id = $1`
+	var email string
+	err := r.db.QueryRow(ctx, query, userID).Scan(&email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrUserNotFound
+		}
+		return "", err
+	}
+	return email, nil
+}
+
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
 	query := `
 		SELECT id, email, password_hash, email_verified, phone, phone_verified,
@@ -368,4 +381,55 @@ func (r *UserRepository) GetPublicKeysByUserIDs(ctx context.Context, userIDs []u
 		result[key.UserID] = &key
 	}
 	return result, nil
+}
+
+// Moderation methods
+
+// IsShadowbanned checks if a user is shadowbanned
+func (r *UserRepository) IsShadowbanned(ctx context.Context, userID uuid.UUID) (bool, error) {
+	query := `SELECT COALESCE(moderation_status = 'shadowbanned', false) FROM users WHERE id = $1`
+	var isShadowbanned bool
+	err := r.db.QueryRow(ctx, query, userID).Scan(&isShadowbanned)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return isShadowbanned, nil
+}
+
+// GetModerationStatus returns the moderation status of a user
+func (r *UserRepository) GetModerationStatus(ctx context.Context, userID uuid.UUID) (string, error) {
+	query := `SELECT COALESCE(moderation_status, 'active') FROM users WHERE id = $1`
+	var status string
+	err := r.db.QueryRow(ctx, query, userID).Scan(&status)
+	return status, err
+}
+
+// SetModerationStatus updates a user's moderation status
+func (r *UserRepository) SetModerationStatus(ctx context.Context, userID uuid.UUID, status, reason string) error {
+	query := `
+		UPDATE users SET
+			moderation_status = $2,
+			shadowban_reason = CASE WHEN $2 = 'shadowbanned' THEN $3 ELSE NULL END,
+			shadowbanned_at = CASE WHEN $2 = 'shadowbanned' THEN NOW() ELSE NULL END
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(ctx, query, userID, status, reason)
+	return err
+}
+
+// IsAdmin checks if a user is an admin
+func (r *UserRepository) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) {
+	query := `SELECT COALESCE(is_admin, false) FROM users WHERE id = $1`
+	var isAdmin bool
+	err := r.db.QueryRow(ctx, query, userID).Scan(&isAdmin)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return isAdmin, nil
 }

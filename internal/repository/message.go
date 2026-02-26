@@ -38,12 +38,12 @@ func (r *MessageRepository) Create(ctx context.Context, msg *message.Message) er
 // GetByID gets a message by ID
 func (r *MessageRepository) GetByID(ctx context.Context, msgID uuid.UUID) (*message.Message, error) {
 	query := `
-		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at
+		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at, read_at
 		FROM messages WHERE id = $1
 	`
 	var msg message.Message
 	err := r.db.QueryRow(ctx, query, msgID).Scan(
-		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt,
+		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt, &msg.ReadAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -57,7 +57,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, msgID uuid.UUID) (*mess
 // GetByMatch gets messages for a match with pagination
 func (r *MessageRepository) GetByMatch(ctx context.Context, matchID uuid.UUID, limit, offset int) ([]message.Message, error) {
 	query := `
-		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at
+		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at, read_at
 		FROM messages
 		WHERE match_id = $1
 		ORDER BY created_at DESC
@@ -72,7 +72,7 @@ func (r *MessageRepository) GetByMatch(ctx context.Context, matchID uuid.UUID, l
 	var messages []message.Message
 	for rows.Next() {
 		var msg message.Message
-		if err := rows.Scan(&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt, &msg.ReadAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, msg)
@@ -89,7 +89,7 @@ func (r *MessageRepository) GetByMatch(ctx context.Context, matchID uuid.UUID, l
 // GetLastMessage gets the last message in a match
 func (r *MessageRepository) GetLastMessage(ctx context.Context, matchID uuid.UUID) (*message.Message, error) {
 	query := `
-		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at
+		SELECT id, match_id, sender_id, content, encrypted_content, image_url, created_at, read_at
 		FROM messages
 		WHERE match_id = $1
 		ORDER BY created_at DESC
@@ -97,7 +97,7 @@ func (r *MessageRepository) GetLastMessage(ctx context.Context, matchID uuid.UUI
 	`
 	var msg message.Message
 	err := r.db.QueryRow(ctx, query, matchID).Scan(
-		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt,
+		&msg.ID, &msg.MatchID, &msg.SenderID, &msg.Content, &msg.EncryptedContent, &msg.ImageURL, &msg.CreatedAt, &msg.ReadAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -188,6 +188,62 @@ func (r *MessageRepository) SetImagePermission(ctx context.Context, matchID, use
 	`
 	_, err := r.db.Exec(ctx, query, matchID, userID, enabled, enabledAt)
 	return err
+}
+
+// MarkMessagesRead marks all messages from a sender as read in a match
+func (r *MessageRepository) MarkMessagesRead(ctx context.Context, matchID, readerID uuid.UUID) (int, error) {
+	// Mark messages as read where the reader is NOT the sender (i.e., messages sent TO them)
+	query := `
+		UPDATE messages
+		SET read_at = NOW()
+		WHERE match_id = $1 AND sender_id != $2 AND read_at IS NULL
+	`
+	result, err := r.db.Exec(ctx, query, matchID, readerID)
+	if err != nil {
+		return 0, err
+	}
+	return int(result.RowsAffected()), nil
+}
+
+// CountUnreadMessages counts unread messages for a user in a match
+func (r *MessageRepository) CountUnreadMessages(ctx context.Context, matchID, userID uuid.UUID) (int, error) {
+	// Count messages where user is NOT the sender and read_at is NULL
+	query := `
+		SELECT COUNT(*) FROM messages
+		WHERE match_id = $1 AND sender_id != $2 AND read_at IS NULL
+	`
+	var count int
+	err := r.db.QueryRow(ctx, query, matchID, userID).Scan(&count)
+	return count, err
+}
+
+// GetUnreadCountsForUser gets unread message counts for all of a user's matches
+func (r *MessageRepository) GetUnreadCountsForUser(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int, error) {
+	query := `
+		SELECT m.match_id, COUNT(*)
+		FROM messages m
+		JOIN matches ma ON ma.id = m.match_id
+		WHERE (ma.user1_id = $1 OR ma.user2_id = $1)
+			AND m.sender_id != $1
+			AND m.read_at IS NULL
+		GROUP BY m.match_id
+	`
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := make(map[uuid.UUID]int)
+	for rows.Next() {
+		var matchID uuid.UUID
+		var count int
+		if err := rows.Scan(&matchID, &count); err != nil {
+			return nil, err
+		}
+		counts[matchID] = count
+	}
+	return counts, rows.Err()
 }
 
 // DeleteByMatch deletes all messages for a match (used when unmatching)
