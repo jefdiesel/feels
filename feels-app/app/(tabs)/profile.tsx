@@ -11,13 +11,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/stores/authStore';
 import { useCreditsStore } from '@/stores/creditsStore';
-import { api, profileApi } from '@/api/client';
+import { api, profileApi, referralApi } from '@/api/client';
 import PremiumModal from '@/components/PremiumModal';
 import PhotoGrid from '@/components/PhotoGrid';
 import {
@@ -39,6 +40,9 @@ import {
   PlusIcon,
   XIcon,
   CheckIcon,
+  ShareIcon,
+  GiftIcon,
+  SparklesIcon,
 } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing, shadows } from '@/constants/theme';
 
@@ -121,6 +125,120 @@ export default function ProfileScreen() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
 
+  // Referral state
+  const [referralCode, setReferralCode] = useState<string>('');
+  const [referralStats, setReferralStats] = useState<{ total_referrals: number; premium_days_earned: number } | null>(null);
+  const [loadingReferral, setLoadingReferral] = useState(false);
+
+  // Profile quality tips
+  const getProfileTips = () => {
+    const tips: { id: string; text: string; action: () => void; priority: number }[] = [];
+
+    // Check photos - most important
+    if (!photos || photos.length === 0) {
+      tips.push({
+        id: 'no_photos',
+        text: 'Add photos to get 10x more matches',
+        action: () => {/* PhotoGrid handles this */},
+        priority: 1,
+      });
+    } else if (photos.length < 3) {
+      tips.push({
+        id: 'few_photos',
+        text: `Add ${3 - photos.length} more photo${3 - photos.length > 1 ? 's' : ''} to get 3x more likes`,
+        action: () => {/* PhotoGrid handles this */},
+        priority: 2,
+      });
+    }
+
+    // Check bio
+    if (!user?.bio || user.bio.length < 20) {
+      tips.push({
+        id: 'no_bio',
+        text: 'Write a bio - profiles with bios get 2x more matches',
+        action: () => openEditModal('bio'),
+        priority: 3,
+      });
+    }
+
+    // Check prompts
+    if (!user?.prompts || user.prompts.length === 0) {
+      tips.push({
+        id: 'no_prompts',
+        text: 'Add prompts to show your personality',
+        action: openPromptSelector,
+        priority: 4,
+      });
+    }
+
+    // Check looking_for
+    if (!user?.looking_for) {
+      tips.push({
+        id: 'no_looking_for',
+        text: 'Set what you\'re looking for to find better matches',
+        action: () => router.push('/settings'),
+        priority: 5,
+      });
+    }
+
+    // Sort by priority and return top 2
+    return tips.sort((a, b) => a.priority - b.priority).slice(0, 2);
+  };
+
+  const profileTips = getProfileTips();
+
+  const loadReferralData = async () => {
+    try {
+      setLoadingReferral(true);
+      const [codeRes, statsRes] = await Promise.all([
+        referralApi.getCode(),
+        referralApi.getStats(),
+      ]);
+      setReferralCode(codeRes.data.code);
+      setReferralStats({
+        total_referrals: statsRes.data.total_referrals,
+        premium_days_earned: statsRes.data.premium_days_earned,
+      });
+    } catch (error) {
+      console.error('Failed to load referral data:', error);
+    } finally {
+      setLoadingReferral(false);
+    }
+  };
+
+  const handleShareProfile = async () => {
+    try {
+      const response = await profileApi.getShareLink();
+      const { url, title, text } = response.data;
+
+      await Share.share({
+        message: `${text}\n\n${url}`,
+        title: title,
+        url: url, // iOS only
+      });
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+        Alert.alert('Error', 'Failed to share profile');
+      }
+    }
+  };
+
+  const handleShareReferral = async () => {
+    if (!referralCode) return;
+
+    try {
+      await Share.share({
+        message: `Join me on feels - the dating app that puts real connections first! Use my code ${referralCode} to get 3 days of premium free.\n\nhttps://feels.app/invite/${referralCode}`,
+        title: 'Invite friends to feels',
+      });
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+      }
+    }
+  };
+
   const loadPhotos = async () => {
     try {
       const response = await profileApi.get();
@@ -137,6 +255,7 @@ export default function ProfileScreen() {
     loadCredits();
     loadSubscription();
     loadPhotos();
+    loadReferralData();
   }, []);
 
   const handleLogout = () => {
@@ -293,9 +412,14 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
-          <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
-            <SettingsIcon size={22} color={colors.text.primary} />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.headerButton} onPress={handleShareProfile}>
+              <ShareIcon size={20} color={colors.text.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/settings')}>
+              <SettingsIcon size={22} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Profile Card */}
@@ -335,6 +459,26 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        {/* Profile Quality Tips */}
+        {profileTips.length > 0 && (
+          <View style={styles.tipsContainer}>
+            {profileTips.map((tip) => (
+              <TouchableOpacity
+                key={tip.id}
+                style={styles.tipCard}
+                onPress={tip.action}
+                activeOpacity={0.8}
+              >
+                <View style={styles.tipIcon}>
+                  <SparklesIcon size={16} color={colors.secondary.DEFAULT} />
+                </View>
+                <Text style={styles.tipText}>{tip.text}</Text>
+                <ChevronRightIcon size={16} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Credits Card */}
         <TouchableOpacity
@@ -577,6 +721,51 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Invite Friends / Referral */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Invite Friends</Text>
+          </View>
+
+          <View style={styles.referralCard}>
+            <View style={styles.referralIconContainer}>
+              <GiftIcon size={28} color={colors.secondary.DEFAULT} />
+            </View>
+            <View style={styles.referralContent}>
+              <Text style={styles.referralTitle}>Get 7 days of premium free</Text>
+              <Text style={styles.referralSubtitle}>
+                Share your code. Friends get 3 days, you get 7 when they sign up.
+              </Text>
+
+              {loadingReferral ? (
+                <ActivityIndicator color={colors.primary.DEFAULT} style={{ marginTop: spacing.md }} />
+              ) : (
+                <>
+                  <View style={styles.referralCodeRow}>
+                    <Text style={styles.referralCode}>{referralCode || '...'}</Text>
+                    <TouchableOpacity
+                      style={styles.shareCodeButton}
+                      onPress={handleShareReferral}
+                    >
+                      <ShareIcon size={16} color={colors.text.primary} />
+                      <Text style={styles.shareCodeText}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {referralStats && referralStats.total_referrals > 0 && (
+                    <View style={styles.referralStatsRow}>
+                      <Text style={styles.referralStatsText}>
+                        {referralStats.total_referrals} friend{referralStats.total_referrals !== 1 ? 's' : ''} joined
+                        {referralStats.premium_days_earned > 0 && ` (+${referralStats.premium_days_earned} days earned)`}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+
         {/* Logout */}
         <View style={styles.section}>
           <TouchableOpacity
@@ -760,6 +949,19 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes['3xl'],
     fontWeight: typography.weights.extrabold as any,
     color: colors.text.primary,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.bg.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   settingsButton: {
     width: 44,
@@ -1194,5 +1396,102 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'right',
     marginTop: spacing.sm,
+  },
+  // Referral styles
+  referralCard: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.secondary.muted,
+  },
+  referralIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(232, 176, 73, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  referralContent: {
+    flex: 1,
+  },
+  referralTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
+  },
+  referralSubtitle: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
+  referralCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    gap: spacing.md,
+  },
+  referralCode: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.extrabold as any,
+    color: colors.secondary.DEFAULT,
+    letterSpacing: 2,
+  },
+  shareCodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary.DEFAULT,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    gap: spacing.xs,
+  },
+  shareCodeText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
+  },
+  referralStatsRow: {
+    marginTop: spacing.sm,
+  },
+  referralStatsText: {
+    fontSize: typography.sizes.sm,
+    color: colors.success,
+    fontWeight: typography.weights.medium as any,
+  },
+  // Profile Tips styles
+  tipsContainer: {
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
+  },
+  tipCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(232, 176, 73, 0.1)',
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(232, 176, 73, 0.3)',
+    gap: spacing.sm,
+  },
+  tipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(232, 176, 73, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tipText: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    fontWeight: typography.weights.medium as any,
   },
 });

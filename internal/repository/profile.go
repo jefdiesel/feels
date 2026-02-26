@@ -60,14 +60,14 @@ func (r *ProfileRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (
 	query := `
 		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
-			alcohol, weed, lat, lng, is_verified, last_active, created_at
+			alcohol, weed, lat, lng, is_verified, last_active, created_at, share_code
 		FROM profiles WHERE user_id = $1
 	`
 	var p profile.Profile
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
 		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
-		&p.Alcohol, &p.Weed, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt,
+		&p.Alcohol, &p.Weed, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -363,4 +363,67 @@ func (r *ProfileRepository) RejectVerification(ctx context.Context, userID, admi
 	`
 	_, err := r.db.Exec(ctx, query, userID)
 	return err
+}
+
+// Share Code Methods
+
+// GetByShareCode returns a profile by its share code (for public profile viewing)
+func (r *ProfileRepository) GetByShareCode(ctx context.Context, code string) (*profile.Profile, error) {
+	query := `
+		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
+			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
+			alcohol, weed, lat, lng, is_verified, last_active, created_at, share_code
+		FROM profiles WHERE share_code = $1
+	`
+	var p profile.Profile
+	err := r.db.QueryRow(ctx, query, code).Scan(
+		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
+		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
+		&p.Alcohol, &p.Weed, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrProfileNotFound
+		}
+		return nil, err
+	}
+
+	photos, err := r.GetPhotos(ctx, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	p.Photos = photos
+
+	return &p, nil
+}
+
+// GetOrCreateShareCode gets the share code for a user, creating one if it doesn't exist
+func (r *ProfileRepository) GetOrCreateShareCode(ctx context.Context, userID uuid.UUID) (string, error) {
+	// First check if share code exists
+	var code *string
+	err := r.db.QueryRow(ctx, `SELECT share_code FROM profiles WHERE user_id = $1`, userID).Scan(&code)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrProfileNotFound
+		}
+		return "", err
+	}
+
+	if code != nil && *code != "" {
+		return *code, nil
+	}
+
+	// Generate a new share code using first 8 chars of MD5(user_id + timestamp)
+	newCode := ""
+	err = r.db.QueryRow(ctx, `
+		UPDATE profiles
+		SET share_code = UPPER(SUBSTRING(MD5($1::text || NOW()::text) FROM 1 FOR 8))
+		WHERE user_id = $1
+		RETURNING share_code
+	`, userID).Scan(&newCode)
+	if err != nil {
+		return "", err
+	}
+
+	return newCode, nil
 }

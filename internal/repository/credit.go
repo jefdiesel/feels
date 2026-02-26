@@ -174,21 +174,21 @@ func (r *CreditRepository) UpdateSubscriptionAutoRenew(ctx context.Context, subI
 
 // GetDailyLikes gets the daily like count for a user
 func (r *CreditRepository) GetDailyLikes(ctx context.Context, userID uuid.UUID) (*credit.DailyLike, error) {
-	today := time.Now().Truncate(24 * time.Hour)
+	// Use CURRENT_DATE for consistent timezone handling (database timezone)
 	query := `
 		SELECT user_id, date, count
 		FROM daily_likes
-		WHERE user_id = $1 AND date = $2
+		WHERE user_id = $1 AND date = CURRENT_DATE
 	`
 	var dl credit.DailyLike
-	err := r.db.QueryRow(ctx, query, userID, today).Scan(
+	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&dl.UserID, &dl.Date, &dl.Count,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &credit.DailyLike{
 				UserID: userID,
-				Date:   today,
+				Date:   time.Now().UTC().Truncate(24 * time.Hour),
 				Count:  0,
 			}, nil
 		}
@@ -199,13 +199,13 @@ func (r *CreditRepository) GetDailyLikes(ctx context.Context, userID uuid.UUID) 
 
 // IncrementDailyLikes increments the daily like count
 func (r *CreditRepository) IncrementDailyLikes(ctx context.Context, userID uuid.UUID) error {
-	today := time.Now().Truncate(24 * time.Hour)
+	// Use CURRENT_DATE for consistent timezone handling
 	query := `
 		INSERT INTO daily_likes (user_id, date, count)
-		VALUES ($1, $2, 1)
+		VALUES ($1, CURRENT_DATE, 1)
 		ON CONFLICT (user_id, date) DO UPDATE SET count = daily_likes.count + 1
 	`
-	_, err := r.db.Exec(ctx, query, userID, today)
+	_, err := r.db.Exec(ctx, query, userID)
 	return err
 }
 
@@ -229,4 +229,65 @@ func (r *CreditRepository) HasSubscription(ctx context.Context, userID uuid.UUID
 		return false, err
 	}
 	return sub != nil, nil
+}
+
+// Atomic operations to prevent race conditions
+
+// UseBonusLikeAtomic atomically checks and uses one bonus like
+func (r *CreditRepository) UseBonusLikeAtomic(ctx context.Context, userID uuid.UUID) error {
+	// Same as UseBonusLike - already atomic due to WHERE clause
+	query := `
+		UPDATE credits
+		SET bonus_likes = bonus_likes - 1
+		WHERE user_id = $1 AND bonus_likes > 0
+	`
+	result, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrInsufficientCredits
+	}
+	return nil
+}
+
+// UseDailyLikeAtomic atomically checks limit and increments daily like count
+// Uses a single INSERT/UPDATE that enforces the limit
+func (r *CreditRepository) UseDailyLikeAtomic(ctx context.Context, userID uuid.UUID, limit int) error {
+	// Use CURRENT_DATE for consistent timezone (database timezone)
+	query := `
+		INSERT INTO daily_likes (user_id, date, count)
+		VALUES ($1, CURRENT_DATE, 1)
+		ON CONFLICT (user_id, date) DO UPDATE
+		SET count = daily_likes.count + 1
+		WHERE daily_likes.count < $2
+		RETURNING count
+	`
+	var newCount int
+	err := r.db.QueryRow(ctx, query, userID, limit).Scan(&newCount)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrDailyLimitReached
+		}
+		return err
+	}
+	return nil
+}
+
+// DeductCreditsAtomic atomically checks and deducts credits
+func (r *CreditRepository) DeductCreditsAtomic(ctx context.Context, userID uuid.UUID, amount int) error {
+	// Same as DeductCredits - already atomic due to WHERE clause
+	query := `
+		UPDATE credits
+		SET balance = balance - $2
+		WHERE user_id = $1 AND balance >= $2
+	`
+	result, err := r.db.Exec(ctx, query, userID, amount)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrInsufficientCredits
+	}
+	return nil
 }

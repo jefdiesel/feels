@@ -133,8 +133,8 @@ func (s *Service) SendNewMatchNotification(ctx context.Context, userID uuid.UUID
 	return s.Send(ctx, &PushMessage{
 		UserID: userID,
 		Type:   NotificationTypeNewMatch,
-		Title:  "New Match!",
-		Body:   fmt.Sprintf("You matched with %s", matchName),
+		Title:  "It's a Match!",
+		Body:   fmt.Sprintf("You and %s like each other - say hi!", matchName),
 		Data: map[string]interface{}{
 			"type":    string(NotificationTypeNewMatch),
 			"matchId": matchID.String(),
@@ -185,4 +185,63 @@ func (s *Service) SendSuperLikeNotification(ctx context.Context, userID uuid.UUI
 			"type": string(NotificationTypeSuperLike),
 		},
 	})
+}
+
+// SendDailyDigestNotification sends a summary of daily activity
+func (s *Service) SendDailyDigestNotification(ctx context.Context, userID uuid.UUID, newLikes, newMatches int) error {
+	if newLikes == 0 && newMatches == 0 {
+		return nil
+	}
+
+	var body string
+	switch {
+	case newMatches > 0 && newLikes > 0:
+		body = fmt.Sprintf("You have %d new match%s and %d new like%s!",
+			newMatches, pluralize(newMatches),
+			newLikes, pluralize(newLikes))
+	case newMatches > 0:
+		body = fmt.Sprintf("You have %d new match%s waiting!", newMatches, pluralize(newMatches))
+	default:
+		body = fmt.Sprintf("%d new like%s - see who's interested!", newLikes, pluralize(newLikes))
+	}
+
+	return s.Send(ctx, &PushMessage{
+		UserID: userID,
+		Type:   NotificationTypeDailyDigest,
+		Title:  "Your Daily Update",
+		Body:   body,
+		Data: map[string]interface{}{
+			"type": string(NotificationTypeDailyDigest),
+		},
+	})
+}
+
+// SendInactivityReminderNotification reminds inactive users to come back
+func (s *Service) SendInactivityReminderNotification(ctx context.Context, userID uuid.UUID, daysSinceActive int) error {
+	var body string
+	switch {
+	case daysSinceActive < 3:
+		body = "New profiles are waiting for you!"
+	case daysSinceActive < 7:
+		body = "People have been checking out your profile"
+	default:
+		body = "Your matches miss you - come say hi!"
+	}
+
+	return s.Send(ctx, &PushMessage{
+		UserID: userID,
+		Type:   NotificationTypeInactivityReminder,
+		Title:  "Come Back to Feels",
+		Body:   body,
+		Data: map[string]interface{}{
+			"type": string(NotificationTypeInactivityReminder),
+		},
+	})
+}
+
+func pluralize(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "es"
 }

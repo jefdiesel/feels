@@ -127,6 +127,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	feedService.SetHub(hub)
 	feedService.SetNotificationService(notificationService)
 	feedService.SetAnalyticsRepository(analyticsRepo)
+	feedService.SetUserRepository(userRepo)
 	matchService := match.NewService(matchRepo, blockRepo)
 	matchService.SetMessageRepository(messageRepo)
 	matchService.SetHub(hub)
@@ -168,6 +169,8 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	// Initialize middleware
 	authMw := middleware.NewAuthMiddleware(userService)
 	adminMw := middleware.NewAdminMiddleware(userRepo)
+	authRateLimiter := middleware.AuthRateLimiter(redisClient)
+	magicLinkRateLimiter := middleware.MagicLinkRateLimiter(redisClient)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
@@ -195,7 +198,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	}
 
 	r.setupMiddleware()
-	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler)
+	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler, authRateLimiter, magicLinkRateLimiter)
 
 	return r
 }
@@ -232,6 +235,8 @@ func (r *Router) setupRoutes(
 	adminHandler *handlers.AdminHandler,
 	adminMw *middleware.AdminMiddleware,
 	referralHandler *handlers.ReferralHandler,
+	authRateLimiter *middleware.RateLimitMiddleware,
+	magicLinkRateLimiter *middleware.RateLimitMiddleware,
 ) {
 	// Health check routes (no auth required)
 	r.mux.Get("/health", healthHandler.Health)
@@ -240,15 +245,16 @@ func (r *Router) setupRoutes(
 
 	// API v1 routes
 	r.mux.Route("/api/v1", func(router chi.Router) {
-		// Auth routes (public)
+		// Auth routes (public) with rate limiting
 		router.Route("/auth", func(auth chi.Router) {
-			auth.Post("/register", authHandler.Register)
-			auth.Post("/login", authHandler.Login)
+			// Rate limited auth endpoints (5 req/min)
+			auth.With(authRateLimiter.Limit).Post("/register", authHandler.Register)
+			auth.With(authRateLimiter.Limit).Post("/login", authHandler.Login)
 			auth.Post("/refresh", authHandler.Refresh)
 			auth.Post("/logout", authHandler.Logout)
 
-			// Magic link (passwordless) auth
-			auth.Post("/magic/send", authHandler.SendMagicLink)
+			// Magic link with stricter rate limit (3 req/min)
+			auth.With(magicLinkRateLimiter.Limit).Post("/magic/send", authHandler.SendMagicLink)
 			auth.Post("/magic/verify", authHandler.VerifyMagicLink)
 		})
 
@@ -257,6 +263,9 @@ func (r *Router) setupRoutes(
 
 		// Public payment routes (plans list)
 		router.Get("/payments/plans", paymentHandler.GetPlans)
+
+		// Public profile for sharing on social media
+		router.Get("/p/{code}", profileHandler.GetPublicProfile)
 
 		// Protected routes
 		router.Group(func(protected chi.Router) {
@@ -275,6 +284,7 @@ func (r *Router) setupRoutes(
 				p.Post("/verify", profileHandler.VerifyProfile)
 				p.Post("/verify/submit", profileHandler.SubmitVerification)
 				p.Get("/analytics", analyticsHandler.GetProfileAnalytics)
+				p.Get("/share-link", profileHandler.GetShareLink)
 			})
 
 			// Feed routes

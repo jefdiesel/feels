@@ -29,6 +29,10 @@ type Repository interface {
 	IncrementDailyLikes(ctx context.Context, userID uuid.UUID) error
 	CanUseDailyLike(ctx context.Context, userID uuid.UUID, limit int) (bool, int, error)
 	HasSubscription(ctx context.Context, userID uuid.UUID) (bool, error)
+	// Atomic operations to prevent race conditions
+	UseBonusLikeAtomic(ctx context.Context, userID uuid.UUID) error
+	UseDailyLikeAtomic(ctx context.Context, userID uuid.UUID, limit int) error
+	DeductCreditsAtomic(ctx context.Context, userID uuid.UUID, amount int) error
 }
 
 type Service struct {
@@ -230,4 +234,30 @@ func (s *Service) ToggleAutoRenew(ctx context.Context, userID uuid.UUID) error {
 // InitializeUser sets up credits for a new user
 func (s *Service) InitializeUser(ctx context.Context, userID uuid.UUID) error {
 	return s.repo.CreateCredit(ctx, userID)
+}
+
+// UseLikeAtomic atomically checks and uses a like credit to prevent race conditions
+func (s *Service) UseLikeAtomic(ctx context.Context, userID uuid.UUID) error {
+	// Check if subscriber first (subscribers bypass limits)
+	hasSub, err := s.repo.HasSubscription(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if hasSub {
+		return nil // Subscribers don't use credits for likes
+	}
+
+	// Try to use bonus like atomically (returns error if none available)
+	err = s.repo.UseBonusLikeAtomic(ctx, userID)
+	if err == nil {
+		return nil // Successfully used bonus like
+	}
+
+	// Fall back to daily like - this is atomic (check + increment in one query)
+	return s.repo.UseDailyLikeAtomic(ctx, userID, FreeDailyLikeLimit)
+}
+
+// UseSuperlikeAtomic atomically checks and deducts credits for a superlike
+func (s *Service) UseSuperlikeAtomic(ctx context.Context, userID uuid.UUID) error {
+	return s.repo.DeductCreditsAtomic(ctx, userID, CostSuperlike)
 }

@@ -19,7 +19,15 @@ var (
 	ErrNoRewindAvailable = errors.New("no recent action to rewind")
 	ErrRewindExpired     = errors.New("rewind window expired (30 seconds)")
 	ErrAlreadyMatched    = errors.New("cannot rewind after matching")
+	ErrUserShadowbanned  = errors.New("user is not available")
 )
+
+// LikeResult contains the result of an atomic like operation
+type LikeResult struct {
+	LikeCreated  bool
+	MatchID      *uuid.UUID
+	MatchCreated bool
+}
 
 type FeedRepository interface {
 	GetFeedProfiles(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences, limit int) ([]FeedProfile, error)
@@ -36,6 +44,14 @@ type FeedRepository interface {
 	DeleteLikesForMatch(ctx context.Context, user1ID, user2ID uuid.UUID) error
 	EnsurePassesTable(ctx context.Context) error
 	RecordRewind(ctx context.Context, userID, targetID uuid.UUID, originalAction string) error
+	// Atomic operations to prevent race conditions
+	CreateLikeAtomic(ctx context.Context, like *Like, matchUser1ID, matchUser2ID uuid.UUID) (*LikeResult, error)
+	CreateLikeWithMessageAtomic(ctx context.Context, like *Like, message string, matchUser1ID, matchUser2ID uuid.UUID) (*LikeResult, error)
+}
+
+// UserRepository interface for checking user status
+type UserRepository interface {
+	IsShadowbanned(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
 type AnalyticsRepository interface {
@@ -57,6 +73,9 @@ type CreditService interface {
 	CanSuperlike(ctx context.Context, userID uuid.UUID) (bool, error)
 	UseSuperlike(ctx context.Context, userID uuid.UUID) error
 	AddBonusLikes(ctx context.Context, userID uuid.UUID, amount int) error
+	// Atomic versions that check and deduct in a single transaction
+	UseLikeAtomic(ctx context.Context, userID uuid.UUID) error
+	UseSuperlikeAtomic(ctx context.Context, userID uuid.UUID) error
 }
 
 // Hub interface for real-time notifications
@@ -75,6 +94,7 @@ type Service struct {
 	feedRepo            FeedRepository
 	profileRepo         ProfileRepository
 	matchRepo           MatchRepository
+	userRepo            UserRepository
 	analyticsRepo       AnalyticsRepository
 	creditService       CreditService
 	notificationService NotificationService
@@ -109,6 +129,11 @@ func (s *Service) SetNotificationService(ns NotificationService) {
 // SetAnalyticsRepository sets the analytics repository for profile view tracking
 func (s *Service) SetAnalyticsRepository(ar AnalyticsRepository) {
 	s.analyticsRepo = ar
+}
+
+// SetUserRepository sets the user repository for checking user status
+func (s *Service) SetUserRepository(ur UserRepository) {
+	s.userRepo = ur
 }
 
 // GetFeed returns the next batch of profiles for the user
@@ -172,30 +197,22 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 	}, nil
 }
 
-// Like likes a profile
+// Like likes a profile using atomic transaction to prevent race conditions
 func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperlike bool) (*LikeResponse, error) {
 	if userID == targetID {
 		return nil, ErrCannotLikeSelf
 	}
 
-	// Check credits/daily limit if credit service is available
-	if s.creditService != nil {
-		if isSuperlike {
-			canSuperlike, err := s.creditService.CanSuperlike(ctx, userID)
-			if err != nil {
-				return nil, err
-			}
-			if !canSuperlike {
-				return nil, ErrInsufficientLikes
-			}
-		} else {
-			canLike, err := s.creditService.CanLike(ctx, userID)
-			if err != nil {
-				return nil, err
-			}
-			if !canLike {
-				return nil, ErrInsufficientLikes
-			}
+	// Check if target user is shadowbanned (prevent matching with shadowbanned users)
+	if s.userRepo != nil {
+		isShadowbanned, err := s.userRepo.IsShadowbanned(ctx, targetID)
+		if err != nil {
+			return nil, err
+		}
+		if isShadowbanned {
+			// Silently accept the like but don't actually process it
+			// This prevents shadowbanned users from knowing they're shadowbanned
+			return &LikeResponse{Matched: false}, nil
 		}
 	}
 
@@ -205,20 +222,20 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 		return nil, ErrAlreadyLiked
 	}
 
-	// Use credits/daily like
+	// Atomically check and use credits to prevent race conditions
 	if s.creditService != nil {
 		if isSuperlike {
-			if err := s.creditService.UseSuperlike(ctx, userID); err != nil {
+			if err := s.creditService.UseSuperlikeAtomic(ctx, userID); err != nil {
 				return nil, err
 			}
 		} else {
-			if err := s.creditService.UseLike(ctx, userID); err != nil {
+			if err := s.creditService.UseLikeAtomic(ctx, userID); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	// Create like
+	// Create like and check for match atomically
 	like := &Like{
 		ID:          uuid.New(),
 		LikerID:     userID,
@@ -227,17 +244,18 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 		CreatedAt:   time.Now(),
 	}
 
-	if err := s.feedRepo.CreateLike(ctx, like); err != nil {
+	user1, user2 := match.OrderedUserIDs(userID, targetID)
+	result, err := s.feedRepo.CreateLikeAtomic(ctx, like, user1, user2)
+	if err != nil {
 		return nil, err
 	}
 
 	// Legacy daily count (kept for backwards compatibility)
 	s.feedRepo.IncrementDailyLikeCount(ctx, userID)
 
-	// Send push notification for like received
-	if s.notificationService != nil {
+	// Send push notification for like received (only if like was created)
+	if result.LikeCreated && s.notificationService != nil {
 		if isSuperlike {
-			// Get liker's profile for name
 			likerProfile, _ := s.profileRepo.GetByUserID(ctx, userID)
 			likerName := "Someone"
 			if likerProfile != nil && likerProfile.Name != "" {
@@ -249,44 +267,23 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 		}
 	}
 
-	// Check for mutual like
-	hasMutual, err := s.feedRepo.HasMutualLike(ctx, userID, targetID)
-	if err != nil {
-		return nil, err
-	}
-
-	if hasMutual {
-		// Create match
-		user1, user2 := match.OrderedUserIDs(userID, targetID)
-		m := &match.Match{
-			ID:        uuid.New(),
-			User1ID:   user1,
-			User2ID:   user2,
-			CreatedAt: time.Now(),
-		}
-
-		if err := s.matchRepo.Create(ctx, m); err != nil {
-			return nil, err
-		}
-
-		// Clean up likes
-		s.feedRepo.DeleteLikesForMatch(ctx, userID, targetID)
+	// If match was created (not just returned existing), send notifications
+	if result.MatchCreated && result.MatchID != nil {
+		matchID := *result.MatchID
 
 		// Notify both users about the match via WebSocket
 		if s.hub != nil {
-			// Notify the current user (who just liked)
 			s.hub.SendToUser(userID, WSMessage{
 				Type: EventMatchCreated,
 				Payload: MatchCreatedPayload{
-					MatchID:     m.ID,
+					MatchID:     matchID,
 					OtherUserID: targetID,
 				},
 			})
-			// Notify the other user (who liked earlier)
 			s.hub.SendToUser(targetID, WSMessage{
 				Type: EventMatchCreated,
 				Payload: MatchCreatedPayload{
-					MatchID:     m.ID,
+					MatchID:     matchID,
 					OtherUserID: userID,
 				},
 			})
@@ -294,7 +291,6 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 
 		// Send push notifications for new match
 		if s.notificationService != nil {
-			// Get both profiles for names
 			userProfile, _ := s.profileRepo.GetByUserID(ctx, userID)
 			targetProfile, _ := s.profileRepo.GetByUserID(ctx, targetID)
 
@@ -307,13 +303,21 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 				targetName = targetProfile.Name
 			}
 
-			go s.notificationService.SendNewMatchNotification(ctx, userID, targetName, m.ID)
-			go s.notificationService.SendNewMatchNotification(ctx, targetID, userName, m.ID)
+			go s.notificationService.SendNewMatchNotification(ctx, userID, targetName, matchID)
+			go s.notificationService.SendNewMatchNotification(ctx, targetID, userName, matchID)
 		}
 
 		return &LikeResponse{
 			Matched: true,
-			MatchID: &m.ID,
+			MatchID: result.MatchID,
+		}, nil
+	}
+
+	// Match already existed (race condition handled)
+	if result.MatchID != nil {
+		return &LikeResponse{
+			Matched: true,
+			MatchID: result.MatchID,
 		}, nil
 	}
 
@@ -381,19 +385,20 @@ func (s *Service) Rewind(ctx context.Context, userID uuid.UUID) (*FeedProfile, e
 }
 
 // LikeWithMessage creates a superlike with an attached message (premium feature)
+// Uses atomic transaction to prevent race conditions
 func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUID, message string) (*LikeResponse, error) {
 	if userID == targetID {
 		return nil, ErrCannotLikeSelf
 	}
 
-	// Check credits/daily limit if credit service is available
-	if s.creditService != nil {
-		canSuperlike, err := s.creditService.CanSuperlike(ctx, userID)
+	// Check if target user is shadowbanned
+	if s.userRepo != nil {
+		isShadowbanned, err := s.userRepo.IsShadowbanned(ctx, targetID)
 		if err != nil {
 			return nil, err
 		}
-		if !canSuperlike {
-			return nil, ErrInsufficientLikes
+		if isShadowbanned {
+			return &LikeResponse{Matched: false}, nil
 		}
 	}
 
@@ -403,14 +408,14 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 		return nil, ErrAlreadyLiked
 	}
 
-	// Use credits/daily like
+	// Atomically check and use superlike credits
 	if s.creditService != nil {
-		if err := s.creditService.UseSuperlike(ctx, userID); err != nil {
-			return nil, err
+		if err := s.creditService.UseSuperlikeAtomic(ctx, userID); err != nil {
+			return nil, ErrInsufficientLikes
 		}
 	}
 
-	// Create like with message
+	// Create like with message and check for match atomically
 	like := &Like{
 		ID:          uuid.New(),
 		LikerID:     userID,
@@ -419,15 +424,17 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 		CreatedAt:   time.Now(),
 	}
 
-	if err := s.feedRepo.CreateLikeWithMessage(ctx, like, message); err != nil {
+	user1, user2 := match.OrderedUserIDs(userID, targetID)
+	result, err := s.feedRepo.CreateLikeWithMessageAtomic(ctx, like, message, user1, user2)
+	if err != nil {
 		return nil, err
 	}
 
 	// Legacy daily count
 	s.feedRepo.IncrementDailyLikeCount(ctx, userID)
 
-	// Send push notification
-	if s.notificationService != nil {
+	// Send push notification (only if like was created)
+	if result.LikeCreated && s.notificationService != nil {
 		likerProfile, _ := s.profileRepo.GetByUserID(ctx, userID)
 		likerName := "Someone"
 		if likerProfile != nil && likerProfile.Name != "" {
@@ -436,48 +443,27 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 		go s.notificationService.SendSuperLikeNotification(ctx, targetID, likerName)
 	}
 
-	// Check for mutual like
-	hasMutual, err := s.feedRepo.HasMutualLike(ctx, userID, targetID)
-	if err != nil {
-		return nil, err
-	}
+	// If match was created, send notifications
+	if result.MatchCreated && result.MatchID != nil {
+		matchID := *result.MatchID
 
-	if hasMutual {
-		// Create match
-		user1, user2 := match.OrderedUserIDs(userID, targetID)
-		m := &match.Match{
-			ID:        uuid.New(),
-			User1ID:   user1,
-			User2ID:   user2,
-			CreatedAt: time.Now(),
-		}
-
-		if err := s.matchRepo.Create(ctx, m); err != nil {
-			return nil, err
-		}
-
-		// Clean up likes
-		s.feedRepo.DeleteLikesForMatch(ctx, userID, targetID)
-
-		// Notify both users about the match via WebSocket
 		if s.hub != nil {
 			s.hub.SendToUser(userID, WSMessage{
 				Type: EventMatchCreated,
 				Payload: MatchCreatedPayload{
-					MatchID:     m.ID,
+					MatchID:     matchID,
 					OtherUserID: targetID,
 				},
 			})
 			s.hub.SendToUser(targetID, WSMessage{
 				Type: EventMatchCreated,
 				Payload: MatchCreatedPayload{
-					MatchID:     m.ID,
+					MatchID:     matchID,
 					OtherUserID: userID,
 				},
 			})
 		}
 
-		// Send push notifications for new match
 		if s.notificationService != nil {
 			userProfile, _ := s.profileRepo.GetByUserID(ctx, userID)
 			targetProfile, _ := s.profileRepo.GetByUserID(ctx, targetID)
@@ -491,13 +477,20 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 				targetName = targetProfile.Name
 			}
 
-			go s.notificationService.SendNewMatchNotification(ctx, userID, targetName, m.ID)
-			go s.notificationService.SendNewMatchNotification(ctx, targetID, userName, m.ID)
+			go s.notificationService.SendNewMatchNotification(ctx, userID, targetName, matchID)
+			go s.notificationService.SendNewMatchNotification(ctx, targetID, userName, matchID)
 		}
 
 		return &LikeResponse{
 			Matched: true,
-			MatchID: &m.ID,
+			MatchID: result.MatchID,
+		}, nil
+	}
+
+	if result.MatchID != nil {
+		return &LikeResponse{
+			Matched: true,
+			MatchID: result.MatchID,
 		}, nil
 	}
 

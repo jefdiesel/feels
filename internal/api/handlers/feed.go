@@ -106,8 +106,6 @@ func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Check and deduct credits for superlike
-
 	resp, err := h.feedService.Like(r.Context(), userID, targetID, true)
 	if err != nil {
 		switch {

@@ -92,6 +92,13 @@ export const feedApi = {
 
   swipe: (targetUserId: string, action: 'like' | 'pass' | 'superlike') =>
     api.post(`/feed/${action}/${targetUserId}`),
+
+  getDailyPicks: () => api.get('/feed/daily-picks'),
+
+  rewind: () => api.post('/feed/rewind'),
+
+  superlikeWithMessage: (targetUserId: string, message: string) =>
+    api.post(`/feed/superlike/${targetUserId}/message`, { message }),
 };
 
 export const matchesApi = {
@@ -200,6 +207,10 @@ export const profileApi = {
 
   // Request profile verification (requires quarterly or annual subscription)
   verify: () => api.post<{ verified: boolean }>('/profile/verify'),
+
+  // Get shareable profile link
+  getShareLink: () =>
+    api.get<{ url: string; title: string; text: string }>('/profile/share-link'),
 };
 
 export const creditsApi = {
@@ -261,4 +272,68 @@ export const paymentsApi = {
 
   // Cancel subscription (will cancel at period end)
   cancelSubscription: () => api.delete('/payments/subscription'),
+};
+
+export interface ReferralCode {
+  code: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface ReferralStats {
+  code: string;
+  total_referrals: number;
+  premium_days_earned: number;
+}
+
+export const referralApi = {
+  // Get or create referral code
+  getCode: () => api.get<ReferralCode>('/referral/code'),
+
+  // Redeem a referral code
+  redeemCode: (code: string) =>
+    api.post<{ success: boolean; message: string }>('/referral/redeem', { code }),
+
+  // Get referral stats
+  getStats: () => api.get<ReferralStats>('/referral/stats'),
+};
+
+export interface NotificationSettings {
+  new_matches: boolean;
+  new_messages: boolean;
+  new_likes: boolean;
+  marketing: boolean;
+}
+
+export interface PrivacySettings {
+  show_online_status: boolean;
+  show_read_receipts: boolean;
+  show_typing_indicator: boolean;
+}
+
+export const settingsApi = {
+  getNotificationSettings: () =>
+    api.get<NotificationSettings>('/settings/notifications'),
+
+  updateNotificationSettings: (settings: Partial<NotificationSettings>) =>
+    api.put('/settings/notifications', settings),
+
+  getPrivacySettings: () => api.get<PrivacySettings>('/settings/privacy'),
+
+  updatePrivacySettings: (settings: Partial<PrivacySettings>) =>
+    api.put('/settings/privacy', settings),
+};
+
+export const pushApi = {
+  registerToken: (token: string, platform: 'ios' | 'android') =>
+    api.post('/push/register', { token, platform }),
+
+  unregisterToken: () => api.delete('/push/register'),
+};
+
+export const analyticsApi = {
+  getProfileAnalytics: () =>
+    api.get<{ view_count: number; view_count_7d: number; view_count_30d: number }>(
+      '/profile/analytics'
+    ),
 };

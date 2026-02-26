@@ -53,6 +53,20 @@ type Profile struct {
 	LastActive   time.Time  `json:"last_active"`
 	CreatedAt    time.Time  `json:"created_at"`
 	Photos       []Photo    `json:"photos"`
+	ShareCode    *string    `json:"share_code,omitempty"`
+}
+
+// PublicProfile is a limited view of a profile for sharing on social media
+type PublicProfile struct {
+	Name         string    `json:"name"`
+	Age          int       `json:"age"`
+	Neighborhood *string   `json:"neighborhood,omitempty"`
+	Bio          string    `json:"bio"`
+	Prompts      Prompts   `json:"prompts"`
+	LookingFor   *string   `json:"looking_for,omitempty"`
+	IsVerified   bool      `json:"is_verified"`
+	Photos       []Photo   `json:"photos"`
+	ShareCode    string    `json:"share_code"`
 }
 
 type Photo struct {

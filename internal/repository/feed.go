@@ -139,18 +139,54 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 		profiles = append(profiles, fp)
 	}
 
-	// Fetch photos for each profile
-	for i := range profiles {
-		photos, err := r.getPhotos(ctx, profiles[i].UserID)
+	// Batch fetch photos for all profiles in one query (prevents N+1)
+	if len(profiles) > 0 {
+		userIDs := make([]uuid.UUID, len(profiles))
+		for i, p := range profiles {
+			userIDs[i] = p.UserID
+		}
+		photosMap, err := r.getPhotosForUsers(ctx, userIDs)
 		if err != nil {
 			return nil, err
 		}
-		profiles[i].Photos = photos
+		for i := range profiles {
+			profiles[i].Photos = photosMap[profiles[i].UserID]
+		}
 	}
 
 	return profiles, rows.Err()
 }
 
+// getPhotosForUsers fetches photos for multiple users in a single query
+func (r *FeedRepository) getPhotosForUsers(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID][]profile.Photo, error) {
+	if len(userIDs) == 0 {
+		return make(map[uuid.UUID][]profile.Photo), nil
+	}
+
+	query := `
+		SELECT id, user_id, url, position, created_at
+		FROM photos
+		WHERE user_id = ANY($1)
+		ORDER BY user_id, position
+	`
+	rows, err := r.db.Query(ctx, query, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	photosMap := make(map[uuid.UUID][]profile.Photo)
+	for rows.Next() {
+		var p profile.Photo
+		if err := rows.Scan(&p.ID, &p.UserID, &p.URL, &p.Position, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		photosMap[p.UserID] = append(photosMap[p.UserID], p)
+	}
+	return photosMap, rows.Err()
+}
+
+// getPhotos fetches photos for a single user (used by other methods)
 func (r *FeedRepository) getPhotos(ctx context.Context, userID uuid.UUID) ([]profile.Photo, error) {
 	query := `SELECT id, user_id, url, position, created_at FROM photos WHERE user_id = $1 ORDER BY position`
 	rows, err := r.db.Query(ctx, query, userID)
@@ -314,6 +350,146 @@ func (r *FeedRepository) DeleteLikesForMatch(ctx context.Context, user1ID, user2
 	query := `DELETE FROM likes WHERE (liker_id = $1 AND liked_id = $2) OR (liker_id = $2 AND liked_id = $1)`
 	_, err := r.db.Exec(ctx, query, user1ID, user2ID)
 	return err
+}
+
+// CreateLikeAtomic creates a like and checks for match atomically in a single transaction
+// This prevents race conditions where two users like each other simultaneously
+func (r *FeedRepository) CreateLikeAtomic(ctx context.Context, like *feed.Like, matchUser1ID, matchUser2ID uuid.UUID) (*feed.LikeResult, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Insert the like (ON CONFLICT DO NOTHING handles duplicates)
+	likeQuery := `
+		INSERT INTO likes (id, liker_id, liked_id, is_superlike, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (liker_id, liked_id) DO NOTHING
+		RETURNING id
+	`
+	var insertedID uuid.UUID
+	err = tx.QueryRow(ctx, likeQuery, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, like.CreatedAt).Scan(&insertedID)
+	likeCreated := err == nil
+	if err != nil && err.Error() != "no rows in result set" {
+		// Real error, not just "already exists"
+		return nil, err
+	}
+
+	// Check for mutual like with row lock to prevent race
+	mutualQuery := `
+		SELECT id FROM likes
+		WHERE liker_id = $1 AND liked_id = $2
+		FOR UPDATE
+	`
+	var mutualLikeID uuid.UUID
+	err = tx.QueryRow(ctx, mutualQuery, like.LikedID, like.LikerID).Scan(&mutualLikeID)
+	hasMutual := err == nil
+
+	result := &feed.LikeResult{LikeCreated: likeCreated}
+
+	if hasMutual {
+		// Try to create match - use ON CONFLICT to handle race where other transaction wins
+		matchID := uuid.New()
+		matchQuery := `
+			INSERT INTO matches (id, user1_id, user2_id, created_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (user1_id, user2_id) DO UPDATE SET id = matches.id
+			RETURNING id, (xmax = 0) AS inserted
+		`
+		var returnedMatchID uuid.UUID
+		var wasInserted bool
+		err = tx.QueryRow(ctx, matchQuery, matchID, matchUser1ID, matchUser2ID).Scan(&returnedMatchID, &wasInserted)
+		if err != nil {
+			return nil, err
+		}
+
+		result.MatchID = &returnedMatchID
+		result.MatchCreated = wasInserted
+
+		// Only delete likes if we created the match (not if it already existed)
+		if wasInserted {
+			deleteQuery := `DELETE FROM likes WHERE (liker_id = $1 AND liked_id = $2) OR (liker_id = $2 AND liked_id = $1)`
+			_, err = tx.Exec(ctx, deleteQuery, like.LikerID, like.LikedID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// CreateLikeWithMessageAtomic creates a superlike with message and checks for match atomically
+func (r *FeedRepository) CreateLikeWithMessageAtomic(ctx context.Context, like *feed.Like, message string, matchUser1ID, matchUser2ID uuid.UUID) (*feed.LikeResult, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Insert the like with message
+	likeQuery := `
+		INSERT INTO likes (id, liker_id, liked_id, is_superlike, attached_message, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (liker_id, liked_id) DO NOTHING
+		RETURNING id
+	`
+	var insertedID uuid.UUID
+	err = tx.QueryRow(ctx, likeQuery, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, message, like.CreatedAt).Scan(&insertedID)
+	likeCreated := err == nil
+	if err != nil && err.Error() != "no rows in result set" {
+		return nil, err
+	}
+
+	// Check for mutual like with row lock
+	mutualQuery := `
+		SELECT id FROM likes
+		WHERE liker_id = $1 AND liked_id = $2
+		FOR UPDATE
+	`
+	var mutualLikeID uuid.UUID
+	err = tx.QueryRow(ctx, mutualQuery, like.LikedID, like.LikerID).Scan(&mutualLikeID)
+	hasMutual := err == nil
+
+	result := &feed.LikeResult{LikeCreated: likeCreated}
+
+	if hasMutual {
+		matchID := uuid.New()
+		matchQuery := `
+			INSERT INTO matches (id, user1_id, user2_id, created_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (user1_id, user2_id) DO UPDATE SET id = matches.id
+			RETURNING id, (xmax = 0) AS inserted
+		`
+		var returnedMatchID uuid.UUID
+		var wasInserted bool
+		err = tx.QueryRow(ctx, matchQuery, matchID, matchUser1ID, matchUser2ID).Scan(&returnedMatchID, &wasInserted)
+		if err != nil {
+			return nil, err
+		}
+
+		result.MatchID = &returnedMatchID
+		result.MatchCreated = wasInserted
+
+		if wasInserted {
+			deleteQuery := `DELETE FROM likes WHERE (liker_id = $1 AND liked_id = $2) OR (liker_id = $2 AND liked_id = $1)`
+			_, err = tx.Exec(ctx, deleteQuery, like.LikerID, like.LikedID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // CreatePassesTableMigration returns SQL for creating passes table

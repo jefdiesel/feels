@@ -308,3 +308,62 @@ func (h *ProfileHandler) SubmitVerification(w http.ResponseWriter, r *http.Reque
 
 	jsonResponse(w, map[string]string{"status": "pending"}, http.StatusOK)
 }
+
+// GetShareLink returns the user's shareable profile link
+func (h *ProfileHandler) GetShareLink(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Use the host from the request or a configured base URL
+	baseURL := "https://feels.app"
+	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
+		baseURL = "https://" + host
+	}
+
+	link, err := h.profileService.GetShareLink(r.Context(), userID, baseURL)
+	if err != nil {
+		if errors.Is(err, repository.ErrProfileNotFound) {
+			jsonError(w, "profile not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "failed to get share link", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, map[string]string{
+		"url":   link,
+		"title": "Check out my profile on feels",
+		"text":  "Connect with me on feels - a dating app that puts real connections first.",
+	}, http.StatusOK)
+}
+
+// GetPublicProfile returns a limited public view of a profile (no auth required)
+func (h *ProfileHandler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+	if code == "" {
+		jsonError(w, "share code required", http.StatusBadRequest)
+		return
+	}
+
+	publicProfile, err := h.profileService.GetPublicProfile(r.Context(), code)
+	if err != nil {
+		if errors.Is(err, repository.ErrProfileNotFound) {
+			jsonError(w, "profile not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "failed to get profile", http.StatusInternalServerError)
+		return
+	}
+
+	// Add app store links for download
+	jsonResponse(w, map[string]interface{}{
+		"profile": publicProfile,
+		"app_links": map[string]string{
+			"ios":     "https://apps.apple.com/app/feels",
+			"android": "https://play.google.com/store/apps/details?id=app.feels",
+		},
+	}, http.StatusOK)
+}

@@ -125,6 +125,14 @@ export function SendIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
   return <Feather name="send" size={size} color={color} />;
 }
 
+export function ShareIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
+  return <Feather name="share" size={size} color={color} />;
+}
+
+export function GiftIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
+  return <Feather name="gift" size={size} color={color} />;
+}
+
 export function SparklesIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
   return <MaterialCommunityIcons name="shimmer" size={size} color={color} />;
 }

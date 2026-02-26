@@ -20,10 +20,12 @@ type PushToken struct {
 type NotificationType string
 
 const (
-	NotificationTypeNewMatch    NotificationType = "new_match"
-	NotificationTypeNewMessage  NotificationType = "new_message"
-	NotificationTypeLikeReceived NotificationType = "like_received"
-	NotificationTypeSuperLike   NotificationType = "super_like"
+	NotificationTypeNewMatch           NotificationType = "new_match"
+	NotificationTypeNewMessage         NotificationType = "new_message"
+	NotificationTypeLikeReceived       NotificationType = "like_received"
+	NotificationTypeSuperLike          NotificationType = "super_like"
+	NotificationTypeDailyDigest        NotificationType = "daily_digest"
+	NotificationTypeInactivityReminder NotificationType = "inactivity_reminder"
 )
 
 // PushPayload is the data sent to Expo push service

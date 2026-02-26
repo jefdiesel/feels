@@ -125,17 +125,58 @@ func (r *MatchRepository) GetUserMatches(ctx context.Context, userID uuid.UUID) 
 			}
 		}
 
-		// Get photos for other user
-		photos, err := r.getPhotos(ctx, mwp.OtherUser.UserID)
-		if err != nil {
-			return nil, err
-		}
-		mwp.OtherUser.Photos = photos
-
 		matches = append(matches, mwp)
 	}
 
-	return matches, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Batch fetch photos for all matched users in one query (prevents N+1)
+	if len(matches) > 0 {
+		userIDs := make([]uuid.UUID, len(matches))
+		for i, m := range matches {
+			userIDs[i] = m.OtherUser.UserID
+		}
+		photosMap, err := r.getPhotosForUsers(ctx, userIDs)
+		if err != nil {
+			return nil, err
+		}
+		for i := range matches {
+			matches[i].OtherUser.Photos = photosMap[matches[i].OtherUser.UserID]
+		}
+	}
+
+	return matches, nil
+}
+
+// getPhotosForUsers fetches photos for multiple users in a single query
+func (r *MatchRepository) getPhotosForUsers(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID][]profile.Photo, error) {
+	if len(userIDs) == 0 {
+		return make(map[uuid.UUID][]profile.Photo), nil
+	}
+
+	query := `
+		SELECT id, user_id, url, position, created_at
+		FROM photos
+		WHERE user_id = ANY($1)
+		ORDER BY user_id, position
+	`
+	rows, err := r.db.Query(ctx, query, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	photosMap := make(map[uuid.UUID][]profile.Photo)
+	for rows.Next() {
+		var p profile.Photo
+		if err := rows.Scan(&p.ID, &p.UserID, &p.URL, &p.Position, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		photosMap[p.UserID] = append(photosMap[p.UserID], p)
+	}
+	return photosMap, rows.Err()
 }
 
 func (r *MatchRepository) getPhotos(ctx context.Context, userID uuid.UUID) ([]profile.Photo, error) {
@@ -192,3 +233,4 @@ func (r *MatchRepository) GetOtherUserID(ctx context.Context, matchID, userID uu
 	}
 	return otherID, nil
 }
+

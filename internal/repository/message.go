@@ -116,6 +116,14 @@ func (r *MessageRepository) CountMessages(ctx context.Context, matchID uuid.UUID
 	return count, err
 }
 
+// HasMessages returns true if a match has any messages
+func (r *MessageRepository) HasMessages(ctx context.Context, matchID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM messages WHERE match_id = $1)`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, matchID).Scan(&exists)
+	return exists, err
+}
+
 // Image Permissions
 
 // GetImagePermission gets image permission for a user in a match

@@ -95,8 +95,8 @@ func (r *AnalyticsRepository) GetProfileAnalytics(ctx context.Context, userID uu
 	}
 	analytics.ViewsThisWeek = weekViews
 
-	// Get views today
-	today := time.Now().Truncate(24 * time.Hour)
+	// Get views today (use UTC for consistent timezone)
+	today := time.Now().UTC().Truncate(24 * time.Hour)
 	todayViews, err := r.GetViewCount(ctx, userID, today)
 	if err != nil {
 		return nil, err

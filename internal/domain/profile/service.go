@@ -41,6 +41,9 @@ type Repository interface {
 	GetPendingVerifications(ctx context.Context, limit int) ([]VerificationRequest, error)
 	ApproveVerification(ctx context.Context, userID, adminID uuid.UUID) error
 	RejectVerification(ctx context.Context, userID, adminID uuid.UUID) error
+	// Share codes
+	GetByShareCode(ctx context.Context, code string) (*Profile, error)
+	GetOrCreateShareCode(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
 // SubscriptionChecker checks if a user has a qualifying subscription for verification
@@ -377,4 +380,33 @@ func calculateAge(dob time.Time) int {
 		years--
 	}
 	return years
+}
+
+// GetShareLink returns the user's shareable profile link
+func (s *Service) GetShareLink(ctx context.Context, userID uuid.UUID, baseURL string) (string, error) {
+	code, err := s.repo.GetOrCreateShareCode(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return baseURL + "/p/" + code, nil
+}
+
+// GetPublicProfile returns a limited public view of a profile by share code
+func (s *Service) GetPublicProfile(ctx context.Context, code string) (*PublicProfile, error) {
+	profile, err := s.repo.GetByShareCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PublicProfile{
+		Name:         profile.Name,
+		Age:          calculateAge(profile.DOB),
+		Neighborhood: profile.Neighborhood,
+		Bio:          profile.Bio,
+		Prompts:      profile.Prompts,
+		LookingFor:   profile.LookingFor,
+		IsVerified:   profile.IsVerified,
+		Photos:       profile.Photos,
+		ShareCode:    code,
+	}, nil
 }
