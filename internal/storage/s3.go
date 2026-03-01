@@ -28,7 +28,15 @@ type S3Config struct {
 }
 
 func NewS3Client(cfg S3Config) (*S3Client, error) {
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
+	// Strip protocol prefix if present - minio adds it based on UseSSL
+	endpoint := cfg.Endpoint
+	if len(endpoint) > 8 && endpoint[:8] == "https://" {
+		endpoint = endpoint[8:]
+	} else if len(endpoint) > 7 && endpoint[:7] == "http://" {
+		endpoint = endpoint[7:]
+	}
+
+	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
 	})
@@ -39,7 +47,7 @@ func NewS3Client(cfg S3Config) (*S3Client, error) {
 	return &S3Client{
 		client:   client,
 		bucket:   cfg.Bucket,
-		endpoint: cfg.Endpoint,
+		endpoint: endpoint,
 		useSSL:   cfg.UseSSL,
 	}, nil
 }
