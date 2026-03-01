@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "feels",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "backgroundColor": "#000000",
     "ios": {
       "supportsTablet": false,
