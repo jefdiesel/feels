@@ -23,7 +23,6 @@
         "backgroundColor": "#000000"
       },
       "package": "com.feels.app",
-      "navigationBarColor": "#000000",
       "backgroundColor": "#000000",
       "intentFilters": [
         {
@@ -52,7 +51,12 @@
       ],
       "expo-asset",
       "expo-font",
-      "@sentry/react-native"
+      [
+        "@sentry/react-native",
+        {
+          "uploadSourceMaps": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
