@@ -61,11 +61,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.userService.Login(r.Context(), &req)
 	if err != nil {
-		if errors.Is(err, user.ErrInvalidCredentials) {
+		switch {
+		case errors.Is(err, user.ErrInvalidCredentials):
 			jsonError(w, "invalid email or password", http.StatusUnauthorized)
-			return
+		case errors.Is(err, user.ErrDeviceRequired):
+			jsonError(w, "device_id is required", http.StatusBadRequest)
+		case errors.Is(err, user.ErrTOTPRequired):
+			jsonError(w, "2FA code required", http.StatusUnauthorized)
+		case errors.Is(err, user.ErrInvalidTOTP):
+			jsonError(w, "invalid 2FA code", http.StatusUnauthorized)
+		default:
+			jsonError(w, "internal server error", http.StatusInternalServerError)
 		}
-		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
