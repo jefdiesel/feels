@@ -115,8 +115,14 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         });
         return;
       }
+      // Extract detailed error info
+      const status = error.response?.status;
+      const serverError = error.response?.data?.error;
+      const errorMsg = serverError
+        ? `${serverError} (${status})`
+        : error.message || 'Failed to load profiles';
       set({
-        error: error.response?.data?.error || 'Failed to load profiles',
+        error: errorMsg,
         isLoading: false,
       });
     }

@@ -21,3 +21,5 @@ vendor/
 
 # Logs
 *.log
+feels-app-release.apk
+*.apk
