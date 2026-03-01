@@ -155,8 +155,8 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 	// Get viewer's profile for looking_for alignment
 	viewerProfile, _ := s.profileRepo.GetByUserID(ctx, userID)
 	viewerLookingFor := ""
-	if viewerProfile != nil && viewerProfile.LookingFor != nil {
-		viewerLookingFor = *viewerProfile.LookingFor
+	if viewerProfile != nil && len(viewerProfile.LookingFor) > 0 {
+		viewerLookingFor = viewerProfile.LookingFor[0]
 	}
 
 	// Count queued likes
@@ -174,8 +174,8 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 	// Compute looking_for alignment for each profile
 	for i := range profiles {
 		profileLookingFor := ""
-		if profiles[i].LookingFor != nil {
-			profileLookingFor = *profiles[i].LookingFor
+		if len(profiles[i].LookingFor) > 0 {
+			profileLookingFor = profiles[i].LookingFor[0]
 		}
 		profiles[i].LookingForAlignment = ComputeLookingForAlignment(viewerLookingFor, profileLookingFor)
 	}

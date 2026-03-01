@@ -187,7 +187,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req *Upda
 		}
 		profile.KinkLevel = req.KinkLevel
 	}
-	if req.LookingFor != nil {
+	if req.LookingFor != nil && len(req.LookingFor) > 0 {
 		profile.LookingFor = req.LookingFor
 	}
 	if req.Zodiac != nil {

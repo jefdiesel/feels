@@ -80,7 +80,7 @@ interface FeedState {
   isLoading: boolean;
   error: string | null;
 
-  loadProfiles: () => Promise<void>;
+  loadProfiles: (forceRefresh?: boolean) => Promise<void>;
   nextProfile: () => void;
   swipe: (action: 'like' | 'pass' | 'superlike') => Promise<boolean>;
   reset: () => void;
@@ -92,7 +92,14 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  loadProfiles: async () => {
+  loadProfiles: async (forceRefresh = false) => {
+    const { profiles: existingProfiles, currentIndex } = get();
+
+    // Don't reload if we still have profiles to view, unless forced
+    if (!forceRefresh && existingProfiles.length > 0 && currentIndex < existingProfiles.length) {
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
       const response = await feedApi.getProfiles(20);
@@ -121,8 +128,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     if (currentIndex < profiles.length - 1) {
       set({ currentIndex: currentIndex + 1 });
     } else {
-      // Reload profiles when we run out
-      get().loadProfiles();
+      // Reload profiles when we run out (force refresh)
+      get().loadProfiles(true);
     }
   },
 

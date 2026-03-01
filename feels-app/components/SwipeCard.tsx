@@ -1,24 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { View, Text, Dimensions, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  runOnJS,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
 import { Profile } from '@/stores/feedStore';
 import { HeartFilledIcon, ChevronDownIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing, gradients } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
-const SWIPE_UP_THRESHOLD = SCREEN_HEIGHT * 0.15;
 
 // Helper function for kink level display
 const formatKinkLevel = (level: string): string => {
@@ -69,102 +57,6 @@ interface SwipeCardProps {
 export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePrompt }: SwipeCardProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const cardScale = useSharedValue(1);
-
-  const handleSwipe = useCallback(
-    (action: 'like' | 'pass' | 'superlike') => {
-      onSwipe(action);
-    },
-    [onSwipe]
-  );
-
-  const gesture = Gesture.Pan()
-    .onStart(() => {
-      cardScale.value = withSpring(0.99, { damping: 20, stiffness: 300 });
-    })
-    .onUpdate((event) => {
-      translateX.value = event.translationX * 0.9;
-      translateY.value = event.translationY * 0.6;
-    })
-    .onEnd((event) => {
-      cardScale.value = withSpring(1, { damping: 20, stiffness: 300 });
-
-      // Swipe up for superlike
-      if (event.translationY < -SWIPE_UP_THRESHOLD && Math.abs(event.translationX) < SWIPE_THRESHOLD) {
-        translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 350 });
-        runOnJS(handleSwipe)('superlike');
-        return;
-      }
-
-      // Swipe right for like
-      if (event.translationX > SWIPE_THRESHOLD) {
-        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 350 });
-        runOnJS(handleSwipe)('like');
-        return;
-      }
-
-      // Swipe left for pass
-      if (event.translationX < -SWIPE_THRESHOLD) {
-        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 350 });
-        runOnJS(handleSwipe)('pass');
-        return;
-      }
-
-      // Reset position with smooth spring
-      translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
-      translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
-    });
-
-  const animatedCardStyle = useAnimatedStyle(() => {
-    const rotate = interpolate(
-      translateX.value,
-      [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-      [-8, 0, 8],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { rotate: `${rotate}deg` },
-        { scale: cardScale.value },
-      ],
-    };
-  });
-
-  const likeOverlayStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      translateX.value,
-      [0, SWIPE_THRESHOLD],
-      [0, 1],
-      Extrapolation.CLAMP
-    );
-    return { opacity };
-  });
-
-  const passOverlayStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      translateX.value,
-      [-SWIPE_THRESHOLD, 0],
-      [1, 0],
-      Extrapolation.CLAMP
-    );
-    return { opacity };
-  });
-
-  const superlikeOverlayStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      translateY.value,
-      [-SWIPE_UP_THRESHOLD, 0],
-      [1, 0],
-      Extrapolation.CLAMP
-    );
-    return { opacity };
-  });
-
   const nextPhoto = () => {
     if (currentPhotoIndex < profile.photos.length - 1) {
       setCurrentPhotoIndex(currentPhotoIndex + 1);
@@ -200,84 +92,64 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
   const displayPrompts = profile.prompts?.length ? profile.prompts : getDefaultPrompts(profile);
 
   return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={[styles.card, animatedCardStyle]}>
-        <ScrollView
-          style={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-          scrollEventThrottle={16}
+    <View style={styles.card}>
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+      >
+        {/* Full-bleed photo */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={(e) => handleTap(e.nativeEvent.locationX)}
+          style={styles.photoContainer}
         >
-          {/* Full-bleed photo */}
+          <Image
+            source={{ uri: profile.photos[currentPhotoIndex] }}
+            style={styles.photo}
+            contentFit="cover"
+            transition={150}
+          />
+
+          {/* Photo indicators */}
+          <View style={styles.photoIndicators}>
+            {profile.photos.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.indicator,
+                  index === currentPhotoIndex && styles.indicatorActive,
+                ]}
+              />
+            ))}
+          </View>
+
+          {/* Gradient overlay */}
+          <LinearGradient
+            colors={gradients.dark as string[]}
+            locations={[0.4, 0.7, 1]}
+            style={styles.gradient}
+          />
+
+          {/* Profile header info */}
           <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => handleTap(e.nativeEvent.locationX)}
-            style={styles.photoContainer}
+            style={styles.profileHeader}
+            onPress={onExpandProfile}
+            activeOpacity={0.9}
           >
-            <Image
-              source={{ uri: profile.photos[currentPhotoIndex] }}
-              style={styles.photo}
-              contentFit="cover"
-              transition={150}
-            />
-
-            {/* Photo indicators */}
-            <View style={styles.photoIndicators}>
-              {profile.photos.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.indicator,
-                    index === currentPhotoIndex && styles.indicatorActive,
-                  ]}
-                />
-              ))}
+            <View style={styles.nameContainer}>
+              <Text style={styles.name}>{profile.name}</Text>
+              <Text style={styles.age}>{profile.age}</Text>
             </View>
-
-            {/* Gradient overlay */}
-            <LinearGradient
-              colors={gradients.dark as string[]}
-              locations={[0.4, 0.7, 1]}
-              style={styles.gradient}
-            />
-
-            {/* Swipe feedback overlays */}
-            <Animated.View style={[styles.actionOverlay, styles.likeOverlay, likeOverlayStyle]}>
-              <View style={styles.feedbackBadge}>
-                <Text style={styles.feedbackText}>LIKE</Text>
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.actionOverlay, styles.passOverlay, passOverlayStyle]}>
-              <View style={[styles.feedbackBadge, styles.passBadge]}>
-                <Text style={[styles.feedbackText, styles.passText]}>NOPE</Text>
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.actionOverlay, styles.superlikeOverlay, superlikeOverlayStyle]}>
-              <View style={[styles.feedbackBadge, styles.superlikeBadge]}>
-                <Text style={[styles.feedbackText, styles.superlikeText]}>SUPER</Text>
-              </View>
-            </Animated.View>
-
-            {/* Profile header info */}
-            <TouchableOpacity
-              style={styles.profileHeader}
-              onPress={onExpandProfile}
-              activeOpacity={0.9}
-            >
-              <View style={styles.nameContainer}>
-                <Text style={styles.name}>{profile.name}</Text>
-                <Text style={styles.age}>{profile.age}</Text>
-              </View>
-              {profile.location && (
-                <Text style={styles.location}>
-                  {profile.location}
-                  {profile.distance && ` · ${profile.distance} mi`}
-                </Text>
-              )}
-            </TouchableOpacity>
+            {profile.location && (
+              <Text style={styles.location}>
+                {profile.location}
+                {profile.distance && ` · ${profile.distance} mi`}
+              </Text>
+            )}
           </TouchableOpacity>
+        </TouchableOpacity>
 
           {/* Profile prompts section */}
           <View style={styles.promptsSection}>
@@ -356,8 +228,7 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
           {/* Bottom padding for scroll */}
           <View style={{ height: 140 }} />
         </ScrollView>
-      </Animated.View>
-    </GestureDetector>
+      </View>
   );
 }
 
@@ -402,52 +273,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 280,
-  },
-  actionOverlay: {
-    position: 'absolute',
-    top: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  likeOverlay: {
-    left: spacing['2xl'],
-  },
-  passOverlay: {
-    right: spacing['2xl'],
-  },
-  superlikeOverlay: {
-    top: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  feedbackBadge: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.sm,
-    borderWidth: 3,
-    borderColor: colors.like,
-    transform: [{ rotate: '-15deg' }],
-  },
-  passBadge: {
-    borderColor: colors.pass,
-    transform: [{ rotate: '15deg' }],
-  },
-  superlikeBadge: {
-    borderColor: colors.superlike,
-    transform: [{ rotate: '0deg' }],
-  },
-  feedbackText: {
-    fontSize: typography.sizes['3xl'],
-    fontWeight: typography.weights.extrabold as any,
-    color: colors.like,
-    letterSpacing: 2,
-  },
-  passText: {
-    color: colors.pass,
-  },
-  superlikeText: {
-    color: colors.superlike,
   },
   profileHeader: {
     position: 'absolute',

@@ -242,8 +242,23 @@ export default function ProfileScreen() {
   const loadPhotos = async () => {
     try {
       const response = await profileApi.get();
-      const profilePhotos = response.data?.profile?.photos || [];
+      const profile = response.data?.profile;
+      const profilePhotos = profile?.photos || [];
       setPhotos(profilePhotos);
+
+      // Merge profile data (bio, prompts, looking_for) into user state
+      if (profile && user) {
+        const updatedUser = {
+          ...user,
+          bio: profile.bio ?? user.bio,
+          prompts: profile.prompts ?? user.prompts,
+          looking_for: profile.looking_for ?? user.looking_for,
+        };
+        // Only update if something changed
+        if (profile.bio !== user.bio || profile.prompts !== user.prompts || profile.looking_for !== user.looking_for) {
+          setUser(updatedUser);
+        }
+      }
     } catch (error) {
       console.error('Failed to load photos:', error);
     } finally {

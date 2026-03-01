@@ -21,6 +21,7 @@ interface User {
   location?: string;
   prompts?: ProfilePrompt[];
   is_verified?: boolean;
+  looking_for?: string;
 }
 
 interface AuthState {

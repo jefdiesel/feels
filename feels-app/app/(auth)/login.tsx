@@ -12,6 +12,7 @@ import {
 import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/stores/authStore';
+import { EyeIcon, EyeOffIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 type LoginMode = 'password' | 'magic' | 'magic_sent';
@@ -19,6 +20,7 @@ type LoginMode = 'password' | 'magic' | 'magic_sent';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [magicToken, setMagicToken] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -121,14 +123,27 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Password"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    {showPassword ? (
+                      <EyeOffIcon size={20} color={colors.text.tertiary} />
+                    ) : (
+                      <EyeIcon size={20} color={colors.text.tertiary} />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -311,6 +326,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     borderRadius: borderRadius.md,
     fontSize: typography.sizes.base,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+  },
+  passwordInput: {
+    flex: 1,
+    color: colors.text.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    fontSize: typography.sizes.base,
+  },
+  eyeButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   button: {
     backgroundColor: colors.primary.DEFAULT,

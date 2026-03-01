@@ -40,7 +40,7 @@ type Profile struct {
 	Bio          string     `json:"bio"`
 	Prompts      Prompts    `json:"prompts"`
 	KinkLevel    *string    `json:"kink_level,omitempty"`
-	LookingFor   *string    `json:"looking_for,omitempty"`
+	LookingFor   []string   `json:"looking_for,omitempty"`
 	Zodiac       *string    `json:"zodiac,omitempty"`
 	Religion     *string    `json:"religion,omitempty"`
 	HasKids      *bool      `json:"has_kids,omitempty"`
@@ -63,7 +63,7 @@ type PublicProfile struct {
 	Neighborhood *string   `json:"neighborhood,omitempty"`
 	Bio          string    `json:"bio"`
 	Prompts      Prompts   `json:"prompts"`
-	LookingFor   *string   `json:"looking_for,omitempty"`
+	LookingFor   []string  `json:"looking_for,omitempty"`
 	IsVerified   bool      `json:"is_verified"`
 	Photos       []Photo   `json:"photos"`
 	ShareCode    string    `json:"share_code"`
@@ -99,7 +99,7 @@ type CreateProfileRequest struct {
 	Bio          string   `json:"bio"`
 	Prompts      []Prompt `json:"prompts,omitempty"`
 	KinkLevel    *string  `json:"kink_level,omitempty"`
-	LookingFor   *string  `json:"looking_for,omitempty"`
+	LookingFor   []string `json:"looking_for,omitempty"`
 	Zodiac       *string  `json:"zodiac,omitempty"`
 	Religion     *string  `json:"religion,omitempty"`
 	HasKids      *bool    `json:"has_kids,omitempty"`
@@ -116,7 +116,7 @@ type UpdateProfileRequest struct {
 	Bio          *string  `json:"bio,omitempty"`
 	Prompts      []Prompt `json:"prompts,omitempty"`
 	KinkLevel    *string  `json:"kink_level,omitempty"`
-	LookingFor   *string  `json:"looking_for,omitempty"`
+	LookingFor   []string `json:"looking_for,omitempty"`
 	Zodiac       *string  `json:"zodiac,omitempty"`
 	Religion     *string  `json:"religion,omitempty"`
 	HasKids      *bool    `json:"has_kids,omitempty"`
