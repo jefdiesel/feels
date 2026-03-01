@@ -107,6 +107,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	}
 
 	// Initialize S3 storage
+	log.Printf("[S3] Initializing with endpoint=%s bucket=%s ssl=%v", cfg.S3.Endpoint, cfg.S3.Bucket, cfg.S3.UseSSL)
 	s3Client, err := storage.NewS3Client(storage.S3Config{
 		Endpoint:  cfg.S3.Endpoint,
 		AccessKey: cfg.S3.AccessKey,
@@ -115,10 +116,12 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		UseSSL:    cfg.S3.UseSSL,
 	})
 	if err != nil {
-		log.Printf("Warning: Failed to initialize S3 client: %v", err)
+		log.Printf("[S3] ERROR: Failed to initialize S3 client: %v", err)
 	} else {
 		if err := s3Client.EnsureBucket(context.Background()); err != nil {
-			log.Printf("Warning: Failed to ensure S3 bucket: %v", err)
+			log.Printf("[S3] ERROR: Failed to ensure S3 bucket: %v", err)
+		} else {
+			log.Printf("[S3] Successfully connected to bucket %s", cfg.S3.Bucket)
 		}
 	}
 

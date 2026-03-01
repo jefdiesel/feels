@@ -65,7 +65,7 @@ func (s *S3Client) UploadPhoto(ctx context.Context, userID uuid.UUID, reader io.
 		ContentType: contentType,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to upload photo: %w", err)
+		return "", fmt.Errorf("failed to upload photo to bucket %s at %s: %w", s.bucket, s.endpoint, err)
 	}
 
 	return s.GetPublicURL(filename), nil
