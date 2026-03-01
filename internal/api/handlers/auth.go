@@ -253,15 +253,9 @@ func (h *AuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 
 // SetPublicKey stores the user's public key for E2E encryption
 func (h *AuthHandler) SetPublicKey(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("user_id").(string)
+	uid, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		jsonError(w, "invalid user", http.StatusBadRequest)
 		return
 	}
 

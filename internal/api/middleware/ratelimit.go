@@ -19,6 +19,8 @@ type RateLimitConfig struct {
 	Window time.Duration
 	// Key prefix for Redis
 	KeyPrefix string
+	// FailClosed denies requests when Redis is unavailable (security-sensitive endpoints)
+	FailClosed bool
 }
 
 // RateLimitMiddleware provides rate limiting using Redis
@@ -43,7 +45,12 @@ func (m *RateLimitMiddleware) Limit(next http.Handler) http.Handler {
 
 		allowed, remaining, err := m.checkLimit(r.Context(), key)
 		if err != nil {
-			// If Redis fails, allow request (fail open) but log
+			if m.config.FailClosed {
+				// For security-sensitive endpoints, deny when Redis is unavailable
+				http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			// For non-critical endpoints, allow request (fail open)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -88,20 +95,24 @@ func (m *RateLimitMiddleware) checkLimit(ctx context.Context, key string) (bool,
 // Common rate limit presets
 
 // AuthRateLimiter returns a rate limiter for auth endpoints (5 req/min)
+// Uses fail-closed to prevent brute force attacks when Redis is unavailable
 func AuthRateLimiter(redis *redis.Client) *RateLimitMiddleware {
 	return NewRateLimitMiddleware(redis, RateLimitConfig{
-		Requests:  5,
-		Window:    time.Minute,
-		KeyPrefix: "rl:auth",
+		Requests:   5,
+		Window:     time.Minute,
+		KeyPrefix:  "rl:auth",
+		FailClosed: true,
 	})
 }
 
 // MagicLinkRateLimiter returns a rate limiter for magic link (3 req/min)
+// Uses fail-closed to prevent enumeration attacks when Redis is unavailable
 func MagicLinkRateLimiter(redis *redis.Client) *RateLimitMiddleware {
 	return NewRateLimitMiddleware(redis, RateLimitConfig{
-		Requests:  3,
-		Window:    time.Minute,
-		KeyPrefix: "rl:magic",
+		Requests:   3,
+		Window:     time.Minute,
+		KeyPrefix:  "rl:magic",
+		FailClosed: true,
 	})
 }
 

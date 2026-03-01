@@ -49,7 +49,7 @@ export default function PrivacySettingsScreen() {
       const response = await api.get('/settings/privacy');
       setSettings({ ...defaultSettings, ...response.data });
     } catch (error: any) {
-      console.log('Using default privacy settings');
+      // If no settings exist yet, use defaults
     } finally {
       setLoading(false);
     }

@@ -48,7 +48,6 @@ export default function NotificationsSettingsScreen() {
       setSettings({ ...defaultSettings, ...response.data });
     } catch (error: any) {
       // If no settings exist yet, use defaults
-      console.log('Using default notification settings');
     } finally {
       setLoading(false);
     }

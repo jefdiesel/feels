@@ -28,12 +28,10 @@ export function usePushNotifications() {
   // Register for push notifications
   const registerForPushNotifications = useCallback(async (): Promise<string | null> => {
     if (Platform.OS === 'web') {
-      console.log('Push notifications not supported on web');
       return null;
     }
 
     if (!Device.isDevice) {
-      console.log('Push notifications require a physical device');
       return null;
     }
 
@@ -49,7 +47,6 @@ export function usePushNotifications() {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('Push notification permission not granted');
         return null;
       }
 
@@ -89,7 +86,6 @@ export function usePushNotifications() {
 
       return token;
     } catch (error) {
-      console.error('Error registering for push notifications:', error);
       return null;
     }
   }, []);
@@ -101,9 +97,8 @@ export function usePushNotifications() {
         token,
         platform: Platform.OS,
       });
-      console.log('Push token saved to server');
     } catch (error) {
-      console.error('Failed to save push token:', error);
+      // Failed to save push token
     }
   }, []);
 
@@ -116,9 +111,8 @@ export function usePushNotifications() {
         data: { token: expoPushToken },
       });
       setExpoPushToken(null);
-      console.log('Push token removed from server');
     } catch (error) {
-      console.error('Failed to remove push token:', error);
+      // Failed to remove push token
     }
   }, [expoPushToken]);
 

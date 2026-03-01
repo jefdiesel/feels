@@ -80,6 +80,7 @@ type S3Config struct {
 	SecretKey string
 	Bucket    string
 	UseSSL    bool
+	PublicURL string
 }
 
 func Load() *Config {
@@ -105,6 +106,7 @@ func Load() *Config {
 			SecretKey: getEnv("S3_SECRET_KEY", "minioadmin"),
 			Bucket:    getEnv("S3_BUCKET", "feels-photos"),
 			UseSSL:    getEnvBool("S3_USE_SSL", false),
+			PublicURL: getEnv("S3_PUBLIC_URL", ""),
 		},
 		Stripe: StripeConfig{
 			SecretKey:        getEnv("STRIPE_SECRET_KEY", ""),

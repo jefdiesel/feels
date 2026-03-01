@@ -111,7 +111,6 @@ export default function ChatScreen() {
   useEffect(() => {
     const initEncryption = async () => {
       if (!isCryptoAvailable()) {
-        console.log('WebCrypto not available, encryption disabled');
         return;
       }
 

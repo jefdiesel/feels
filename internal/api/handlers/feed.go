@@ -40,10 +40,10 @@ func (h *FeedHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse limit from query
+	// Parse limit from query with validation
 	limit := feed.DefaultFeedLimit
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 	}

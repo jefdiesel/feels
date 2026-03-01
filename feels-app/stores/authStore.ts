@@ -114,9 +114,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Strip formatting from phone, keep just digits
       const phoneDigits = phone.replace(/\D/g, '');
 
-      console.log('Making API request to:', '/auth/register');
-      console.log('Request payload:', { email, phone: phoneDigits, device_id: deviceId, platform: Platform.OS });
-
       const response = await api.post('/auth/register', {
         email,
         password,
@@ -125,7 +122,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         platform: Platform.OS,
       });
 
-      console.log('Registration response:', response.data);
       const { access_token, refresh_token, user } = response.data;
 
       await storage.setItem('accessToken', access_token);
@@ -142,12 +138,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
       });
     } catch (error: any) {
-      console.error('Registration API error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        code: error.code,
-      });
       set({ isLoading: false });
       const errorMessage = error.response?.data?.error || error.message || 'Registration failed';
       throw new Error(errorMessage);

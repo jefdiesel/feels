@@ -2,7 +2,6 @@ import axios from 'axios';
 import { storage } from '@/stores/storage';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-console.log('API Base URL:', BASE_URL);
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -34,14 +33,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Log errors for debugging
-    console.error('API Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-    });
-
     const originalRequest = error.config;
 
     // If 401 and we haven't tried to refresh yet

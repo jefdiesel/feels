@@ -70,12 +70,10 @@ export default function RegisterScreen() {
 
     setError('');
     try {
-      console.log('Attempting registration with:', { firstName, email, phone: phone.replace(/\D/g, '') });
       await register(firstName, email, password, phone);
       // After registration, go to onboarding to complete profile
       router.replace('/(auth)/onboarding');
     } catch (e: any) {
-      console.error('Registration error:', e);
       const errorMsg = e.message || 'Registration failed';
       setError(errorMsg);
     }

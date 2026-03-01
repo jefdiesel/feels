@@ -13,10 +13,11 @@ import (
 )
 
 type S3Client struct {
-	client   *minio.Client
-	bucket   string
-	endpoint string
-	useSSL   bool
+	client    *minio.Client
+	bucket    string
+	endpoint  string
+	useSSL    bool
+	publicURL string // Custom domain for public URLs
 }
 
 type S3Config struct {
@@ -25,6 +26,7 @@ type S3Config struct {
 	SecretKey string
 	Bucket    string
 	UseSSL    bool
+	PublicURL string // Custom domain for public URLs (e.g., photos.feelsfun.app)
 }
 
 func NewS3Client(cfg S3Config) (*S3Client, error) {
@@ -45,10 +47,11 @@ func NewS3Client(cfg S3Config) (*S3Client, error) {
 	}
 
 	return &S3Client{
-		client:   client,
-		bucket:   cfg.Bucket,
-		endpoint: endpoint,
-		useSSL:   cfg.UseSSL,
+		client:    client,
+		bucket:    cfg.Bucket,
+		endpoint:  endpoint,
+		useSSL:    cfg.UseSSL,
+		publicURL: cfg.PublicURL,
 	}, nil
 }
 
@@ -88,6 +91,10 @@ func (s *S3Client) DeletePhoto(ctx context.Context, url string) error {
 }
 
 func (s *S3Client) GetPublicURL(objectName string) string {
+	// Use custom public URL if configured (e.g., photos.feelsfun.app)
+	if s.publicURL != "" {
+		return fmt.Sprintf("https://%s/%s", s.publicURL, objectName)
+	}
 	scheme := "http"
 	if s.useSSL {
 		scheme = "https"
@@ -104,6 +111,14 @@ func (s *S3Client) GetPresignedURL(ctx context.Context, objectName string, expir
 }
 
 func (s *S3Client) urlToObjectName(url string) string {
+	// Check custom public URL first
+	if s.publicURL != "" {
+		prefix := fmt.Sprintf("https://%s/", s.publicURL)
+		if len(url) > len(prefix) && url[:len(prefix)] == prefix {
+			return url[len(prefix):]
+		}
+	}
+	// Fall back to endpoint-based URL
 	prefix := fmt.Sprintf("http://%s/%s/", s.endpoint, s.bucket)
 	if s.useSSL {
 		prefix = fmt.Sprintf("https://%s/%s/", s.endpoint, s.bucket)

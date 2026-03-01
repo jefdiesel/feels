@@ -146,10 +146,9 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       // Return true if it's a match (backend returns { matched: bool, match_id?: string })
       return response.data?.matched || false;
     } catch (error: any) {
-      console.error('Swipe error:', error);
-      // Still advance even if API fails
-      get().nextProfile();
-      return false;
+      // Don't advance on failure - let user retry
+      set({ error: 'Swipe failed. Please try again.' });
+      throw error;
     }
   },
 
