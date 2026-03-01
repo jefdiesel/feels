@@ -97,6 +97,7 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "profile not found", http.StatusNotFound)
 			return
 		}
+		log.Printf("[ERROR] UpdateProfile failed for user %s: %v", userID, err)
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

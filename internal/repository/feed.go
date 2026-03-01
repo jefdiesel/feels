@@ -85,7 +85,7 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 		)
 		SELECT
 			user_id, name, dob, gender, zip_code, neighborhood, bio,
-			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
+			kink_level, COALESCE(array_to_string(looking_for, ','), '') as looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, lat, lng, is_verified, last_active, created_at,
 			age, distance, priority
 		FROM candidates

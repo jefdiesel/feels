@@ -132,15 +132,17 @@ func (r *CreditRepository) ResetMonthlyCredits(ctx context.Context, userID uuid.
 // GetSubscription gets a user's active subscription
 func (r *CreditRepository) GetSubscription(ctx context.Context, userID uuid.UUID) (*credit.Subscription, error) {
 	query := `
-		SELECT id, user_id, plan, period, credits_monthly, started_at, expires_at, auto_renew
+		SELECT id, user_id, plan_type, status, current_period_start, current_period_end
 		FROM subscriptions
-		WHERE user_id = $1 AND expires_at > NOW()
-		ORDER BY expires_at DESC
+		WHERE user_id = $1 AND status = 'active' AND current_period_end > NOW()
+		ORDER BY current_period_end DESC
 		LIMIT 1
 	`
 	var s credit.Subscription
+	var planType string
+	var status string
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&s.ID, &s.UserID, &s.Plan, &s.Period, &s.CreditsMonthly, &s.StartedAt, &s.ExpiresAt, &s.AutoRenew,
+		&s.ID, &s.UserID, &planType, &status, &s.StartedAt, &s.ExpiresAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -148,6 +150,10 @@ func (r *CreditRepository) GetSubscription(ctx context.Context, userID uuid.UUID
 		}
 		return nil, err
 	}
+	// Map plan_type to Plan and Period
+	s.Plan = credit.PlanType(planType)
+	s.Period = credit.Monthly // Default, actual period is in plan_type
+	s.AutoRenew = status == "active"
 	return &s, nil
 }
 
