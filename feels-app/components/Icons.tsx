@@ -229,10 +229,6 @@ export function TrendingUpIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
   return <Feather name="trending-up" size={size} color={color} />;
 }
 
-export function GiftIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
-  return <Feather name="gift" size={size} color={color} />;
-}
-
 export function AwardIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
   return <Feather name="award" size={size} color={color} />;
 }

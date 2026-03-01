@@ -31,7 +31,10 @@
               "scheme": "feels"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -45,7 +48,8 @@
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true
