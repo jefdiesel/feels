@@ -37,6 +37,19 @@
             "BROWSABLE",
             "DEFAULT"
           ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "feels"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -61,6 +74,12 @@
         "projectId": "cdc6ede8-be05-4e77-94ff-1ee55e4dde35"
       }
     },
-    "owner": "jefdiesel"
+    "owner": "jefdiesel",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cdc6ede8-be05-4e77-94ff-1ee55e4dde35"
+    }
   }
 }
