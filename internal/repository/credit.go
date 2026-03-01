@@ -152,7 +152,7 @@ func (r *CreditRepository) GetSubscription(ctx context.Context, userID uuid.UUID
 	}
 	// Map plan_type to Plan and Period
 	s.Plan = credit.PlanType(planType)
-	s.Period = credit.Monthly // Default, actual period is in plan_type
+	s.Period = credit.PeriodMonthly // Default, actual period is in plan_type
 	s.AutoRenew = status == "active"
 	return &s, nil
 }
