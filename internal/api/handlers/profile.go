@@ -320,11 +320,8 @@ func (h *ProfileHandler) GetShareLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use the host from the request or a configured base URL
+	// Always use the main app URL for share links, not the API URL
 	baseURL := "https://feelsfun.app"
-	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
-		baseURL = "https://" + host
-	}
 
 	link, err := h.profileService.GetShareLink(r.Context(), userID, baseURL)
 	if err != nil {
