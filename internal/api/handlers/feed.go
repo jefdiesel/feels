@@ -86,6 +86,7 @@ func (h *FeedHandler) Like(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, feed.ErrInsufficientLikes):
 			jsonError(w, err.Error(), http.StatusPaymentRequired)
 		default:
+			log.Printf("[ERROR] Like failed for user %s -> %s: %v", userID, targetID, err)
 			jsonError(w, "failed to like", http.StatusInternalServerError)
 		}
 		return
@@ -118,6 +119,7 @@ func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, feed.ErrInsufficientLikes):
 			jsonError(w, err.Error(), http.StatusPaymentRequired)
 		default:
+			log.Printf("[ERROR] Superlike failed for user %s -> %s: %v", userID, targetID, err)
 			jsonError(w, "failed to superlike", http.StatusInternalServerError)
 		}
 		return
