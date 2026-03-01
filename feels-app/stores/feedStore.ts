@@ -104,10 +104,9 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     try {
       const response = await feedApi.getProfiles(20);
       const feedResponse: FeedResponse = response.data;
-      const profiles = feedResponse.profiles.map(transformProfile);
+      const profiles = (feedResponse?.profiles || []).map(transformProfile);
       set({ profiles, currentIndex: 0, isLoading: false });
     } catch (error: any) {
-      console.error('Feed load error:', error);
       // Check if profile is required (428 Precondition Required)
       if (error.response?.status === 428) {
         set({
