@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "feels",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "backgroundColor": "#000000",
     "ios": {
       "supportsTablet": false,
@@ -50,13 +50,7 @@
         }
       ],
       "expo-asset",
-      "expo-font",
-      [
-        "@sentry/react-native",
-        {
-          "uploadSourceMaps": false
-        }
-      ]
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

@@ -7,19 +7,14 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SystemUI from 'expo-system-ui';
-import * as Sentry from '@sentry/react-native';
 import { useAuthStore } from '@/stores/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
-// Initialize Sentry
-if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    environment: process.env.EXPO_PUBLIC_ENV || 'development',
-    tracesSampleRate: 0.1,
-    enableAutoSessionTracking: true,
-  });
-}
+// Sentry initialization disabled for now - can be re-enabled once build is stable
+// import * as Sentry from '@sentry/react-native';
+// if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+//   Sentry.init({...});
+// }
 
 const queryClient = new QueryClient({
   defaultOptions: {
