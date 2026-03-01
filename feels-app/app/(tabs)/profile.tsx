@@ -246,18 +246,17 @@ export default function ProfileScreen() {
       const profilePhotos = profile?.photos || [];
       setPhotos(profilePhotos);
 
-      // Merge profile data (bio, prompts, looking_for) into user state
+      // Merge profile data into user state
       if (profile && user) {
         const updatedUser = {
           ...user,
+          name: profile.name ?? user.name,
           bio: profile.bio ?? user.bio,
           prompts: profile.prompts ?? user.prompts,
           looking_for: profile.looking_for ?? user.looking_for,
+          age: profile.age ?? user.age,
         };
-        // Only update if something changed
-        if (profile.bio !== user.bio || profile.prompts !== user.prompts || profile.looking_for !== user.looking_for) {
-          setUser(updatedUser);
-        }
+        setUser(updatedUser);
       }
     } catch (error) {
       console.error('Failed to load photos:', error);
