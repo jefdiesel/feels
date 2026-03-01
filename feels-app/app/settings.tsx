@@ -22,20 +22,11 @@ const GENDER_OPTIONS = [
   { label: 'Trans', value: 'trans' },
 ];
 
-const VIBE_LEVEL_OPTIONS = [
-  { label: 'Vanilla', value: 'vanilla' },
-  { label: 'Curious', value: 'curious' },
-  { label: 'Sensual', value: 'sensual' },
-  { label: 'Experienced', value: 'experienced' },
-  { label: 'Adventurous', value: 'kinky' },
-];
-
 interface Preferences {
   age_min: number;
   age_max: number;
   distance_miles: number;
   genders_seeking: string[];
-  kink_levels: string[];
   visible_to_genders: string[];
 }
 
@@ -47,7 +38,6 @@ export default function SettingsScreen() {
     age_max: 99,
     distance_miles: 25,
     genders_seeking: [],
-    kink_levels: [],
     visible_to_genders: [],
   });
 
@@ -64,7 +54,6 @@ export default function SettingsScreen() {
         age_max: data.age_max ?? 99,
         distance_miles: data.distance_miles ?? 25,
         genders_seeking: data.genders_seeking ?? [],
-        kink_levels: data.kink_levels ?? [],
         visible_to_genders: data.visible_to_genders ?? [],
       });
     } catch (error: any) {
@@ -98,7 +87,7 @@ export default function SettingsScreen() {
   };
 
   const toggleSelection = (
-    field: 'genders_seeking' | 'kink_levels' | 'visible_to_genders',
+    field: 'genders_seeking' | 'visible_to_genders',
     value: string
   ) => {
     setPreferences((prev) => {
@@ -242,31 +231,6 @@ export default function SettingsScreen() {
                   )}
                   <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
                     {gender.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Vibe Levels Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vibe Levels</Text>
-          <Text style={styles.sectionHint}>Select all that apply</Text>
-          <View style={styles.optionsContainer}>
-            {VIBE_LEVEL_OPTIONS.map((level) => {
-              const isSelected = preferences.kink_levels.includes(level.value);
-              return (
-                <TouchableOpacity
-                  key={level.value}
-                  style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
-                  onPress={() => toggleSelection('kink_levels', level.value)}
-                >
-                  {isSelected && (
-                    <CheckIcon size={16} color={colors.primary.DEFAULT} />
-                  )}
-                  <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-                    {level.label}
                   </Text>
                 </TouchableOpacity>
               );

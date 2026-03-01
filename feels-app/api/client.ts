@@ -292,16 +292,20 @@ export const referralApi = {
 };
 
 export interface NotificationSettings {
+  push_enabled: boolean;
   new_matches: boolean;
   new_messages: boolean;
-  new_likes: boolean;
-  marketing: boolean;
+  likes_received: boolean;
+  super_likes: boolean;
+  promotions: boolean;
 }
 
 export interface PrivacySettings {
   show_online_status: boolean;
   show_read_receipts: boolean;
-  show_typing_indicator: boolean;
+  show_distance: boolean;
+  hide_age: boolean;
+  incognito_mode: boolean;
 }
 
 export const settingsApi = {

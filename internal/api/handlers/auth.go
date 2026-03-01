@@ -308,6 +308,23 @@ func (h *AuthHandler) GetPublicKey(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, resp, http.StatusOK)
 }
 
+// GetCurrentUser returns the authenticated user's information
+func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	u, err := h.userService.GetUser(r.Context(), userID)
+	if err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	jsonResponse(w, u, http.StatusOK)
+}
+
 type errorResponse struct {
 	Error string `json:"error"`
 }

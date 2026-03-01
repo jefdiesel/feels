@@ -26,7 +26,7 @@ var Plans = map[PlanType]Plan{
 		Type:          PlanTypeMonthly,
 		Name:          "Premium Monthly",
 		PriceID:       "", // Set from config
-		Amount:        1499, // $14.99
+		Amount:        999, // $9.99
 		Currency:      "usd",
 		Interval:      "month",
 		IntervalCount: 1,
@@ -36,7 +36,7 @@ var Plans = map[PlanType]Plan{
 		Type:          PlanTypeQuarterly,
 		Name:          "Premium Quarterly",
 		PriceID:       "", // Set from config
-		Amount:        2999, // $29.99 (~$10/month)
+		Amount:        1993, // $19.93 (~$6.64/month)
 		Currency:      "usd",
 		Interval:      "month",
 		IntervalCount: 3,
@@ -46,7 +46,7 @@ var Plans = map[PlanType]Plan{
 		Type:          PlanTypeAnnual,
 		Name:          "Premium Annual",
 		PriceID:       "", // Set from config
-		Amount:        7999, // $79.99 (~$6.67/month)
+		Amount:        5999, // $59.99 (~$5/month)
 		Currency:      "usd",
 		Interval:      "year",
 		IntervalCount: 1,

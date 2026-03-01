@@ -303,6 +303,9 @@ func (r *Router) setupRoutes(
 			// 2FA routes (disabled until needed)
 			// protected.Post("/auth/2fa/setup", authHandler.Setup2FA)
 
+			// Current user
+			protected.Get("/users/me", authHandler.GetCurrentUser)
+
 			// Profile routes
 			protected.Route("/profile", func(p chi.Router) {
 				p.Get("/", profileHandler.GetProfile)

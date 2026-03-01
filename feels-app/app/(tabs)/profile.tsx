@@ -604,7 +604,7 @@ export default function ProfileScreen() {
                   });
                 }
               }}
-              maxPhotos={6}
+              maxPhotos={5}
             />
           )}
         </View>

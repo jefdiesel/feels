@@ -28,7 +28,7 @@ interface PhotoGridProps {
 export default function PhotoGrid({
   photos,
   onPhotosChange,
-  maxPhotos = 6,
+  maxPhotos = 5,
 }: PhotoGridProps) {
   const [uploading, setUploading] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
