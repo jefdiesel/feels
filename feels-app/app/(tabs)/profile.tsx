@@ -229,7 +229,7 @@ export default function ProfileScreen() {
 
     try {
       await Share.share({
-        message: `Join me on feels - the dating app that puts real connections first! Use my code ${referralCode} to get 3 days of premium free.\n\nhttps://feels.app/invite/${referralCode}`,
+        message: `Join me on feels - the dating app that puts real connections first! Use my code ${referralCode} to get 3 days of premium free.\n\nhttps://feelsfun.app/invite/${referralCode}`,
         title: 'Invite friends to feels',
       });
     } catch (error: any) {

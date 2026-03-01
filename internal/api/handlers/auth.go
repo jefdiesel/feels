@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/feels/feels/internal/api/middleware"
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
 	"github.com/feels/feels/internal/repository"
@@ -112,16 +113,9 @@ func (h *AuthHandler) SendPhoneCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user ID from context (set by auth middleware)
-	userID, ok := r.Context().Value("user_id").(string)
+	uid, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		jsonError(w, "invalid user", http.StatusBadRequest)
 		return
 	}
 
@@ -149,15 +143,9 @@ func (h *AuthHandler) VerifyPhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := r.Context().Value("user_id").(string)
+	uid, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		jsonError(w, "invalid user", http.StatusBadRequest)
 		return
 	}
 
@@ -179,15 +167,9 @@ func (h *AuthHandler) VerifyPhone(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Setup2FA(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("user_id").(string)
+	uid, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		jsonError(w, "invalid user", http.StatusBadRequest)
 		return
 	}
 

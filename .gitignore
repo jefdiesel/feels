@@ -1,0 +1,23 @@
+# Environment files - NEVER COMMIT
+.env
+.env.*
+*.env
+
+# Binaries
+feels-api
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Logs
+*.log

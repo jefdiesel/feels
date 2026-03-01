@@ -318,7 +318,7 @@ func (h *ProfileHandler) GetShareLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use the host from the request or a configured base URL
-	baseURL := "https://feels.app"
+	baseURL := "https://feelsfun.app"
 	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
 		baseURL = "https://" + host
 	}

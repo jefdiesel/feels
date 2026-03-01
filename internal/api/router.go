@@ -23,6 +23,7 @@ import (
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
 	"github.com/feels/feels/internal/repository"
+	"github.com/feels/feels/internal/sms"
 	"github.com/feels/feels/internal/storage"
 	"github.com/feels/feels/internal/websocket"
 	"github.com/go-chi/chi/v5"
@@ -55,6 +56,18 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
+
+	// Configure WebSocket allowed origins based on environment
+	if cfg.IsProduction() {
+		websocket.AllowedOrigins = []string{"https://feelsfun.app", "https://www.feelsfun.app"}
+	} else {
+		websocket.AllowedOrigins = []string{
+			"http://localhost:8081",
+			"http://127.0.0.1:8081",
+			"http://localhost:19006",
+			"http://127.0.0.1:19006",
+		}
+	}
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
@@ -109,6 +122,13 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		}
 	}
 
+	// Initialize SMS service
+	smsService := sms.NewService(sms.Config{
+		AccountSID: cfg.SMS.AccountSID,
+		AuthToken:  cfg.SMS.AuthToken,
+		FromNumber: cfg.SMS.FromNumber,
+	})
+
 	// Initialize services
 	userService := user.NewService(
 		userRepo,
@@ -116,6 +136,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		cfg.JWT.AccessExpiry,
 		cfg.JWT.RefreshExpiry,
 	)
+	userService.SetSMSService(smsService)
 
 	profileService := profile.NewService(profileRepo, s3Client)
 	// Payment service is initialized later and will be set on profile service
@@ -211,7 +232,7 @@ func (r *Router) setupMiddleware() {
 	r.mux.Use(chimiddleware.Timeout(30 * time.Second))
 
 	r.mux.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*", "https://*.feels.app"},
+		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*", "https://*.feelsfun.app"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
 		ExposedHeaders:   []string{"Link"},
@@ -270,6 +291,13 @@ func (r *Router) setupRoutes(
 		// Protected routes
 		router.Group(func(protected chi.Router) {
 			protected.Use(r.authMw.Authenticate)
+
+			// Phone verification routes (disabled until Twilio configured)
+			// protected.Post("/auth/phone/send", authHandler.SendPhoneCode)
+			// protected.Post("/auth/phone/verify", authHandler.VerifyPhone)
+
+			// 2FA routes (disabled until needed)
+			// protected.Post("/auth/2fa/setup", authHandler.Setup2FA)
 
 			// Profile routes
 			protected.Route("/profile", func(p chi.Router) {
@@ -380,8 +408,4 @@ func (r *Router) setupRoutes(
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.mux.ServeHTTP(w, req)
-}
-
-func notImplemented(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
 }

@@ -14,9 +14,16 @@ type Config struct {
 	S3         S3Config
 	Stripe     StripeConfig
 	Email      EmailConfig
+	SMS        SMSConfig
 	Sentry     SentryConfig
 	OpenAI     OpenAIConfig
 	Moderation ModerationConfig
+}
+
+type SMSConfig struct {
+	AccountSID string
+	AuthToken  string
+	FromNumber string
 }
 
 type SentryConfig struct {
@@ -110,6 +117,11 @@ func Load() *Config {
 			APIKey:    getEnv("RESEND_API_KEY", ""),
 			FromEmail: getEnv("EMAIL_FROM", ""),
 			FromName:  getEnv("EMAIL_FROM_NAME", "Feels"),
+		},
+		SMS: SMSConfig{
+			AccountSID: getEnv("TWILIO_ACCOUNT_SID", ""),
+			AuthToken:  getEnv("TWILIO_AUTH_TOKEN", ""),
+			FromNumber: getEnv("TWILIO_FROM_NUMBER", ""),
 		},
 		Sentry: SentryConfig{
 			DSN:         getEnv("SENTRY_DSN", ""),

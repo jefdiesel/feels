@@ -413,11 +413,12 @@ func (r *ProfileRepository) GetOrCreateShareCode(ctx context.Context, userID uui
 		return *code, nil
 	}
 
-	// Generate a new share code using first 8 chars of MD5(user_id + timestamp)
+	// Generate a cryptographically random share code using PostgreSQL's gen_random_bytes
+	// Encode as base36 (alphanumeric) and take 8 characters for URL-friendly codes
 	newCode := ""
 	err = r.db.QueryRow(ctx, `
 		UPDATE profiles
-		SET share_code = UPPER(SUBSTRING(MD5($1::text || NOW()::text) FROM 1 FOR 8))
+		SET share_code = UPPER(SUBSTRING(REPLACE(REPLACE(ENCODE(gen_random_bytes(6), 'base64'), '/', ''), '+', '') FROM 1 FOR 8))
 		WHERE user_id = $1
 		RETURNING share_code
 	`, userID).Scan(&newCode)

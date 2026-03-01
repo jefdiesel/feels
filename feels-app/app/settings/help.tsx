@@ -69,23 +69,23 @@ export default function HelpScreen() {
   };
 
   const handleContactSupport = () => {
-    Linking.openURL('mailto:support@feels.app?subject=Help%20Request');
+    Linking.openURL('mailto:support@feelsfun.app?subject=Help%20Request');
   };
 
   const handleSafetyCenter = () => {
-    Linking.openURL('https://feels.app/safety');
+    Linking.openURL('https://feelsfun.app/safety');
   };
 
   const handleCommunityGuidelines = () => {
-    Linking.openURL('https://feels.app/guidelines');
+    Linking.openURL('https://feelsfun.app/guidelines');
   };
 
   const handlePrivacyPolicy = () => {
-    Linking.openURL('https://feels.app/privacy');
+    Linking.openURL('https://feelsfun.app/privacy');
   };
 
   const handleTerms = () => {
-    Linking.openURL('https://feels.app/terms');
+    Linking.openURL('https://feelsfun.app/terms');
   };
 
   return (

@@ -69,11 +69,17 @@ type Repository interface {
 	GetPublicKeysByUserIDs(ctx context.Context, userIDs []uuid.UUID, keyType string) (map[uuid.UUID]*UserPublicKey, error)
 }
 
+// SMSService interface for sending SMS messages
+type SMSService interface {
+	SendVerificationCode(ctx context.Context, to, code string) error
+}
+
 type Service struct {
 	repo          Repository
 	jwtSecret     []byte
 	accessExpiry  time.Duration
 	refreshExpiry time.Duration
+	smsService    SMSService
 }
 
 type Claims struct {
@@ -88,6 +94,11 @@ func NewService(repo Repository, jwtSecret string, accessExpiry, refreshExpiry t
 		accessExpiry:  accessExpiry,
 		refreshExpiry: refreshExpiry,
 	}
+}
+
+// SetSMSService sets the SMS service for phone verification
+func (s *Service) SetSMSService(sms SMSService) {
+	s.smsService = sms
 }
 
 func (s *Service) Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error) {
@@ -413,9 +424,14 @@ func (s *Service) SendPhoneCode(ctx context.Context, userID *uuid.UUID, phone st
 		return err
 	}
 
-	// TODO: Send SMS via Twilio/SNS
-	// For now, log the code (remove in production!)
-	_ = code // In production: smsService.Send(normalized, code)
+	// Send SMS via Twilio
+	if s.smsService != nil {
+		if err := s.smsService.SendVerificationCode(ctx, normalized, code); err != nil {
+			// Log error but don't fail - user can retry
+			// The code is still stored and valid
+			_ = err
+		}
+	}
 
 	return nil
 }

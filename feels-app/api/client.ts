@@ -84,6 +84,18 @@ export const authApi = {
 
   refresh: (refreshToken: string) =>
     api.post('/auth/refresh', { refresh_token: refreshToken }),
+
+  // Phone verification (disabled until Twilio configured)
+  // sendPhoneCode: (phone: string) =>
+  //   api.post('/auth/phone/send', { phone }),
+  // verifyPhone: (phone: string, code: string) =>
+  //   api.post('/auth/phone/verify', { phone, code }),
+
+  // 2FA (disabled until needed)
+  // setup2FA: () =>
+  //   api.post<{ secret: string; qr_code: string; backup_codes: string[] }>(
+  //     '/auth/2fa/setup'
+  //   ),
 };
 
 export const feedApi = {
@@ -144,16 +156,6 @@ export const safetyApi = {
 
   report: (userId: string, reason: string, details?: string) =>
     api.post(`/report/${userId}`, { reason, details }),
-};
-
-export const userApi = {
-  getMe: () => api.get('/users/me'),
-
-  updateProfile: (data: {
-    name?: string;
-    bio?: string;
-    photos?: string[];
-  }) => api.patch('/users/me', data),
 };
 
 interface ProfilePrompt {

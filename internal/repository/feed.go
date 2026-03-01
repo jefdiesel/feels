@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/feels/feels/internal/domain/feed"
 	"github.com/feels/feels/internal/domain/profile"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -371,8 +373,8 @@ func (r *FeedRepository) CreateLikeAtomic(ctx context.Context, like *feed.Like, 
 	var insertedID uuid.UUID
 	err = tx.QueryRow(ctx, likeQuery, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, like.CreatedAt).Scan(&insertedID)
 	likeCreated := err == nil
-	if err != nil && err.Error() != "no rows in result set" {
-		// Real error, not just "already exists"
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		// Real error, not just "already exists" (ON CONFLICT DO NOTHING returns no rows)
 		return nil, err
 	}
 
@@ -442,7 +444,7 @@ func (r *FeedRepository) CreateLikeWithMessageAtomic(ctx context.Context, like *
 	var insertedID uuid.UUID
 	err = tx.QueryRow(ctx, likeQuery, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, message, like.CreatedAt).Scan(&insertedID)
 	likeCreated := err == nil
-	if err != nil && err.Error() != "no rows in result set" {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 

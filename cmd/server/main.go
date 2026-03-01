@@ -35,7 +35,7 @@ func main() {
 		}
 	}
 
-	log.Printf("Starting Feels server in %s mode", cfg.Server.Env)
+	log.Printf("Starting Feels server in %s mode (ENV=%q)", cfg.Server.Env, os.Getenv("ENV"))
 
 	// Connect to database
 	db, err := connectDB(cfg.Database.URL)

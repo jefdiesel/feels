@@ -3,7 +3,9 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -36,15 +38,7 @@ func NewRateLimitMiddleware(redis *redis.Client, config RateLimitConfig) *RateLi
 // Limit returns middleware that rate limits by IP
 func (m *RateLimitMiddleware) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		// Use X-Forwarded-For if behind proxy
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			ip = xff
-		}
-		if xri := r.Header.Get("X-Real-IP"); xri != "" {
-			ip = xri
-		}
-
+		ip := extractClientIP(r)
 		key := fmt.Sprintf("%s:%s", m.config.KeyPrefix, ip)
 
 		allowed, remaining, err := m.checkLimit(r.Context(), key)
@@ -127,4 +121,56 @@ func StrictRateLimiter(redis *redis.Client) *RateLimitMiddleware {
 		Window:    time.Minute,
 		KeyPrefix: "rl:strict",
 	})
+}
+
+// extractClientIP extracts the real client IP from the request.
+// It handles X-Forwarded-For and X-Real-IP headers safely by:
+// 1. Taking only the first (leftmost) IP from X-Forwarded-For (the original client)
+// 2. Stripping port numbers from the IP
+// 3. Falling back to RemoteAddr if no proxy headers present
+func extractClientIP(r *http.Request) string {
+	// X-Real-IP is typically set by nginx and is more reliable when present
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		if ip := parseIP(xri); ip != "" {
+			return ip
+		}
+	}
+
+	// X-Forwarded-For contains comma-separated list: client, proxy1, proxy2, ...
+	// We want the first (leftmost) IP which is the original client
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take only the first IP (the client)
+		if comma := strings.Index(xff, ","); comma != -1 {
+			xff = xff[:comma]
+		}
+		if ip := parseIP(strings.TrimSpace(xff)); ip != "" {
+			return ip
+		}
+	}
+
+	// Fall back to RemoteAddr
+	return parseIP(r.RemoteAddr)
+}
+
+// parseIP extracts and validates an IP address, stripping any port number
+func parseIP(addr string) string {
+	// Handle IPv6 addresses with brackets [::1]:8080
+	if strings.HasPrefix(addr, "[") {
+		if end := strings.Index(addr, "]"); end != -1 {
+			addr = addr[1:end]
+		}
+	} else if strings.Contains(addr, ":") && strings.Count(addr, ":") == 1 {
+		// IPv4 with port: 192.168.1.1:8080
+		host, _, err := net.SplitHostPort(addr)
+		if err == nil {
+			addr = host
+		}
+	}
+
+	// Validate it's actually an IP
+	if ip := net.ParseIP(addr); ip != nil {
+		return ip.String()
+	}
+
+	return addr
 }

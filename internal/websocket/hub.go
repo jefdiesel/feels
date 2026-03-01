@@ -12,14 +12,27 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// TODO: Add proper origin checking in production
-		return true
-	},
-}
+var (
+	// AllowedOrigins is set by the router based on environment
+	AllowedOrigins = []string{"http://localhost:8081", "http://127.0.0.1:8081"}
+
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true // Allow non-browser clients (mobile apps)
+			}
+			for _, allowed := range AllowedOrigins {
+				if origin == allowed {
+					return true
+				}
+			}
+			return false
+		},
+	}
+)
 
 // Client represents a connected WebSocket client
 type Client struct {

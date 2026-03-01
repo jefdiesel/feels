@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS profile_views;
+DROP TABLE IF EXISTS rewinds;
