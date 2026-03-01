@@ -12,7 +12,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.feels.app",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#000000",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -53,6 +56,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cdc6ede8-be05-4e77-94ff-1ee55e4dde35"
+      }
+    },
+    "owner": "jefdiesel"
   }
 }

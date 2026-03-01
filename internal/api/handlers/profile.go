@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/feels/feels/internal/api/middleware"
@@ -34,6 +35,7 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "profile not found", http.StatusNotFound)
 			return
 		}
+		log.Printf("[ERROR] GetProfile failed for user %s: %v", userID, err)
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

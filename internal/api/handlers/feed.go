@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -53,6 +54,7 @@ func (h *FeedHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "profile required to use feed", http.StatusPreconditionRequired)
 			return
 		}
+		log.Printf("[ERROR] GetFeed failed for user %s: %v", userID, err)
 		jsonError(w, "failed to get feed", http.StatusInternalServerError)
 		return
 	}

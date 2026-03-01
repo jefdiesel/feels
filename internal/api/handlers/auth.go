@@ -311,6 +311,9 @@ type errorResponse struct {
 }
 
 func jsonError(w http.ResponseWriter, message string, code int) {
+	if code >= 500 {
+		log.Printf("[ERROR] %d: %s", code, message)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(errorResponse{Error: message})

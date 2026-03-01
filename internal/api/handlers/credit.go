@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/feels/feels/internal/api/middleware"
@@ -26,6 +27,7 @@ func (h *CreditHandler) GetCredits(w http.ResponseWriter, r *http.Request) {
 
 	balance, err := h.creditService.GetBalance(r.Context(), userID)
 	if err != nil {
+		log.Printf("[ERROR] GetCredits failed for user %s: %v", userID, err)
 		jsonError(w, "failed to get credits", http.StatusInternalServerError)
 		return
 	}
