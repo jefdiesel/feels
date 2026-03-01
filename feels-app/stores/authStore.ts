@@ -109,7 +109,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch (error: any) {
       set({ isLoading: false });
-      const msg = error.response?.data?.error || error.message || 'Login failed';
+      // Extract error message with better fallbacks
+      let msg = 'Login failed';
+      if (error.response?.data?.error) {
+        msg = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        msg = error.response.data.message;
+      } else if (error.message) {
+        msg = error.message;
+      } else if (error.code === 'ECONNABORTED') {
+        msg = 'Connection timed out. Please try again.';
+      } else if (error.code === 'ERR_NETWORK') {
+        msg = 'Network error. Please check your connection.';
+      }
       throw new Error(msg);
     }
   },
@@ -146,8 +158,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch (error: any) {
       set({ isLoading: false });
-      const errorMessage = error.response?.data?.error || error.message || 'Registration failed';
-      throw new Error(errorMessage);
+      let msg = 'Registration failed';
+      if (error.response?.data?.error) {
+        msg = error.response.data.error;
+      } else if (error.message) {
+        msg = error.message;
+      } else if (error.code === 'ERR_NETWORK') {
+        msg = 'Network error. Please check your connection.';
+      }
+      throw new Error(msg);
     }
   },
 
@@ -280,7 +299,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch (error: any) {
       set({ isLoading: false });
-      throw new Error(error.response?.data?.error || 'Invalid or expired magic link');
+      let msg = 'Invalid or expired magic link';
+      if (error.response?.data?.error) {
+        msg = error.response.data.error;
+      } else if (error.message) {
+        msg = error.message;
+      } else if (error.code === 'ERR_NETWORK') {
+        msg = 'Network error. Please check your connection.';
+      }
+      throw new Error(msg);
     }
   },
 
