@@ -81,7 +81,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email: string, password: string, totpCode?: string) => {
     set({ isLoading: true });
     try {
-      const deviceId = await get().getDeviceId();
+      let deviceId: string;
+      try {
+        deviceId = await get().getDeviceId();
+      } catch (e) {
+        deviceId = `fallback-${Platform.OS}-${Date.now()}`;
+      }
+
       const response = await api.post('/auth/login', {
         email,
         password,
@@ -246,7 +252,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   verifyMagicLink: async (token: string) => {
     set({ isLoading: true });
     try {
-      const deviceId = await get().getDeviceId();
+      let deviceId: string;
+      try {
+        deviceId = await get().getDeviceId();
+      } catch (e) {
+        deviceId = `fallback-${Platform.OS}-${Date.now()}`;
+      }
+
       const response = await api.post('/auth/magic/verify', {
         token,
         device_id: deviceId,
