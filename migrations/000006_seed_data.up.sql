@@ -29,14 +29,14 @@ DECLARE
     -- Religion options
     religions TEXT[] := ARRAY['agnostic', 'atheist', 'buddhist', 'catholic', 'christian', 'hindu', 'jewish', 'muslim', 'spiritual', 'other', NULL];
 
-    -- Wants kids options
-    wants_kids_opts TEXT[] := ARRAY['want_kids', 'dont_want_kids', 'open_to_kids', 'have_kids_want_more', 'have_kids_done', NULL];
+    -- Wants kids options (matches frontend formatWantsKids)
+    wants_kids_opts TEXT[] := ARRAY['want', 'open', 'not_sure', 'dont_want', NULL];
 
-    -- Alcohol options
-    alcohol_opts TEXT[] := ARRAY['never', 'rarely', 'socially', 'often', NULL];
+    -- Alcohol options (matches frontend formatAlcohol)
+    alcohol_opts TEXT[] := ARRAY['never', 'socially', 'regularly', NULL];
 
-    -- Weed options
-    weed_opts TEXT[] := ARRAY['never', 'rarely', 'socially', 'often', NULL];
+    -- Weed options (matches frontend formatWeed)
+    weed_opts TEXT[] := ARRAY['never', 'socially', 'regularly', NULL];
 
     -- Bio templates
     bio_templates TEXT[] := ARRAY[
@@ -325,15 +325,15 @@ BEGIN
         curr_lat := base_lat + (random() - 0.5) * 0.1;
         curr_lng := base_lng + (random() - 0.5) * 0.1;
 
-        -- Generate prompts (3 per profile)
+        -- Generate prompts (3 per profile) with unique IDs
         prompt_idx1 := 1 + (i % array_length(prompt_questions, 1));
         prompt_idx2 := 1 + ((i + 3) % array_length(prompt_questions, 1));
         prompt_idx3 := 1 + ((i + 7) % array_length(prompt_questions, 1));
 
         curr_prompts := jsonb_build_array(
-            jsonb_build_object('question', prompt_questions[prompt_idx1], 'answer', prompt_answers[1 + (i % array_length(prompt_answers, 1))]),
-            jsonb_build_object('question', prompt_questions[prompt_idx2], 'answer', prompt_answers[1 + ((i + 5) % array_length(prompt_answers, 1))]),
-            jsonb_build_object('question', prompt_questions[prompt_idx3], 'answer', prompt_answers[1 + ((i + 11) % array_length(prompt_answers, 1))])
+            jsonb_build_object('id', 'prompt_' || i || '_1', 'question', prompt_questions[prompt_idx1], 'answer', prompt_answers[1 + (i % array_length(prompt_answers, 1))]),
+            jsonb_build_object('id', 'prompt_' || i || '_2', 'question', prompt_questions[prompt_idx2], 'answer', prompt_answers[1 + ((i + 5) % array_length(prompt_answers, 1))]),
+            jsonb_build_object('id', 'prompt_' || i || '_3', 'question', prompt_questions[prompt_idx3], 'answer', prompt_answers[1 + ((i + 11) % array_length(prompt_answers, 1))])
         );
 
         INSERT INTO profiles (user_id, name, dob, gender, zip_code, neighborhood, bio, kink_level, looking_for, zodiac, religion, has_kids, wants_kids, alcohol, weed, lat, lng, is_verified, last_active, prompts)

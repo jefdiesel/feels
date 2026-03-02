@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { feedApi } from '@/api/client';
 
 export interface ProfilePrompt {
+  id?: string;
   question: string;
   answer: string;
 }
@@ -10,6 +11,7 @@ export interface Profile {
   id: string;
   name: string;
   age: number;
+  gender?: string;
   bio?: string;
   photos: string[];
   location?: string;
@@ -18,7 +20,14 @@ export interface Profile {
   prompts?: ProfilePrompt[];
   interests?: string[];
   lookingFor?: string;
-  lookingForAlignment?: 'perfect' | 'similar'; // alignment with your intentions
+  lookingForAlignment?: 'perfect' | 'similar';
+  // Additional details
+  hasKids?: boolean;
+  wantsKids?: string;
+  religion?: string;
+  alcohol?: string;
+  weed?: string;
+  zodiac?: string;
 }
 
 // Backend response types
@@ -30,6 +39,7 @@ interface BackendPhoto {
 }
 
 interface BackendPrompt {
+  id?: string;
   question: string;
   answer: string;
 }
@@ -38,6 +48,7 @@ interface BackendProfile {
   user_id: string;
   name: string;
   age: number;
+  gender?: string;
   bio?: string;
   photos?: BackendPhoto[];
   neighborhood?: string;
@@ -47,6 +58,13 @@ interface BackendProfile {
   interests?: string[];
   looking_for?: string;
   looking_for_alignment?: 'perfect' | 'similar';
+  // Additional details
+  has_kids?: boolean;
+  wants_kids?: string;
+  religion?: string;
+  alcohol?: string;
+  weed?: string;
+  zodiac?: string;
 }
 
 interface FeedResponse {
@@ -62,6 +80,7 @@ function transformProfile(bp: BackendProfile): Profile {
     id: bp.user_id,
     name: bp.name,
     age: bp.age,
+    gender: bp.gender,
     bio: bp.bio,
     photos: bp.photos?.map((p) => p.url) || [],
     location: bp.neighborhood,
@@ -71,6 +90,12 @@ function transformProfile(bp: BackendProfile): Profile {
     interests: bp.interests,
     lookingFor: bp.looking_for,
     lookingForAlignment: bp.looking_for_alignment,
+    hasKids: bp.has_kids,
+    wantsKids: bp.wants_kids,
+    religion: bp.religion,
+    alcohol: bp.alcohol,
+    weed: bp.weed,
+    zodiac: bp.zodiac,
   };
 }
 
