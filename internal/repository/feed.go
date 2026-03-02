@@ -50,7 +50,8 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 				p.*,
 				EXTRACT(YEAR FROM AGE(p.dob)) AS age,
 				CASE
-					WHEN up.lat IS NOT NULL AND up.lng IS NOT NULL AND p.lat IS NOT NULL AND p.lng IS NOT NULL
+					WHEN up.lat IS NOT NULL AND up.lng IS NOT NULL AND up.lat != 0 AND up.lng != 0
+						AND p.lat IS NOT NULL AND p.lng IS NOT NULL AND p.lat != 0 AND p.lng != 0
 					THEN ROUND((3959 * acos(cos(radians(up.lat)) * cos(radians(p.lat)) * cos(radians(p.lng) - radians(up.lng)) + sin(radians(up.lat)) * sin(radians(p.lat))))::numeric, 0)::int
 					ELSE NULL
 				END AS distance,
@@ -78,10 +79,10 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 				AND p.user_id NOT IN (SELECT * FROM already_seen)
 				AND p.user_id NOT IN (SELECT * FROM matched_users)
 				AND p.user_id NOT IN (SELECT * FROM shadowbanned_users)
-				-- Visibility: user must be visible to our gender
-				AND (target_prefs.visible_to_genders IS NULL OR up.gender = ANY(target_prefs.visible_to_genders))
-				-- Hard blocks: user hasn't hard-blocked our gender
-				AND (target_prefs.hard_block_genders IS NULL OR NOT up.gender = ANY(target_prefs.hard_block_genders))
+				-- Visibility: user must be visible to our gender (skip check if our gender is NULL)
+				AND (target_prefs.visible_to_genders IS NULL OR up.gender IS NULL OR up.gender = ANY(target_prefs.visible_to_genders))
+				-- Hard blocks: user hasn't hard-blocked our gender (skip check if our gender is NULL)
+				AND (target_prefs.hard_block_genders IS NULL OR up.gender IS NULL OR NOT up.gender = ANY(target_prefs.hard_block_genders))
 		)
 		SELECT
 			user_id, name, dob, gender, zip_code, neighborhood, bio,
