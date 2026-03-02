@@ -321,6 +321,7 @@ type CurrentUserResponse struct {
 	Name          string            `json:"name,omitempty"`
 	Bio           string            `json:"bio,omitempty"`
 	Age           int               `json:"age,omitempty"`
+	Neighborhood  string            `json:"neighborhood,omitempty"`
 	Photos        []string          `json:"photos"`
 	Prompts       []profile.Prompt  `json:"prompts,omitempty"`
 	IsVerified    bool              `json:"is_verified"`
@@ -359,6 +360,7 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 			resp.Name = profileResp.Profile.Name
 			resp.Bio = profileResp.Profile.Bio
 			resp.Age = profileResp.Age
+			resp.Neighborhood = profileResp.Profile.Neighborhood
 			resp.IsVerified = profileResp.Profile.IsVerified
 			resp.LookingFor = profileResp.Profile.LookingFor
 			resp.Prompts = profileResp.Profile.Prompts
