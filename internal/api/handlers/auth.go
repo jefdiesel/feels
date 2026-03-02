@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/feels/feels/internal/api/middleware"
+	"github.com/feels/feels/internal/domain/profile"
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
 	"github.com/feels/feels/internal/repository"
@@ -14,16 +15,18 @@ import (
 )
 
 type AuthHandler struct {
-	userService  *user.Service
-	emailService *email.Service
-	isDev        bool
+	userService    *user.Service
+	profileService *profile.Service
+	emailService   *email.Service
+	isDev          bool
 }
 
-func NewAuthHandler(userService *user.Service, emailService *email.Service, isDev bool) *AuthHandler {
+func NewAuthHandler(userService *user.Service, profileService *profile.Service, emailService *email.Service, isDev bool) *AuthHandler {
 	return &AuthHandler{
-		userService:  userService,
-		emailService: emailService,
-		isDev:        isDev,
+		userService:    userService,
+		profileService: profileService,
+		emailService:   emailService,
+		isDev:          isDev,
 	}
 }
 
@@ -308,7 +311,23 @@ func (h *AuthHandler) GetPublicKey(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, resp, http.StatusOK)
 }
 
-// GetCurrentUser returns the authenticated user's information
+// CurrentUserResponse combines user auth data with profile data
+type CurrentUserResponse struct {
+	ID            uuid.UUID         `json:"id"`
+	Email         string            `json:"email"`
+	Phone         *string           `json:"phone,omitempty"`
+	PhoneVerified bool              `json:"phone_verified"`
+	TOTPEnabled   bool              `json:"totp_enabled"`
+	Name          string            `json:"name,omitempty"`
+	Bio           string            `json:"bio,omitempty"`
+	Age           int               `json:"age,omitempty"`
+	Photos        []string          `json:"photos"`
+	Prompts       []profile.Prompt  `json:"prompts,omitempty"`
+	IsVerified    bool              `json:"is_verified"`
+	LookingFor    []string          `json:"looking_for,omitempty"`
+}
+
+// GetCurrentUser returns the authenticated user's information with profile data
 func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -322,7 +341,36 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonResponse(w, u, http.StatusOK)
+	// Build response with user data
+	resp := CurrentUserResponse{
+		ID:            u.ID,
+		Email:         u.Email,
+		Phone:         u.Phone,
+		PhoneVerified: u.PhoneVerified,
+		TOTPEnabled:   u.TOTPEnabled,
+		Photos:        []string{},
+		Prompts:       []profile.Prompt{},
+	}
+
+	// Try to get profile data (may not exist if onboarding incomplete)
+	if h.profileService != nil {
+		profileResp, err := h.profileService.GetProfile(r.Context(), userID)
+		if err == nil && profileResp != nil {
+			resp.Name = profileResp.Profile.Name
+			resp.Bio = profileResp.Profile.Bio
+			resp.Age = profileResp.Age
+			resp.IsVerified = profileResp.Profile.IsVerified
+			resp.LookingFor = profileResp.Profile.LookingFor
+			resp.Prompts = profileResp.Profile.Prompts
+
+			// Extract photo URLs
+			for _, photo := range profileResp.Profile.Photos {
+				resp.Photos = append(resp.Photos, photo.URL)
+			}
+		}
+	}
+
+	jsonResponse(w, resp, http.StatusOK)
 }
 
 type errorResponse struct {

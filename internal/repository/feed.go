@@ -516,6 +516,16 @@ func init() {
 	_ = CreatePassesTableMigration()
 }
 
+// ResetFeedHistory clears likes and passes for a user (testing only)
+func (r *FeedRepository) ResetFeedHistory(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM likes WHERE liker_id = $1`, userID)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(ctx, `DELETE FROM passes WHERE passer_id = $1`, userID)
+	return err
+}
+
 // DebugFeedFilters returns counts of profiles filtered at each step
 func (r *FeedRepository) DebugFeedFilters(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences) (map[string]int, error) {
 	result := make(map[string]int)

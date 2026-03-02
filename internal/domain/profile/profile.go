@@ -142,6 +142,7 @@ type UpdatePreferencesRequest struct {
 type ProfileResponse struct {
 	Profile     *Profile     `json:"profile"`
 	Preferences *Preferences `json:"preferences,omitempty"`
+	Age         int          `json:"age"`
 }
 
 // VerificationRequest represents a pending photo verification

@@ -160,6 +160,7 @@ func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*ProfileRes
 	return &ProfileResponse{
 		Profile:     profile,
 		Preferences: prefs,
+		Age:         calculateAge(profile.DOB),
 	}, nil
 }
 
