@@ -22,13 +22,39 @@ const formatKinkLevel = (level: string): string => {
 
 const formatLookingFor = (value: string): string => {
   const labels: Record<string, string> = {
-    serious: 'Something serious',
-    relationship: 'Relationship minded',
+    serious: 'Serious',
+    relationship: 'Relationship',
     dating: 'Dating',
-    meeting_people: 'Meeting new people',
-    friends_and_more: 'Friends and more',
+    meeting_people: 'Meeting people',
+    friends_and_more: 'Friends+',
   };
   return labels[value] || value;
+};
+
+const formatGender = (gender?: string): string => {
+  if (!gender) return '';
+  const labels: Record<string, string> = {
+    woman: 'Woman',
+    man: 'Man',
+    non_binary: 'Non-binary',
+    trans_woman: 'Trans woman',
+    trans_man: 'Trans man',
+  };
+  return labels[gender] || gender;
+};
+
+const formatDetail = (key: string, value: any): string | null => {
+  if (value === null || value === undefined) return null;
+  const formatters: Record<string, Record<string, string>> = {
+    wantsKids: { want: 'Wants kids', open: 'Open to kids', not_sure: 'Not sure', dont_want: 'No kids' },
+    alcohol: { never: 'Sober', socially: 'Drinks socially', regularly: 'Drinks' },
+    weed: { never: 'No 420', socially: '420 friendly', regularly: '420' },
+  };
+  if (key === 'hasKids' && value === true) return 'Has kids';
+  if (key === 'religion' && value) return value.charAt(0).toUpperCase() + value.slice(1);
+  if (key === 'zodiac' && value) return value.charAt(0).toUpperCase() + value.slice(1);
+  if (formatters[key] && formatters[key][value]) return formatters[key][value];
+  return null;
 };
 
 // Default prompts when profile doesn't have any
@@ -142,17 +168,39 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
               <Text style={styles.name}>{profile.name}</Text>
               <Text style={styles.age}>{profile.age}</Text>
             </View>
-            {profile.location && (
-              <Text style={styles.location}>
-                {profile.location}
-                {profile.distance && ` · ${profile.distance} mi`}
-              </Text>
-            )}
+            {/* Info bar: gender / location / looking for / vibe */}
+            <Text style={styles.infoBar}>
+              {[
+                formatGender(profile.gender),
+                profile.location ? `${profile.location}${profile.distance ? ` · ${profile.distance}mi` : ''}` : null,
+                profile.lookingFor ? formatLookingFor(profile.lookingFor) : null,
+                profile.kinkLevel ? formatKinkLevel(profile.kinkLevel) : null,
+              ].filter(Boolean).join(' · ')}
+            </Text>
           </TouchableOpacity>
         </TouchableOpacity>
 
           {/* Profile prompts section */}
           <View style={styles.promptsSection}>
+            {/* Details tags */}
+            {(() => {
+              const details = [
+                formatDetail('hasKids', profile.hasKids),
+                formatDetail('wantsKids', profile.wantsKids),
+                formatDetail('religion', profile.religion),
+                formatDetail('alcohol', profile.alcohol),
+                formatDetail('weed', profile.weed),
+                formatDetail('zodiac', profile.zodiac),
+              ].filter(Boolean) as string[];
+              return details.length > 0 ? (
+                <View style={styles.detailsRow}>
+                  {details.map((d, i) => (
+                    <View key={i} style={styles.detailTag}><Text style={styles.detailText}>{d}</Text></View>
+                  ))}
+                </View>
+              ) : null;
+            })()}
+
             {displayPrompts.slice(0, 3).map((prompt, index) => (
               <View key={prompt.id || index} style={styles.promptCard}>
                 <Text style={styles.promptQuestion}>{prompt.question}</Text>
@@ -302,6 +350,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     marginTop: spacing.xs,
     letterSpacing: 0.2,
+  },
+  infoBar: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium as any,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: spacing.xs,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  detailTag: {
+    backgroundColor: colors.bg.tertiary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  detailText: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
   },
   promptsSection: {
     paddingHorizontal: spacing.lg,
