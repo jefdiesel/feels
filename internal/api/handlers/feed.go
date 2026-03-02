@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/feels/feels/internal/api/middleware"
+	"github.com/feels/feels/internal/domain/credit"
 	"github.com/feels/feels/internal/domain/feed"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -83,8 +84,10 @@ func (h *FeedHandler) Like(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 		case errors.Is(err, feed.ErrAlreadyLiked):
 			jsonError(w, err.Error(), http.StatusConflict)
-		case errors.Is(err, feed.ErrInsufficientLikes):
-			jsonError(w, err.Error(), http.StatusPaymentRequired)
+		case errors.Is(err, feed.ErrInsufficientLikes),
+			errors.Is(err, credit.ErrInsufficientCredits),
+			errors.Is(err, credit.ErrDailyLimitReached):
+			jsonError(w, "no likes remaining today", http.StatusPaymentRequired)
 		default:
 			log.Printf("[ERROR] Like failed for user %s -> %s: %v", userID, targetID, err)
 			jsonError(w, "failed to like", http.StatusInternalServerError)
@@ -116,8 +119,10 @@ func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 		case errors.Is(err, feed.ErrAlreadyLiked):
 			jsonError(w, err.Error(), http.StatusConflict)
-		case errors.Is(err, feed.ErrInsufficientLikes):
-			jsonError(w, err.Error(), http.StatusPaymentRequired)
+		case errors.Is(err, feed.ErrInsufficientLikes),
+			errors.Is(err, credit.ErrInsufficientCredits),
+			errors.Is(err, credit.ErrDailyLimitReached):
+			jsonError(w, "insufficient credits for superlike", http.StatusPaymentRequired)
 		default:
 			log.Printf("[ERROR] Superlike failed for user %s -> %s: %v", userID, targetID, err)
 			jsonError(w, "failed to superlike", http.StatusInternalServerError)
@@ -262,8 +267,10 @@ func (h *FeedHandler) SuperlikeWithMessage(w http.ResponseWriter, r *http.Reques
 			jsonError(w, err.Error(), http.StatusBadRequest)
 		case errors.Is(err, feed.ErrAlreadyLiked):
 			jsonError(w, err.Error(), http.StatusConflict)
-		case errors.Is(err, feed.ErrInsufficientLikes):
-			jsonError(w, err.Error(), http.StatusPaymentRequired)
+		case errors.Is(err, feed.ErrInsufficientLikes),
+			errors.Is(err, credit.ErrInsufficientCredits),
+			errors.Is(err, credit.ErrDailyLimitReached):
+			jsonError(w, "insufficient credits for superlike", http.StatusPaymentRequired)
 		default:
 			jsonError(w, "failed to superlike", http.StatusInternalServerError)
 		}
