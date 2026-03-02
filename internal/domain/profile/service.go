@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrInvalidGender              = errors.New("invalid gender")
+	ErrInvalidGenderChange        = errors.New("invalid gender change")
 	ErrInvalidDOB                 = errors.New("invalid date of birth")
 	ErrTooYoung                   = errors.New("must be 18 or older")
 	ErrInvalidKinkLevel           = errors.New("invalid kink level")
@@ -99,29 +100,43 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, req *Crea
 		prompts = req.Prompts
 	}
 
+	// For trans/non_binary, require gender_origin (assigned at birth)
+	var genderOrigin *string
+	if req.Gender == "trans" || req.Gender == "non_binary" {
+		if req.GenderOrigin == nil {
+			return nil, ErrInvalidGender // must provide gender_origin for trans/nb
+		}
+		if *req.GenderOrigin != "man" && *req.GenderOrigin != "woman" {
+			return nil, ErrInvalidGender // gender_origin must be man or woman
+		}
+		genderOrigin = req.GenderOrigin
+	}
+
 	profile := &Profile{
-		UserID:       userID,
-		Name:         req.Name,
-		DOB:          dob,
-		Gender:       req.Gender,
-		ZipCode:      req.ZipCode,
-		Neighborhood: req.Neighborhood,
-		Bio:          req.Bio,
-		Prompts:      prompts,
-		KinkLevel:    req.KinkLevel,
-		LookingFor:   req.LookingFor,
-		Zodiac:       req.Zodiac,
-		Religion:     req.Religion,
-		HasKids:      req.HasKids,
-		WantsKids:    req.WantsKids,
-		Alcohol:      req.Alcohol,
-		Weed:         req.Weed,
-		Lat:          req.Lat,
-		Lng:          req.Lng,
-		IsVerified:   false,
-		LastActive:   now,
-		CreatedAt:    now,
-		Photos:       []Photo{},
+		UserID:         userID,
+		Name:           req.Name,
+		DOB:            dob,
+		Gender:         req.Gender,
+		GenderOrigin:   genderOrigin,
+		GenderIdentity: req.GenderIdentity,
+		ZipCode:        req.ZipCode,
+		Neighborhood:   req.Neighborhood,
+		Bio:            req.Bio,
+		Prompts:        prompts,
+		KinkLevel:      req.KinkLevel,
+		LookingFor:     req.LookingFor,
+		Zodiac:         req.Zodiac,
+		Religion:       req.Religion,
+		HasKids:        req.HasKids,
+		WantsKids:      req.WantsKids,
+		Alcohol:        req.Alcohol,
+		Weed:           req.Weed,
+		Lat:            req.Lat,
+		Lng:            req.Lng,
+		IsVerified:     false,
+		LastActive:     now,
+		CreatedAt:      now,
+		Photos:         []Photo{},
 	}
 
 	if err := s.repo.Create(ctx, profile); err != nil {
@@ -168,6 +183,28 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req *Upda
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle gender change with origin validation
+	if req.Gender != nil && *req.Gender != profile.Gender {
+		newGender := *req.Gender
+		if !IsValidGender(newGender) {
+			return nil, ErrInvalidGender
+		}
+		// Cannot cross from man↔woman (must go through trans/non_binary)
+		// Check against gender_origin, not current gender
+		if profile.GenderOrigin != nil {
+			origin := *profile.GenderOrigin
+			// Block: man origin trying to become woman, or woman origin trying to become man
+			if (origin == "man" && newGender == "woman") || (origin == "woman" && newGender == "man") {
+				return nil, ErrInvalidGenderChange
+			}
+		}
+		profile.Gender = newGender
+	}
+
+	if req.GenderIdentity != nil {
+		profile.GenderIdentity = req.GenderIdentity
 	}
 
 	if req.Name != nil {
@@ -265,6 +302,15 @@ func (s *Service) UpdatePreferences(ctx context.Context, userID uuid.UUID, req *
 	}
 	if req.HardBlockAgeMax != nil {
 		prefs.HardBlockAgeMax = req.HardBlockAgeMax
+	}
+	if req.GenderPresentations != nil {
+		// Merge with existing presentations (don't overwrite entirely)
+		if prefs.GenderPresentations == nil {
+			prefs.GenderPresentations = make(map[string]*GenderPresentation)
+		}
+		for gender, presentation := range req.GenderPresentations {
+			prefs.GenderPresentations[gender] = presentation
+		}
 	}
 
 	if err := s.repo.UpdatePreferences(ctx, prefs); err != nil {

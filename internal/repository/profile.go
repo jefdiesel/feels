@@ -33,17 +33,24 @@ func (r *ProfileRepository) Create(ctx context.Context, p *profile.Profile) erro
 		return err
 	}
 
+	// Set gender_origin on creation (for trans/nb, use the assigned-at-birth value passed in)
+	// For man/woman, gender_origin = gender
+	genderOrigin := p.GenderOrigin
+	if genderOrigin == nil && (p.Gender == "man" || p.Gender == "woman") {
+		genderOrigin = &p.Gender
+	}
+
 	query := `
 		INSERT INTO profiles (
-			user_id, name, dob, gender, zip_code, neighborhood, bio, prompts,
+			user_id, name, dob, gender, gender_origin, gender_identity, zip_code, neighborhood, bio, prompts,
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
 		)
 	`
 	_, err = r.db.Exec(ctx, query,
-		p.UserID, p.Name, p.DOB, p.Gender, p.ZipCode, p.Neighborhood, p.Bio, promptsJSON,
+		p.UserID, p.Name, p.DOB, p.Gender, genderOrigin, p.GenderIdentity, p.ZipCode, p.Neighborhood, p.Bio, promptsJSON,
 		p.KinkLevel, p.LookingFor, p.Zodiac, p.Religion, p.HasKids, p.WantsKids,
 		p.Alcohol, p.Weed, p.WorkForMoney, p.WorkForPassion, p.Lat, p.Lng, p.IsVerified, p.LastActive, p.CreatedAt,
 	)
@@ -58,14 +65,14 @@ func (r *ProfileRepository) Create(ctx context.Context, p *profile.Profile) erro
 
 func (r *ProfileRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*profile.Profile, error) {
 	query := `
-		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
+		SELECT user_id, name, dob, gender, gender_origin, gender_identity, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at, share_code
 		FROM profiles WHERE user_id = $1
 	`
 	var p profile.Profile
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
+		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.GenderOrigin, &p.GenderIdentity, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
 		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
 		&p.Alcohol, &p.Weed, &p.WorkForMoney, &p.WorkForPassion, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
 	)
@@ -230,17 +237,22 @@ func (r *ProfileRepository) ReorderPhotos(ctx context.Context, userID uuid.UUID,
 // Preferences
 
 func (r *ProfileRepository) CreatePreferences(ctx context.Context, p *profile.Preferences) error {
+	genderPresentationsJSON, err := json.Marshal(p.GenderPresentations)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		INSERT INTO preferences (
 			user_id, genders_seeking, age_min, age_max, distance_miles,
 			include_trans, visible_to_genders, hard_block_genders,
-			hard_block_age_min, hard_block_age_max
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			hard_block_age_min, hard_block_age_max, gender_presentations
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
-	_, err := r.db.Exec(ctx, query,
+	_, err = r.db.Exec(ctx, query,
 		p.UserID, p.GendersSeeking, p.AgeMin, p.AgeMax, p.DistanceMiles,
 		p.IncludeTrans, p.VisibleToGenders, p.HardBlockGenders,
-		p.HardBlockAgeMin, p.HardBlockAgeMax,
+		p.HardBlockAgeMin, p.HardBlockAgeMax, genderPresentationsJSON,
 	)
 	return err
 }
@@ -249,14 +261,15 @@ func (r *ProfileRepository) GetPreferences(ctx context.Context, userID uuid.UUID
 	query := `
 		SELECT user_id, genders_seeking, age_min, age_max, distance_miles,
 			include_trans, visible_to_genders, hard_block_genders,
-			hard_block_age_min, hard_block_age_max
+			hard_block_age_min, hard_block_age_max, COALESCE(gender_presentations, '{}'::jsonb)
 		FROM preferences WHERE user_id = $1
 	`
 	var p profile.Preferences
+	var genderPresentationsJSON []byte
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&p.UserID, &p.GendersSeeking, &p.AgeMin, &p.AgeMax, &p.DistanceMiles,
 		&p.IncludeTrans, &p.VisibleToGenders, &p.HardBlockGenders,
-		&p.HardBlockAgeMin, &p.HardBlockAgeMax,
+		&p.HardBlockAgeMin, &p.HardBlockAgeMax, &genderPresentationsJSON,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -264,21 +277,34 @@ func (r *ProfileRepository) GetPreferences(ctx context.Context, userID uuid.UUID
 		}
 		return nil, err
 	}
+
+	// Parse gender_presentations JSON
+	if len(genderPresentationsJSON) > 0 {
+		if err := json.Unmarshal(genderPresentationsJSON, &p.GenderPresentations); err != nil {
+			return nil, err
+		}
+	}
+
 	return &p, nil
 }
 
 func (r *ProfileRepository) UpdatePreferences(ctx context.Context, p *profile.Preferences) error {
+	genderPresentationsJSON, err := json.Marshal(p.GenderPresentations)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		UPDATE preferences SET
 			genders_seeking = $2, age_min = $3, age_max = $4, distance_miles = $5,
 			include_trans = $6, visible_to_genders = $7, hard_block_genders = $8,
-			hard_block_age_min = $9, hard_block_age_max = $10
+			hard_block_age_min = $9, hard_block_age_max = $10, gender_presentations = $11
 		WHERE user_id = $1
 	`
 	result, err := r.db.Exec(ctx, query,
 		p.UserID, p.GendersSeeking, p.AgeMin, p.AgeMax, p.DistanceMiles,
 		p.IncludeTrans, p.VisibleToGenders, p.HardBlockGenders,
-		p.HardBlockAgeMin, p.HardBlockAgeMax,
+		p.HardBlockAgeMin, p.HardBlockAgeMax, genderPresentationsJSON,
 	)
 	if err != nil {
 		return err
@@ -370,14 +396,14 @@ func (r *ProfileRepository) RejectVerification(ctx context.Context, userID, admi
 // GetByShareCode returns a profile by its share code (for public profile viewing)
 func (r *ProfileRepository) GetByShareCode(ctx context.Context, code string) (*profile.Profile, error) {
 	query := `
-		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
+		SELECT user_id, name, dob, gender, gender_identity, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at, share_code
 		FROM profiles WHERE share_code = $1
 	`
 	var p profile.Profile
 	err := r.db.QueryRow(ctx, query, code).Scan(
-		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
+		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.GenderIdentity, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
 		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
 		&p.Alcohol, &p.Weed, &p.WorkForMoney, &p.WorkForPassion, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
 	)

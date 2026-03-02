@@ -22,6 +22,11 @@ var (
 	ErrUserShadowbanned  = errors.New("user is not available")
 )
 
+// Credit costs (must match credit package values)
+const (
+	CostSuperlike = 10
+)
+
 // LikeResult contains the result of an atomic like operation
 type LikeResult struct {
 	LikeCreated  bool
@@ -29,9 +34,24 @@ type LikeResult struct {
 	MatchCreated bool
 }
 
+// CreditCheckResult contains the result of a credit check within a transaction
+type CreditCheckResult struct {
+	UsedSubscription bool
+	UsedBonusLike    bool
+	UsedDailyLike    bool
+}
+
+// PremiumCheckResult contains the result of checking if a premium like is required
+type PremiumCheckResult struct {
+	RequiresPremium bool
+	Reason          string // "queue_full" or "age_range"
+}
+
 type FeedRepository interface {
 	GetFeedProfiles(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences, limit int) ([]FeedProfile, error)
 	CountQueuedLikes(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences) (int, error)
+	CountPendingLikesForUser(ctx context.Context, targetUserID uuid.UUID) (int, error)
+	CheckPremiumRequired(ctx context.Context, likerID, targetID uuid.UUID, freeSlots int) (*PremiumCheckResult, error)
 	DebugFeedFilters(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences) (map[string]int, error)
 	CreateLike(ctx context.Context, like *Like) error
 	CreateLikeWithMessage(ctx context.Context, like *Like, message string) error
@@ -48,6 +68,9 @@ type FeedRepository interface {
 	// Atomic operations to prevent race conditions
 	CreateLikeAtomic(ctx context.Context, like *Like, matchUser1ID, matchUser2ID uuid.UUID) (*LikeResult, error)
 	CreateLikeWithMessageAtomic(ctx context.Context, like *Like, message string, matchUser1ID, matchUser2ID uuid.UUID) (*LikeResult, error)
+	// Atomic like+credit operations (credit deduction + like creation in single transaction)
+	CreateLikeWithCreditAtomic(ctx context.Context, like *Like, isSuperlike bool, dailyLikeLimit int, superlikeCost int, matchUser1ID, matchUser2ID uuid.UUID) (*LikeResult, *CreditCheckResult, error)
+	CreateLikeWithMessageAndCreditAtomic(ctx context.Context, like *Like, message string, superlikeCost int, matchUser1ID, matchUser2ID uuid.UUID) (*LikeResult, error)
 }
 
 // UserRepository interface for checking user status
@@ -199,6 +222,8 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 }
 
 // Like likes a profile using atomic transaction to prevent race conditions
+// Credit deduction and like creation are wrapped in a single transaction to prevent credit loss
+// For non-premium likes: checks if target's queue is full or if liker is outside age range
 func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperlike bool) (*LikeResponse, error) {
 	if userID == targetID {
 		return nil, ErrCannotLikeSelf
@@ -223,20 +248,23 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 		return nil, ErrAlreadyLiked
 	}
 
-	// Atomically check and use credits to prevent race conditions
-	if s.creditService != nil {
-		if isSuperlike {
-			if err := s.creditService.UseSuperlikeAtomic(ctx, userID); err != nil {
-				return nil, err
-			}
-		} else {
-			if err := s.creditService.UseLikeAtomic(ctx, userID); err != nil {
-				return nil, err
-			}
+	// For regular likes (not superlikes), check if premium is required
+	// Premium is required if: target's queue is full OR liker is outside target's age range
+	if !isSuperlike {
+		premiumCheck, err := s.feedRepo.CheckPremiumRequired(ctx, userID, targetID, FreeLikeSlots)
+		if err != nil {
+			return nil, err
+		}
+		if premiumCheck.RequiresPremium {
+			return &LikeResponse{
+				Matched:         false,
+				RequiresPremium: true,
+				PremiumReason:   premiumCheck.Reason,
+			}, nil
 		}
 	}
 
-	// Create like and check for match atomically
+	// Create like object
 	like := &Like{
 		ID:          uuid.New(),
 		LikerID:     userID,
@@ -246,13 +274,22 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 	}
 
 	user1, user2 := match.OrderedUserIDs(userID, targetID)
-	result, err := s.feedRepo.CreateLikeAtomic(ctx, like, user1, user2)
+
+	var result *LikeResult
+
+	// Use atomic credit+like transaction to prevent credit loss
+	// This wraps credit deduction and like creation in a single database transaction
+	result, _, err = s.feedRepo.CreateLikeWithCreditAtomic(
+		ctx,
+		like,
+		isSuperlike,
+		s.dailyLimit,
+		CostSuperlike,
+		user1, user2,
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	// Legacy daily count (kept for backwards compatibility)
-	s.feedRepo.IncrementDailyLikeCount(ctx, userID)
 
 	// Send push notification for like received (only if like was created)
 	if result.LikeCreated && s.notificationService != nil {
@@ -386,7 +423,7 @@ func (s *Service) Rewind(ctx context.Context, userID uuid.UUID) (*FeedProfile, e
 }
 
 // LikeWithMessage creates a superlike with an attached message (premium feature)
-// Uses atomic transaction to prevent race conditions
+// Uses atomic transaction to prevent race conditions and credit loss
 func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUID, message string) (*LikeResponse, error) {
 	if userID == targetID {
 		return nil, ErrCannotLikeSelf
@@ -409,14 +446,7 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 		return nil, ErrAlreadyLiked
 	}
 
-	// Atomically check and use superlike credits
-	if s.creditService != nil {
-		if err := s.creditService.UseSuperlikeAtomic(ctx, userID); err != nil {
-			return nil, ErrInsufficientLikes
-		}
-	}
-
-	// Create like with message and check for match atomically
+	// Create like object
 	like := &Like{
 		ID:          uuid.New(),
 		LikerID:     userID,
@@ -426,13 +456,13 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 	}
 
 	user1, user2 := match.OrderedUserIDs(userID, targetID)
-	result, err := s.feedRepo.CreateLikeWithMessageAtomic(ctx, like, message, user1, user2)
+
+	// Use atomic credit+like transaction to prevent credit loss
+	// This wraps credit deduction and like creation in a single database transaction
+	result, err := s.feedRepo.CreateLikeWithMessageAndCreditAtomic(ctx, like, message, CostSuperlike, user1, user2)
 	if err != nil {
 		return nil, err
 	}
-
-	// Legacy daily count
-	s.feedRepo.IncrementDailyLikeCount(ctx, userID)
 
 	// Send push notification (only if like was created)
 	if result.LikeCreated && s.notificationService != nil {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 
@@ -38,6 +39,7 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 	log.Printf("[FEED] total=%d already_seen=%d", total, seen)
 	// Complex query implementing the feed algorithm
 	// Priority: qualified_superlike > qualified_like > gap_superlike > browse
+	// Now also handles gender_presentations for per-gender visibility and bio addendum
 	query := `
 		WITH user_profile AS (
 			SELECT lat, lng, gender FROM profiles WHERE user_id = $1
@@ -86,7 +88,10 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 					ELSE 4  -- browse
 				END AS priority,
 				l.is_superlike,
-				l.created_at AS liked_at
+				l.created_at AS liked_at,
+				-- Gender presentation: get bio addendum and tags for viewer's gender
+				COALESCE(target_prefs.gender_presentations, '{}'::jsonb) AS gender_presentations,
+				up.gender AS viewer_gender
 			FROM profiles p
 			CROSS JOIN user_profile up
 			LEFT JOIN likes l ON l.liker_id = p.user_id AND l.liked_id = $1
@@ -100,12 +105,19 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 				AND (target_prefs.visible_to_genders IS NULL OR up.gender IS NULL OR up.gender = ANY(target_prefs.visible_to_genders))
 				-- Hard blocks: user hasn't hard-blocked our gender (skip check if our gender is NULL)
 				AND (target_prefs.hard_block_genders IS NULL OR up.gender IS NULL OR NOT up.gender = ANY(target_prefs.hard_block_genders))
+				-- Gender presentations: check if enabled for viewer's gender (default true if not set)
+				AND (
+					target_prefs.gender_presentations IS NULL
+					OR up.gender IS NULL
+					OR target_prefs.gender_presentations->up.gender IS NULL
+					OR (target_prefs.gender_presentations->up.gender->>'enabled')::boolean IS NOT FALSE
+				)
 		)
 		SELECT
-			user_id, name, dob, gender, zip_code, neighborhood, bio,
+			user_id, name, dob, gender, gender_identity, zip_code, neighborhood, bio,
 			kink_level, COALESCE(looking_for, ARRAY[]::TEXT[]) as looking_for, zodiac, religion, has_kids, wants_kids,
 			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at,
-			age, distance, priority
+			age, distance, priority, gender_presentations, viewer_gender
 		FROM candidates
 		WHERE (priority <= 3) OR (
 			-- For browse, apply all search criteria
@@ -135,11 +147,13 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 	for rows.Next() {
 		var fp feed.FeedProfile
 		var priority int
+		var genderPresentationsJSON []byte
+		var viewerGender *string
 		err := rows.Scan(
-			&fp.UserID, &fp.Name, &fp.DOB, &fp.Gender, &fp.ZipCode, &fp.Neighborhood, &fp.Bio,
+			&fp.UserID, &fp.Name, &fp.DOB, &fp.Gender, &fp.GenderIdentity, &fp.ZipCode, &fp.Neighborhood, &fp.Bio,
 			&fp.KinkLevel, &fp.LookingFor, &fp.Zodiac, &fp.Religion, &fp.HasKids, &fp.WantsKids,
 			&fp.Alcohol, &fp.Weed, &fp.WorkForMoney, &fp.WorkForPassion, &fp.Lat, &fp.Lng, &fp.IsVerified, &fp.LastActive, &fp.CreatedAt,
-			&fp.Age, &fp.Distance, &priority,
+			&fp.Age, &fp.Distance, &priority, &genderPresentationsJSON, &viewerGender,
 		)
 		if err != nil {
 			return nil, err
@@ -154,6 +168,23 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 			fp.Priority = feed.PriorityGapSuperlike
 		default:
 			fp.Priority = feed.PriorityBrowse
+		}
+
+		// Apply gender-specific bio addendum and tags
+		if viewerGender != nil && len(genderPresentationsJSON) > 0 {
+			var genderPresentations map[string]*profile.GenderPresentation
+			if err := json.Unmarshal(genderPresentationsJSON, &genderPresentations); err == nil {
+				if gp, ok := genderPresentations[*viewerGender]; ok && gp != nil {
+					// Append gender-specific bio if set
+					if gp.Bio != nil && *gp.Bio != "" {
+						fp.Bio = fp.Bio + "\n\n" + *gp.Bio
+					}
+					// Set gender-specific tags
+					if len(gp.Tags) > 0 {
+						fp.GenderTags = gp.Tags
+					}
+				}
+			}
 		}
 
 		profiles = append(profiles, fp)
@@ -241,6 +272,93 @@ func (r *FeedRepository) CountQueuedLikes(ctx context.Context, userID uuid.UUID,
 	var count int
 	err := r.db.QueryRow(ctx, query, userID, prefs.GendersSeeking, prefs.AgeMin, prefs.AgeMax).Scan(&count)
 	return count, err
+}
+
+// CountPendingLikesForUser returns the number of pending (unprocessed) likes for a user
+// This is used for the queue slot system - counts likes not yet processed by the target
+func (r *FeedRepository) CountPendingLikesForUser(ctx context.Context, targetUserID uuid.UUID) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM likes l
+		WHERE l.liked_id = $1
+			AND l.liker_id NOT IN (SELECT liked_id FROM likes WHERE liker_id = $1)
+			AND l.liker_id NOT IN (SELECT passed_id FROM passes WHERE passer_id = $1)
+	`
+	var count int
+	err := r.db.QueryRow(ctx, query, targetUserID).Scan(&count)
+	return count, err
+}
+
+// CheckPremiumRequired checks if a premium like is required for liker to like target
+// Returns reason: "queue_full" (target has 10+ pending likes) or "age_range" (liker outside target's age prefs)
+func (r *FeedRepository) CheckPremiumRequired(ctx context.Context, likerID, targetID uuid.UUID, freeSlots int) (*feed.PremiumCheckResult, error) {
+	// First, get liker's profile (age and gender)
+	var likerAge int
+	var likerGender string
+	err := r.db.QueryRow(ctx, `
+		SELECT EXTRACT(YEAR FROM AGE(dob))::int, gender
+		FROM profiles WHERE user_id = $1
+	`, likerID).Scan(&likerAge, &likerGender)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get target's preferences including gender_presentations
+	var targetAgeMin, targetAgeMax int
+	var genderPresentationsJSON []byte
+	err = r.db.QueryRow(ctx, `
+		SELECT age_min, age_max, COALESCE(gender_presentations, '{}'::jsonb)
+		FROM preferences WHERE user_id = $1
+	`, targetID).Scan(&targetAgeMin, &targetAgeMax, &genderPresentationsJSON)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// No preferences set, allow free like
+			return &feed.PremiumCheckResult{RequiresPremium: false}, nil
+		}
+		return nil, err
+	}
+
+	// Check gender-specific age range override
+	effectiveAgeMin := targetAgeMin
+	effectiveAgeMax := targetAgeMax
+
+	if len(genderPresentationsJSON) > 0 {
+		var genderPresentations map[string]*profile.GenderPresentation
+		if err := json.Unmarshal(genderPresentationsJSON, &genderPresentations); err == nil {
+			if gp, ok := genderPresentations[likerGender]; ok && gp != nil {
+				// Use gender-specific age range if set
+				if gp.AgeMin != nil {
+					effectiveAgeMin = *gp.AgeMin
+				}
+				if gp.AgeMax != nil {
+					effectiveAgeMax = *gp.AgeMax
+				}
+			}
+		}
+	}
+
+	// Check if liker is outside target's age range for their gender
+	if likerAge < effectiveAgeMin || likerAge > effectiveAgeMax {
+		return &feed.PremiumCheckResult{
+			RequiresPremium: true,
+			Reason:          feed.PremiumReasonAgeRange,
+		}, nil
+	}
+
+	// Check if target's queue is full (10+ pending likes)
+	pendingCount, err := r.CountPendingLikesForUser(ctx, targetID)
+	if err != nil {
+		return nil, err
+	}
+
+	if pendingCount >= freeSlots {
+		return &feed.PremiumCheckResult{
+			RequiresPremium: true,
+			Reason:          feed.PremiumReasonQueueFull,
+		}, nil
+	}
+
+	return &feed.PremiumCheckResult{RequiresPremium: false}, nil
 }
 
 // CreateLike creates a like record
@@ -453,6 +571,251 @@ func (r *FeedRepository) CreateLikeWithMessageAtomic(ctx context.Context, like *
 	defer tx.Rollback(ctx)
 
 	// Insert the like with message
+	likeQuery := `
+		INSERT INTO likes (id, liker_id, liked_id, is_superlike, attached_message, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (liker_id, liked_id) DO NOTHING
+		RETURNING id
+	`
+	var insertedID uuid.UUID
+	err = tx.QueryRow(ctx, likeQuery, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, message, like.CreatedAt).Scan(&insertedID)
+	likeCreated := err == nil
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	// Check for mutual like with row lock
+	mutualQuery := `
+		SELECT id FROM likes
+		WHERE liker_id = $1 AND liked_id = $2
+		FOR UPDATE
+	`
+	var mutualLikeID uuid.UUID
+	err = tx.QueryRow(ctx, mutualQuery, like.LikedID, like.LikerID).Scan(&mutualLikeID)
+	hasMutual := err == nil
+
+	result := &feed.LikeResult{LikeCreated: likeCreated}
+
+	if hasMutual {
+		matchID := uuid.New()
+		matchQuery := `
+			INSERT INTO matches (id, user1_id, user2_id, created_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (user1_id, user2_id) DO UPDATE SET id = matches.id
+			RETURNING id, (xmax = 0) AS inserted
+		`
+		var returnedMatchID uuid.UUID
+		var wasInserted bool
+		err = tx.QueryRow(ctx, matchQuery, matchID, matchUser1ID, matchUser2ID).Scan(&returnedMatchID, &wasInserted)
+		if err != nil {
+			return nil, err
+		}
+
+		result.MatchID = &returnedMatchID
+		result.MatchCreated = wasInserted
+
+		if wasInserted {
+			deleteQuery := `DELETE FROM likes WHERE (liker_id = $1 AND liked_id = $2) OR (liker_id = $2 AND liked_id = $1)`
+			_, err = tx.Exec(ctx, deleteQuery, like.LikerID, like.LikedID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// CreateLikeWithCreditAtomic creates a like while atomically checking/deducting credits
+// This ensures credits are not lost if the like creation fails
+// Parameters:
+//   - like: the like to create
+//   - isSuperlike: whether this is a superlike (costs credits)
+//   - dailyLikeLimit: the daily like limit for free users
+//   - superlikeCost: the credit cost for superlikes
+//   - matchUser1ID, matchUser2ID: ordered user IDs for match creation
+func (r *FeedRepository) CreateLikeWithCreditAtomic(
+	ctx context.Context,
+	like *feed.Like,
+	isSuperlike bool,
+	dailyLikeLimit int,
+	superlikeCost int,
+	matchUser1ID, matchUser2ID uuid.UUID,
+) (*feed.LikeResult, *feed.CreditCheckResult, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	creditResult := &feed.CreditCheckResult{}
+
+	if isSuperlike {
+		// Superlikes always cost credits - deduct atomically
+		deductQuery := `
+			UPDATE credits
+			SET balance = balance - $2
+			WHERE user_id = $1 AND balance >= $2
+			RETURNING balance
+		`
+		var newBalance int
+		err = tx.QueryRow(ctx, deductQuery, like.LikerID, superlikeCost).Scan(&newBalance)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, ErrInsufficientCredits
+			}
+			return nil, nil, err
+		}
+	} else {
+		// Regular like - check subscription first, then bonus likes, then daily limit
+		// Step 1: Check for active subscription
+		subQuery := `
+			SELECT 1 FROM subscriptions
+			WHERE user_id = $1 AND status = 'active' AND current_period_end > NOW()
+			LIMIT 1
+		`
+		var hasSub int
+		err = tx.QueryRow(ctx, subQuery, like.LikerID).Scan(&hasSub)
+		if err == nil {
+			// Has subscription - no credit deduction needed
+			creditResult.UsedSubscription = true
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, err
+		} else {
+			// No subscription - try bonus likes first
+			bonusQuery := `
+				UPDATE credits
+				SET bonus_likes = bonus_likes - 1
+				WHERE user_id = $1 AND bonus_likes > 0
+				RETURNING bonus_likes
+			`
+			var newBonusLikes int
+			err = tx.QueryRow(ctx, bonusQuery, like.LikerID).Scan(&newBonusLikes)
+			if err == nil {
+				// Used a bonus like
+				creditResult.UsedBonusLike = true
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, err
+			} else {
+				// No bonus likes - use daily like
+				dailyQuery := `
+					INSERT INTO daily_likes (user_id, date, count)
+					VALUES ($1, CURRENT_DATE, 1)
+					ON CONFLICT (user_id, date) DO UPDATE
+					SET count = daily_likes.count + 1
+					WHERE daily_likes.count < $2
+					RETURNING count
+				`
+				var newCount int
+				err = tx.QueryRow(ctx, dailyQuery, like.LikerID, dailyLikeLimit).Scan(&newCount)
+				if err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, nil, ErrDailyLimitReached
+					}
+					return nil, nil, err
+				}
+				creditResult.UsedDailyLike = true
+			}
+		}
+	}
+
+	// Now create the like - credits have been atomically reserved
+	likeQuery := `
+		INSERT INTO likes (id, liker_id, liked_id, is_superlike, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (liker_id, liked_id) DO NOTHING
+		RETURNING id
+	`
+	var insertedID uuid.UUID
+	err = tx.QueryRow(ctx, likeQuery, like.ID, like.LikerID, like.LikedID, like.IsSuperlike, like.CreatedAt).Scan(&insertedID)
+	likeCreated := err == nil
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, err
+	}
+
+	// Check for mutual like with row lock to prevent race
+	mutualQuery := `
+		SELECT id FROM likes
+		WHERE liker_id = $1 AND liked_id = $2
+		FOR UPDATE
+	`
+	var mutualLikeID uuid.UUID
+	err = tx.QueryRow(ctx, mutualQuery, like.LikedID, like.LikerID).Scan(&mutualLikeID)
+	hasMutual := err == nil
+
+	result := &feed.LikeResult{LikeCreated: likeCreated}
+
+	if hasMutual {
+		// Create match atomically
+		matchID := uuid.New()
+		matchQuery := `
+			INSERT INTO matches (id, user1_id, user2_id, created_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (user1_id, user2_id) DO UPDATE SET id = matches.id
+			RETURNING id, (xmax = 0) AS inserted
+		`
+		var returnedMatchID uuid.UUID
+		var wasInserted bool
+		err = tx.QueryRow(ctx, matchQuery, matchID, matchUser1ID, matchUser2ID).Scan(&returnedMatchID, &wasInserted)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		result.MatchID = &returnedMatchID
+		result.MatchCreated = wasInserted
+
+		// Delete likes if we created the match
+		if wasInserted {
+			deleteQuery := `DELETE FROM likes WHERE (liker_id = $1 AND liked_id = $2) OR (liker_id = $2 AND liked_id = $1)`
+			_, err = tx.Exec(ctx, deleteQuery, like.LikerID, like.LikedID)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, err
+	}
+
+	return result, creditResult, nil
+}
+
+// CreateLikeWithMessageAndCreditAtomic creates a superlike with message while atomically deducting credits
+func (r *FeedRepository) CreateLikeWithMessageAndCreditAtomic(
+	ctx context.Context,
+	like *feed.Like,
+	message string,
+	superlikeCost int,
+	matchUser1ID, matchUser2ID uuid.UUID,
+) (*feed.LikeResult, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Superlikes always cost credits - deduct atomically
+	deductQuery := `
+		UPDATE credits
+		SET balance = balance - $2
+		WHERE user_id = $1 AND balance >= $2
+		RETURNING balance
+	`
+	var newBalance int
+	err = tx.QueryRow(ctx, deductQuery, like.LikerID, superlikeCost).Scan(&newBalance)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrInsufficientCredits
+		}
+		return nil, err
+	}
+
+	// Create the like with message
 	likeQuery := `
 		INSERT INTO likes (id, liker_id, liked_id, is_superlike, attached_message, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)

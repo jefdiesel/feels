@@ -132,7 +132,7 @@ func (r *CreditRepository) ResetMonthlyCredits(ctx context.Context, userID uuid.
 // GetSubscription gets a user's active subscription
 func (r *CreditRepository) GetSubscription(ctx context.Context, userID uuid.UUID) (*credit.Subscription, error) {
 	query := `
-		SELECT id, user_id, plan_type, status, current_period_start, current_period_end
+		SELECT id, user_id, plan_type, status, current_period_start, current_period_end, canceled_at
 		FROM subscriptions
 		WHERE user_id = $1 AND status = 'active' AND current_period_end > NOW()
 		ORDER BY current_period_end DESC
@@ -141,8 +141,9 @@ func (r *CreditRepository) GetSubscription(ctx context.Context, userID uuid.UUID
 	var s credit.Subscription
 	var planType string
 	var status string
+	var canceledAt *time.Time
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&s.ID, &s.UserID, &planType, &status, &s.StartedAt, &s.ExpiresAt,
+		&s.ID, &s.UserID, &planType, &status, &s.StartedAt, &s.ExpiresAt, &canceledAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -153,26 +154,51 @@ func (r *CreditRepository) GetSubscription(ctx context.Context, userID uuid.UUID
 	// Map plan_type to Plan and Period
 	s.Plan = credit.PlanType(planType)
 	s.Period = credit.PeriodMonthly // Default, actual period is in plan_type
-	s.AutoRenew = status == "active"
+	// AutoRenew is true if status is active AND subscription hasn't been canceled
+	s.AutoRenew = status == "active" && canceledAt == nil
 	return &s, nil
 }
 
 // CreateSubscription creates a new subscription
+// DEPRECATED: Use payment service to create subscriptions via Stripe webhooks
+// This method is kept for backwards compatibility but creates legacy-prefixed records
 func (r *CreditRepository) CreateSubscription(ctx context.Context, sub *credit.Subscription) error {
+	// Use new schema with placeholder Stripe IDs for legacy/test subscriptions
 	query := `
-		INSERT INTO subscriptions (id, user_id, plan, period, credits_monthly, started_at, expires_at, auto_renew)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO subscriptions (
+			id, user_id, stripe_subscription_id, stripe_customer_id,
+			plan_type, status, current_period_start, current_period_end,
+			created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 	`
+	stripeSubID := "legacy_" + sub.ID.String()
+	stripeCustomerID := "legacy_customer_" + sub.UserID.String()
+	status := "active"
+	if !sub.AutoRenew {
+		status = "canceled"
+	}
+
 	_, err := r.db.Exec(ctx, query,
-		sub.ID, sub.UserID, sub.Plan, sub.Period, sub.CreditsMonthly, sub.StartedAt, sub.ExpiresAt, sub.AutoRenew,
+		sub.ID, sub.UserID, stripeSubID, stripeCustomerID,
+		string(sub.Plan), status, sub.StartedAt, sub.ExpiresAt,
 	)
 	return err
 }
 
 // UpdateSubscriptionAutoRenew updates the auto-renew setting
+// In the new schema, this sets canceled_at timestamp when autoRenew is false
+// Note: For Stripe-managed subscriptions, use the payment service instead
 func (r *CreditRepository) UpdateSubscriptionAutoRenew(ctx context.Context, subID uuid.UUID, autoRenew bool) error {
-	query := `UPDATE subscriptions SET auto_renew = $2 WHERE id = $1`
-	_, err := r.db.Exec(ctx, query, subID, autoRenew)
+	if autoRenew {
+		// Clear canceled_at to re-enable auto-renewal
+		query := `UPDATE subscriptions SET canceled_at = NULL, updated_at = NOW() WHERE id = $1`
+		_, err := r.db.Exec(ctx, query, subID)
+		return err
+	}
+	// Set canceled_at to disable auto-renewal (subscription will end at current_period_end)
+	query := `UPDATE subscriptions SET canceled_at = NOW(), updated_at = NOW() WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, subID)
 	return err
 }
 

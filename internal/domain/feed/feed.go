@@ -10,10 +10,11 @@ import (
 // FeedProfile is a profile as shown in the feed
 type FeedProfile struct {
 	profile.Profile
-	Age                 int     `json:"age"`
-	Distance            *int    `json:"distance,omitempty"`             // miles, nil if location not available
-	Priority            string  `json:"priority,omitempty"`             // for debugging: qualified_superlike, qualified_like, gap_superlike, browse
-	LookingForAlignment *string `json:"looking_for_alignment,omitempty"` // alignment with viewer's intentions
+	Age                 int      `json:"age"`
+	Distance            *int     `json:"distance,omitempty"`              // miles, nil if location not available
+	Priority            string   `json:"priority,omitempty"`              // for debugging: qualified_superlike, qualified_like, gap_superlike, browse
+	LookingForAlignment *string  `json:"looking_for_alignment,omitempty"` // alignment with viewer's intentions
+	GenderTags          []string `json:"gender_tags,omitempty"`           // gender-specific tags (e.g., "curious", "experienced")
 }
 
 // LookingFor alignment values
@@ -89,9 +90,17 @@ type FeedResponse struct {
 
 // LikeResponse is the response for like/superlike actions
 type LikeResponse struct {
-	Matched bool       `json:"matched"`
-	MatchID *uuid.UUID `json:"match_id,omitempty"`
+	Matched         bool       `json:"matched"`
+	MatchID         *uuid.UUID `json:"match_id,omitempty"`
+	RequiresPremium bool       `json:"requires_premium,omitempty"` // true if premium like required
+	PremiumReason   string     `json:"premium_reason,omitempty"`   // "queue_full" or "age_range"
 }
+
+// Premium like reasons
+const (
+	PremiumReasonQueueFull = "queue_full" // target has 10+ pending likes
+	PremiumReasonAgeRange  = "age_range"  // liker is outside target's age range
+)
 
 // Priority buckets for feed algorithm
 const (
@@ -106,6 +115,7 @@ const (
 	MaxQualifiedLikesShown = 10  // max qualified likes shown before must process
 	DefaultFeedLimit       = 10  // default number of profiles per request
 	MaxFeedLimit           = 50  // max profiles per request
+	FreeLikeSlots          = 10  // number of free like slots per user before premium required
 )
 
 // WebSocket event types

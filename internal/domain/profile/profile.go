@@ -31,11 +31,13 @@ func (p *Prompts) Scan(value interface{}) error {
 }
 
 type Profile struct {
-	UserID       uuid.UUID  `json:"user_id"`
-	Name         string     `json:"name"`
-	DOB          time.Time  `json:"dob"`
-	Gender       string     `json:"gender"`
-	ZipCode      string     `json:"zip_code"`
+	UserID         uuid.UUID `json:"user_id"`
+	Name           string    `json:"name"`
+	DOB            time.Time `json:"dob"`
+	Gender         string    `json:"gender"`
+	GenderOrigin   *string   `json:"gender_origin,omitempty"`   // immutable, only sent to own profile (for UI gender options)
+	GenderIdentity *string   `json:"gender_identity,omitempty"` // free text for display (e.g., "trans woman")
+	ZipCode        string    `json:"zip_code"`
 	Neighborhood *string    `json:"neighborhood,omitempty"`
 	Bio          string     `json:"bio"`
 	Prompts      Prompts    `json:"prompts"`
@@ -79,6 +81,15 @@ type Photo struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// GenderPresentation defines per-gender visibility and presentation settings
+type GenderPresentation struct {
+	Enabled bool     `json:"enabled"`            // whether visible to this gender
+	Bio     *string  `json:"bio,omitempty"`      // appended to default bio for this gender
+	Tags    []string `json:"tags,omitempty"`     // gender-specific tags (e.g., "curious", "experienced")
+	AgeMin  *int     `json:"age_min,omitempty"`  // min age for free likes (nil = inherit default)
+	AgeMax  *int     `json:"age_max,omitempty"`  // max age for free likes (nil = inherit default)
+}
+
 type Preferences struct {
 	UserID           uuid.UUID `json:"user_id"`
 	GendersSeeking   []string  `json:"genders_seeking"`
@@ -90,13 +101,18 @@ type Preferences struct {
 	HardBlockGenders []string  `json:"hard_block_genders,omitempty"`
 	HardBlockAgeMin  *int      `json:"hard_block_age_min,omitempty"`
 	HardBlockAgeMax  *int      `json:"hard_block_age_max,omitempty"`
+	// Per-gender presentation settings (bio addendum, tags, age ranges)
+	// Key is gender string (e.g., "man", "woman")
+	GenderPresentations map[string]*GenderPresentation `json:"gender_presentations,omitempty"`
 }
 
 type CreateProfileRequest struct {
-	Name         string   `json:"name"`
-	DOB          string   `json:"dob"` // YYYY-MM-DD
-	Gender       string   `json:"gender"`
-	ZipCode      string   `json:"zip_code"`
+	Name           string  `json:"name"`
+	DOB            string  `json:"dob"` // YYYY-MM-DD
+	Gender         string  `json:"gender"`
+	GenderOrigin   *string `json:"gender_origin,omitempty"`   // required for trans/non_binary (assigned at birth)
+	GenderIdentity *string `json:"gender_identity,omitempty"` // optional free text (e.g., "trans woman")
+	ZipCode        string  `json:"zip_code"`
 	Neighborhood *string  `json:"neighborhood,omitempty"`
 	Bio          string   `json:"bio"`
 	Prompts      []Prompt `json:"prompts,omitempty"`
@@ -115,8 +131,10 @@ type CreateProfileRequest struct {
 }
 
 type UpdateProfileRequest struct {
-	Name         *string  `json:"name,omitempty"`
-	ZipCode      *string  `json:"zip_code,omitempty"`
+	Name           *string `json:"name,omitempty"`
+	Gender         *string `json:"gender,omitempty"`          // can change to trans/non_binary but not cross man↔woman
+	GenderIdentity *string `json:"gender_identity,omitempty"` // free text identity
+	ZipCode        *string `json:"zip_code,omitempty"`
 	Neighborhood *string  `json:"neighborhood,omitempty"`
 	Bio          *string  `json:"bio,omitempty"`
 	Prompts      []Prompt `json:"prompts,omitempty"`
@@ -135,15 +153,16 @@ type UpdateProfileRequest struct {
 }
 
 type UpdatePreferencesRequest struct {
-	GendersSeeking   []string `json:"genders_seeking,omitempty"`
-	AgeMin           *int     `json:"age_min,omitempty"`
-	AgeMax           *int     `json:"age_max,omitempty"`
-	DistanceMiles    *int     `json:"distance_miles,omitempty"`
-	IncludeTrans     *bool    `json:"include_trans,omitempty"`
-	VisibleToGenders []string `json:"visible_to_genders,omitempty"`
-	HardBlockGenders []string `json:"hard_block_genders,omitempty"`
-	HardBlockAgeMin  *int     `json:"hard_block_age_min,omitempty"`
-	HardBlockAgeMax  *int     `json:"hard_block_age_max,omitempty"`
+	GendersSeeking      []string                       `json:"genders_seeking,omitempty"`
+	AgeMin              *int                           `json:"age_min,omitempty"`
+	AgeMax              *int                           `json:"age_max,omitempty"`
+	DistanceMiles       *int                           `json:"distance_miles,omitempty"`
+	IncludeTrans        *bool                          `json:"include_trans,omitempty"`
+	VisibleToGenders    []string                       `json:"visible_to_genders,omitempty"`
+	HardBlockGenders    []string                       `json:"hard_block_genders,omitempty"`
+	HardBlockAgeMin     *int                           `json:"hard_block_age_min,omitempty"`
+	HardBlockAgeMax     *int                           `json:"hard_block_age_max,omitempty"`
+	GenderPresentations map[string]*GenderPresentation `json:"gender_presentations,omitempty"`
 }
 
 type ProfileResponse struct {
