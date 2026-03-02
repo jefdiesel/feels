@@ -199,7 +199,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
-	authHandler := handlers.NewAuthHandler(userService, emailService, cfg.IsDevelopment())
+	authHandler := handlers.NewAuthHandler(userService, profileService, emailService, cfg.IsDevelopment())
 	profileHandler := handlers.NewProfileHandler(profileService)
 	feedHandler := handlers.NewFeedHandler(feedService)
 	feedHandler.SetSubscriptionChecker(paymentService)
@@ -325,6 +325,7 @@ func (r *Router) setupRoutes(
 			// Feed routes
 			protected.Route("/feed", func(f chi.Router) {
 				f.Get("/", feedHandler.GetFeed)
+				f.Get("/debug", feedHandler.DebugFeed)
 				f.Get("/daily-picks", feedHandler.GetDailyPicks)
 				f.Post("/like/{id}", feedHandler.Like)
 				f.Post("/superlike/{id}", feedHandler.Superlike)

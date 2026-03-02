@@ -272,3 +272,20 @@ func (h *FeedHandler) SuperlikeWithMessage(w http.ResponseWriter, r *http.Reques
 
 	jsonResponse(w, resp, http.StatusOK)
 }
+
+// DebugFeed returns diagnostic info about why feed might be empty
+func (h *FeedHandler) DebugFeed(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	debug, err := h.feedService.DebugFeed(r.Context(), userID)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, debug, http.StatusOK)
+}

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"log"
 
 	"github.com/feels/feels/internal/domain/feed"
 	"github.com/feels/feels/internal/domain/profile"
@@ -21,6 +22,8 @@ func NewFeedRepository(db *pgxpool.Pool) *FeedRepository {
 
 // GetFeedProfiles returns profiles for the feed based on the algorithm
 func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences, limit int) ([]feed.FeedProfile, error) {
+	log.Printf("[DEBUG] GetFeedProfiles: userID=%s, genders_seeking=%v, age_min=%d, age_max=%d, distance=%d",
+		userID, prefs.GendersSeeking, prefs.AgeMin, prefs.AgeMax, prefs.DistanceMiles)
 	// Complex query implementing the feed algorithm
 	// Priority: qualified_superlike > qualified_like > gap_superlike > browse
 	query := `
@@ -511,4 +514,51 @@ func CreatePassesTableMigration() string {
 func init() {
 	// Register migration need - this would be better handled by a proper migration
 	_ = CreatePassesTableMigration()
+}
+
+// DebugFeedFilters returns counts of profiles filtered at each step
+func (r *FeedRepository) DebugFeedFilters(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences) (map[string]int, error) {
+	result := make(map[string]int)
+	var count int
+
+	// Total profiles
+	r.db.QueryRow(ctx, `SELECT COUNT(*) FROM profiles WHERE user_id != $1`, userID).Scan(&count)
+	result["total_profiles"] = count
+
+	// Already seen (liked or passed)
+	r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM profiles p WHERE p.user_id != $1 AND p.user_id IN (
+			SELECT liked_id FROM likes WHERE liker_id = $1
+			UNION
+			SELECT passed_id FROM passes WHERE passer_id = $1
+		)
+	`, userID).Scan(&count)
+	result["already_seen"] = count
+
+	// Gender match
+	r.db.QueryRow(ctx, `SELECT COUNT(*) FROM profiles WHERE user_id != $1 AND gender = ANY($2)`, userID, prefs.GendersSeeking).Scan(&count)
+	result["gender_match"] = count
+
+	// Age match
+	r.db.QueryRow(ctx, `SELECT COUNT(*) FROM profiles WHERE user_id != $1 AND EXTRACT(YEAR FROM AGE(dob)) BETWEEN $2 AND $3`, userID, prefs.AgeMin, prefs.AgeMax).Scan(&count)
+	result["age_match"] = count
+
+	// User's profile info
+	var userLat, userLng *float64
+	var userGender *string
+	r.db.QueryRow(ctx, `SELECT lat, lng, gender FROM profiles WHERE user_id = $1`, userID).Scan(&userLat, &userLng, &userGender)
+	if userLat != nil {
+		result["user_lat"] = int(*userLat * 1000)
+	}
+	if userLng != nil {
+		result["user_lng"] = int(*userLng * 1000)
+	}
+
+	// Prefs info
+	result["pref_age_min"] = prefs.AgeMin
+	result["pref_age_max"] = prefs.AgeMax
+	result["pref_distance"] = prefs.DistanceMiles
+	result["pref_genders_count"] = len(prefs.GendersSeeking)
+
+	return result, nil
 }

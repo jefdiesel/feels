@@ -32,6 +32,7 @@ type LikeResult struct {
 type FeedRepository interface {
 	GetFeedProfiles(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences, limit int) ([]FeedProfile, error)
 	CountQueuedLikes(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences) (int, error)
+	DebugFeedFilters(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences) (map[string]int, error)
 	CreateLike(ctx context.Context, like *Like) error
 	CreateLikeWithMessage(ctx context.Context, like *Like, message string) error
 	GetLike(ctx context.Context, likerID, likedID uuid.UUID) (*Like, error)
@@ -497,4 +498,14 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 	return &LikeResponse{
 		Matched: false,
 	}, nil
+}
+
+// DebugFeed returns diagnostic info about why feed might be empty
+func (s *Service) DebugFeed(ctx context.Context, userID uuid.UUID) (map[string]int, error) {
+	prefs, err := s.profileRepo.GetPreferences(ctx, userID)
+	if err != nil {
+		return nil, ErrProfileRequired
+	}
+
+	return s.feedRepo.DebugFeedFilters(ctx, userID, prefs)
 }
