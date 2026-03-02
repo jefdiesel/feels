@@ -27,6 +27,8 @@ export interface Profile {
   alcohol?: string;
   weed?: string;
   zodiac?: string;
+  workForMoney?: string;
+  workForPassion?: string;
 }
 
 // Backend response types
@@ -63,6 +65,8 @@ interface BackendProfile {
   alcohol?: string;
   weed?: string;
   zodiac?: string;
+  work_for_money?: string;
+  work_for_passion?: string;
 }
 
 interface FeedResponse {
@@ -94,6 +98,8 @@ function transformProfile(bp: BackendProfile): Profile {
     alcohol: bp.alcohol,
     weed: bp.weed,
     zodiac: bp.zodiac,
+    workForMoney: bp.work_for_money,
+    workForPassion: bp.work_for_passion,
   };
 }
 
@@ -174,8 +180,22 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       // Return true if it's a match (backend returns { matched: bool, match_id?: string })
       return response.data?.matched || false;
     } catch (error: any) {
-      // Don't advance on failure - let user retry
-      set({ error: 'Swipe failed. Please try again.' });
+      // Show specific error from backend
+      const status = error.response?.status;
+      const serverError = error.response?.data?.error;
+
+      let errorMsg = 'Swipe failed. Please try again.';
+      if (status === 402) {
+        errorMsg = serverError || 'Out of likes. Get more credits!';
+      } else if (status === 409) {
+        errorMsg = 'Already liked this person';
+        get().nextProfile(); // Skip to next since already liked
+        return false;
+      } else if (serverError) {
+        errorMsg = serverError;
+      }
+
+      set({ error: errorMsg });
       throw error;
     }
   },

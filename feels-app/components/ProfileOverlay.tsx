@@ -1,14 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Profile } from '@/stores/feedStore';
 import { ChevronDownIcon, HeartFilledIcon, MapPinIcon, SparkleIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
@@ -38,6 +30,64 @@ const formatLookingFor = (value: string): string => {
   return labels[value] || value;
 };
 
+const formatDetail = (key: string, value: any): string | null => {
+  if (value === null || value === undefined || value === '') return null;
+
+  const formatters: Record<string, Record<string, string>> = {
+    hasKids: { 'true': 'Has kids', true: 'Has kids' },
+    wantsKids: {
+      yes: 'Wants kids',
+      no: 'Doesn\'t want kids',
+      maybe: 'Open to kids',
+    },
+    alcohol: {
+      never: 'Doesn\'t drink',
+      socially: 'Social drinker',
+      often: 'Drinks often',
+    },
+    weed: {
+      never: 'No weed',
+      socially: 'Social smoker',
+      often: 'Smokes often',
+      '420_friendly': '420 friendly',
+    },
+    religion: {
+      agnostic: 'Agnostic',
+      atheist: 'Atheist',
+      buddhist: 'Buddhist',
+      catholic: 'Catholic',
+      christian: 'Christian',
+      hindu: 'Hindu',
+      jewish: 'Jewish',
+      muslim: 'Muslim',
+      spiritual: 'Spiritual',
+      other: 'Religious',
+    },
+    zodiac: {
+      aries: 'Aries ♈',
+      taurus: 'Taurus ♉',
+      gemini: 'Gemini ♊',
+      cancer: 'Cancer ♋',
+      leo: 'Leo ♌',
+      virgo: 'Virgo ♍',
+      libra: 'Libra ♎',
+      scorpio: 'Scorpio ♏',
+      sagittarius: 'Sagittarius ♐',
+      capricorn: 'Capricorn ♑',
+      aquarius: 'Aquarius ♒',
+      pisces: 'Pisces ♓',
+    },
+  };
+
+  if (formatters[key] && formatters[key][value]) {
+    return formatters[key][value];
+  }
+
+  if (key === 'hasKids' && value === false) return null;
+
+  return null;
+};
+
 // Default prompts when profile doesn't have any
 // Note: lookingFor and kinkLevel are shown in Basics section, so don't duplicate them here
 const getDefaultPrompts = (profile: Profile) => {
@@ -62,45 +112,12 @@ interface ProfileOverlayProps {
 }
 
 export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: ProfileOverlayProps) {
-  const translateY = useSharedValue(0);
-
-  const gesture = Gesture.Pan()
-    .onUpdate((event) => {
-      // Only allow dragging down
-      if (event.translationY > 0) {
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd((event) => {
-      if (event.translationY > 100) {
-        translateY.value = withSpring(SCREEN_HEIGHT);
-        onClose();
-      } else {
-        translateY.value = withSpring(0);
-      }
-    });
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      translateY.value,
-      [0, SCREEN_HEIGHT * 0.3],
-      [1, 0],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      transform: [{ translateY: translateY.value }],
-      opacity,
-    };
-  });
-
   if (!isVisible) return null;
 
   const displayPrompts = profile.prompts?.length ? profile.prompts : getDefaultPrompts(profile);
 
   return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={[styles.container, animatedStyle]}>
+    <View style={styles.container}>
         {/* Header gradient */}
         <LinearGradient
           colors={['rgba(0,0,0,0.9)', 'transparent']}
@@ -163,6 +180,33 @@ export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: 
             </View>
           </View>
 
+          {/* Details section */}
+          {(profile.religion || profile.alcohol || profile.zodiac || profile.weed || profile.workForMoney || profile.workForPassion) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Details</Text>
+              <View style={styles.detailsRow}>
+                {profile.religion && formatDetail('religion', profile.religion) && (
+                  <View style={styles.detailTag}><Text style={styles.detailTagText}>{formatDetail('religion', profile.religion)}</Text></View>
+                )}
+                {profile.alcohol && formatDetail('alcohol', profile.alcohol) && (
+                  <View style={styles.detailTag}><Text style={styles.detailTagText}>{formatDetail('alcohol', profile.alcohol)}</Text></View>
+                )}
+                {profile.zodiac && formatDetail('zodiac', profile.zodiac) && (
+                  <View style={styles.detailTag}><Text style={styles.detailTagText}>{formatDetail('zodiac', profile.zodiac)}</Text></View>
+                )}
+                {profile.weed && formatDetail('weed', profile.weed) && (
+                  <View style={styles.detailTag}><Text style={styles.detailTagText}>{formatDetail('weed', profile.weed)}</Text></View>
+                )}
+                {profile.workForMoney && (
+                  <View style={styles.detailTag}><Text style={styles.detailTagText}>💼 {profile.workForMoney}</Text></View>
+                )}
+                {profile.workForPassion && (
+                  <View style={styles.detailTag}><Text style={styles.detailTagText}>✨ {profile.workForPassion}</Text></View>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Prompts section */}
           {displayPrompts.length > 0 && (
             <View style={styles.section}>
@@ -224,8 +268,7 @@ export default function ProfileOverlay({ profile, isVisible, onClose, onLike }: 
             </TouchableOpacity>
           </View>
         )}
-      </Animated.View>
-    </GestureDetector>
+    </View>
   );
 }
 
@@ -377,6 +420,21 @@ const styles = StyleSheet.create({
   galleryPhoto: {
     width: '100%',
     height: '100%',
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  detailTag: {
+    backgroundColor: colors.bg.tertiary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+  },
+  detailTagText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
   },
   interestsTags: {
     flexDirection: 'row',

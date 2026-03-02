@@ -19,9 +19,19 @@ interface User {
   bio?: string;
   age?: number;
   location?: string;
+  neighborhood?: string;
   prompts?: ProfilePrompt[];
   is_verified?: boolean;
   looking_for?: string;
+  work_for_money?: string;
+  work_for_passion?: string;
+  zodiac?: string;
+  religion?: string;
+  has_kids?: boolean;
+  wants_kids?: string;
+  alcohol?: string;
+  weed?: string;
+  kink_level?: string;
 }
 
 interface AuthState {

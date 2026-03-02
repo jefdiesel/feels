@@ -300,6 +300,108 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Work fields state
+  const [workModalVisible, setWorkModalVisible] = useState(false);
+  const [editingWorkField, setEditingWorkField] = useState<'money' | 'passion'>('money');
+  const [workValue, setWorkValue] = useState('');
+  const [savingWork, setSavingWork] = useState(false);
+
+  // Details/lifestyle fields state
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [editingDetailKey, setEditingDetailKey] = useState<string>('');
+  const [editingDetailLabel, setEditingDetailLabel] = useState<string>('');
+  const [detailOptions, setDetailOptions] = useState<{value: string; label: string}[]>([]);
+  const [selectedDetailValue, setSelectedDetailValue] = useState<string | null>(null);
+  const [savingDetail, setSavingDetail] = useState(false);
+
+  // Detail field definitions
+  const DETAIL_FIELDS: Record<string, { label: string; options: {value: string; label: string}[] }> = {
+    zodiac: {
+      label: 'Zodiac Sign',
+      options: [
+        { value: 'aries', label: 'Aries ♈' },
+        { value: 'taurus', label: 'Taurus ♉' },
+        { value: 'gemini', label: 'Gemini ♊' },
+        { value: 'cancer', label: 'Cancer ♋' },
+        { value: 'leo', label: 'Leo ♌' },
+        { value: 'virgo', label: 'Virgo ♍' },
+        { value: 'libra', label: 'Libra ♎' },
+        { value: 'scorpio', label: 'Scorpio ♏' },
+        { value: 'sagittarius', label: 'Sagittarius ♐' },
+        { value: 'capricorn', label: 'Capricorn ♑' },
+        { value: 'aquarius', label: 'Aquarius ♒' },
+        { value: 'pisces', label: 'Pisces ♓' },
+      ],
+    },
+    religion: {
+      label: 'Religion',
+      options: [
+        { value: 'agnostic', label: 'Agnostic' },
+        { value: 'atheist', label: 'Atheist' },
+        { value: 'buddhist', label: 'Buddhist' },
+        { value: 'catholic', label: 'Catholic' },
+        { value: 'christian', label: 'Christian' },
+        { value: 'hindu', label: 'Hindu' },
+        { value: 'jewish', label: 'Jewish' },
+        { value: 'muslim', label: 'Muslim' },
+        { value: 'spiritual', label: 'Spiritual' },
+        { value: 'other', label: 'Other' },
+      ],
+    },
+    has_kids: {
+      label: 'Have Kids',
+      options: [
+        { value: 'true', label: 'Yes, I have kids' },
+        { value: 'false', label: 'No kids' },
+      ],
+    },
+    wants_kids: {
+      label: 'Want Kids',
+      options: [
+        { value: 'yes', label: 'Want kids' },
+        { value: 'no', label: 'Don\'t want kids' },
+        { value: 'maybe', label: 'Open to kids' },
+      ],
+    },
+    alcohol: {
+      label: 'Alcohol',
+      options: [
+        { value: 'never', label: 'Never drink' },
+        { value: 'socially', label: 'Drink socially' },
+        { value: 'often', label: 'Drink often' },
+      ],
+    },
+    weed: {
+      label: 'Weed',
+      options: [
+        { value: 'never', label: 'Never' },
+        { value: 'socially', label: 'Socially' },
+        { value: 'often', label: 'Often' },
+        { value: '420_friendly', label: '420 friendly' },
+      ],
+    },
+    kink_level: {
+      label: 'Vibe',
+      options: [
+        { value: 'vanilla', label: 'Vanilla' },
+        { value: 'curious', label: 'Curious' },
+        { value: 'sensual', label: 'Sensual' },
+        { value: 'experienced', label: 'Experienced' },
+        { value: 'kinky', label: 'Adventurous' },
+      ],
+    },
+    looking_for: {
+      label: 'Looking For',
+      options: [
+        { value: 'serious', label: 'Serious relationship' },
+        { value: 'relationship', label: 'Relationship' },
+        { value: 'dating', label: 'Dating' },
+        { value: 'meeting_people', label: 'Meeting people' },
+        { value: 'friends_and_more', label: 'Friends & more' },
+      ],
+    },
+  };
+
   // Prompts state
   const [promptModalVisible, setPromptModalVisible] = useState(false);
   const [selectPromptModalVisible, setSelectPromptModalVisible] = useState(false);
@@ -350,8 +452,8 @@ export default function ProfileScreen() {
       });
     }
 
-    // Check bio
-    if (!user?.bio || user.bio.length < 20) {
+    // Check bio - only show if completely empty
+    if (!user?.bio) {
       tips.push({
         id: 'no_bio',
         text: 'Write a bio - profiles with bios get 2x more matches',
@@ -454,6 +556,16 @@ export default function ProfileScreen() {
           prompts: profile.prompts ?? user.prompts,
           looking_for: profile.looking_for ?? user.looking_for,
           age: profile.age ?? user.age,
+          neighborhood: profile.neighborhood ?? user.neighborhood,
+          work_for_money: profile.work_for_money ?? user.work_for_money,
+          work_for_passion: profile.work_for_passion ?? user.work_for_passion,
+          zodiac: profile.zodiac ?? user.zodiac,
+          religion: profile.religion ?? user.religion,
+          has_kids: profile.has_kids ?? user.has_kids,
+          wants_kids: profile.wants_kids ?? user.wants_kids,
+          alcohol: profile.alcohol ?? user.alcohol,
+          weed: profile.weed ?? user.weed,
+          kink_level: profile.kink_level ?? user.kink_level,
         };
         setUser(updatedUser);
       }
@@ -617,6 +729,7 @@ export default function ProfileScreen() {
 
   // Location functions
   const openLocationModal = () => {
+    // Reset inputs but we'll show current location in the modal
     setZipInput('');
     setZipData(null);
     setSelectedNeighborhood('');
@@ -668,6 +781,100 @@ export default function ProfileScreen() {
     } finally {
       setSavingLocation(false);
     }
+  };
+
+  // Work field functions
+  const openWorkModal = (field: 'money' | 'passion') => {
+    setEditingWorkField(field);
+    setWorkValue(field === 'money' ? (user?.work_for_money || '') : (user?.work_for_passion || ''));
+    setWorkModalVisible(true);
+  };
+
+  const saveWorkField = async () => {
+    setSavingWork(true);
+    try {
+      const fieldName = editingWorkField === 'money' ? 'work_for_money' : 'work_for_passion';
+      await profileApi.update({ [fieldName]: workValue.trim() || null });
+      setUser({ ...user!, [fieldName]: workValue.trim() || undefined });
+      setWorkModalVisible(false);
+    } catch (error: any) {
+      console.error('Save work field error:', error);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to save');
+    } finally {
+      setSavingWork(false);
+    }
+  };
+
+  // Detail field functions
+  const openDetailModal = (key: string) => {
+    const field = DETAIL_FIELDS[key];
+    if (!field) return;
+
+    setEditingDetailKey(key);
+    setEditingDetailLabel(field.label);
+    setDetailOptions(field.options);
+
+    // Get current value
+    let currentValue: string | null = null;
+    if (key === 'has_kids') {
+      currentValue = user?.has_kids !== undefined ? String(user.has_kids) : null;
+    } else {
+      currentValue = (user as any)?.[key] || null;
+    }
+    setSelectedDetailValue(currentValue);
+    setDetailsModalVisible(true);
+  };
+
+  const saveDetailField = async () => {
+    setSavingDetail(true);
+    try {
+      let updateData: any = {};
+      if (editingDetailKey === 'has_kids') {
+        updateData[editingDetailKey] = selectedDetailValue === 'true' ? true : selectedDetailValue === 'false' ? false : null;
+      } else {
+        updateData[editingDetailKey] = selectedDetailValue || null;
+      }
+
+      await profileApi.update(updateData);
+      setUser({ ...user!, ...updateData });
+      setDetailsModalVisible(false);
+    } catch (error: any) {
+      console.error('Save detail error:', error);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to save');
+    } finally {
+      setSavingDetail(false);
+    }
+  };
+
+  const clearDetailField = async () => {
+    setSavingDetail(true);
+    try {
+      let updateData: any = { [editingDetailKey]: null };
+      await profileApi.update(updateData);
+      setUser({ ...user!, [editingDetailKey]: undefined });
+      setDetailsModalVisible(false);
+    } catch (error: any) {
+      console.error('Clear detail error:', error);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to clear');
+    } finally {
+      setSavingDetail(false);
+    }
+  };
+
+  const getDetailDisplayValue = (key: string): string | null => {
+    const field = DETAIL_FIELDS[key];
+    if (!field) return null;
+
+    let value: string | null = null;
+    if (key === 'has_kids') {
+      value = user?.has_kids !== undefined ? String(user.has_kids) : null;
+    } else {
+      value = (user as any)?.[key] || null;
+    }
+
+    if (!value) return null;
+    const option = field.options.find(o => o.value === value);
+    return option?.label || value;
   };
 
   return (
@@ -913,6 +1120,56 @@ export default function ProfileScreen() {
               </Text>
             )}
           </TouchableOpacity>
+        </View>
+
+        {/* What I Do Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>What I Do</Text>
+          </View>
+          <TouchableOpacity style={styles.workCard} onPress={() => openWorkModal('money')}>
+            <Text style={styles.workLabel}>For money</Text>
+            {user?.work_for_money ? (
+              <Text style={styles.workText}>{user.work_for_money}</Text>
+            ) : (
+              <Text style={styles.workPlaceholder}>What do you do for work?</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.workCard} onPress={() => openWorkModal('passion')}>
+            <Text style={styles.workLabel}>For passion</Text>
+            {user?.work_for_passion ? (
+              <Text style={styles.workText}>{user.work_for_passion}</Text>
+            ) : (
+              <Text style={styles.workPlaceholder}>What lights you up?</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* My Details Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>My Details</Text>
+          </View>
+          <View style={styles.detailsGrid}>
+            {Object.entries(DETAIL_FIELDS).map(([key, field]) => {
+              const displayValue = getDetailDisplayValue(key);
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={styles.detailItem}
+                  onPress={() => openDetailModal(key)}
+                >
+                  <Text style={styles.detailItemLabel}>{field.label}</Text>
+                  {displayValue ? (
+                    <Text style={styles.detailItemValue}>{displayValue}</Text>
+                  ) : (
+                    <Text style={styles.detailItemPlaceholder}>Add</Text>
+                  )}
+                  <ChevronRightIcon size={16} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Home/Location Section */}
@@ -1258,7 +1515,14 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.locationLabel}>ZIP Code</Text>
+            {user?.neighborhood && !zipData && (
+              <View style={styles.currentLocationBox}>
+                <Text style={styles.currentLocationLabel}>Current location</Text>
+                <Text style={styles.currentLocationValue}>{user.neighborhood}</Text>
+              </View>
+            )}
+
+            <Text style={styles.locationLabel}>{user?.neighborhood ? 'Change to new ZIP' : 'ZIP Code'}</Text>
             <TextInput
               style={styles.zipInput}
               value={zipInput}
@@ -1314,6 +1578,129 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Details Field Modal */}
+      <Modal
+        visible={detailsModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDetailsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.detailsModalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity
+                onPress={() => setDetailsModalVisible(false)}
+                disabled={savingDetail}
+              >
+                <Text style={[styles.modalCancel, savingDetail && { opacity: 0.5 }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>{editingDetailLabel}</Text>
+              <TouchableOpacity onPress={saveDetailField} disabled={savingDetail}>
+                {savingDetail ? (
+                  <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+                ) : (
+                  <Text style={styles.modalSave}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.detailOptionsList}>
+              {detailOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.detailOption,
+                    selectedDetailValue === option.value && styles.detailOptionSelected,
+                  ]}
+                  onPress={() => setSelectedDetailValue(option.value)}
+                >
+                  <Text
+                    style={[
+                      styles.detailOptionText,
+                      selectedDetailValue === option.value && styles.detailOptionTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {selectedDetailValue === option.value && (
+                    <CheckIcon size={20} color={colors.primary.DEFAULT} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {selectedDetailValue && (
+              <TouchableOpacity
+                style={styles.clearDetailButton}
+                onPress={clearDetailField}
+                disabled={savingDetail}
+              >
+                <Text style={styles.clearDetailText}>Clear / Don't show</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Work Field Modal */}
+      <Modal
+        visible={workModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setWorkModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity
+                onPress={() => setWorkModalVisible(false)}
+                disabled={savingWork}
+              >
+                <Text style={[styles.modalCancel, savingWork && { opacity: 0.5 }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>
+                {editingWorkField === 'money' ? 'For Money' : 'For Passion'}
+              </Text>
+              <TouchableOpacity onPress={saveWorkField} disabled={savingWork}>
+                {savingWork ? (
+                  <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+                ) : (
+                  <Text style={styles.modalSave}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.workModalHint}>
+              {editingWorkField === 'money'
+                ? 'What do you do for work? (e.g., "Software engineer", "Nurse", "Own a bakery")'
+                : 'What lights you up? (e.g., "Music production", "Hiking", "Building robots")'}
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              value={workValue}
+              onChangeText={setWorkValue}
+              placeholder={editingWorkField === 'money' ? 'Your job or career' : 'Your passion or hobby'}
+              placeholderTextColor={colors.text.disabled}
+              autoFocus
+              maxLength={50}
+              editable={!savingWork}
+            />
+
+            <Text style={styles.charCount}>
+              {workValue.length}/50
+            </Text>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1591,6 +1978,106 @@ const styles = StyleSheet.create({
     color: colors.text.disabled,
     fontStyle: 'italic',
   },
+  // Work field styles
+  workCard: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  workLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+  },
+  workText: {
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
+  },
+  workPlaceholder: {
+    fontSize: typography.sizes.base,
+    color: colors.text.disabled,
+    fontStyle: 'italic',
+  },
+  workModalHint: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  // Details section styles
+  detailsGrid: {
+    gap: spacing.sm,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+  },
+  detailItemLabel: {
+    flex: 1,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+  },
+  detailItemValue: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.primary,
+    marginRight: spacing.sm,
+  },
+  detailItemPlaceholder: {
+    fontSize: typography.sizes.base,
+    color: colors.primary.DEFAULT,
+    marginRight: spacing.sm,
+  },
+  detailsModalContent: {
+    backgroundColor: colors.bg.secondary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xl,
+    paddingBottom: 40,
+    maxHeight: '70%',
+    marginTop: 'auto',
+  },
+  detailOptionsList: {
+    maxHeight: 350,
+  },
+  detailOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  detailOptionSelected: {
+    backgroundColor: colors.primary.muted,
+    borderWidth: 1,
+    borderColor: colors.primary.DEFAULT,
+  },
+  detailOptionText: {
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
+  },
+  detailOptionTextSelected: {
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
+  },
+  clearDetailButton: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  clearDetailText: {
+    fontSize: typography.sizes.base,
+    color: colors.error,
+  },
   // Location styles
   locationCard: {
     flexDirection: 'row',
@@ -1674,6 +2161,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.lg,
     fontStyle: 'italic',
+  },
+  currentLocationBox: {
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+  },
+  currentLocationLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
+  },
+  currentLocationValue: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
   },
   // Prompts styles
   loadingOverlay: {
