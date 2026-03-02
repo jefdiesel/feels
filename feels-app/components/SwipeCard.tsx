@@ -22,92 +22,13 @@ const formatKinkLevel = (level: string): string => {
 
 const formatLookingFor = (value: string): string => {
   const labels: Record<string, string> = {
-    serious: 'Serious',
-    relationship: 'Relationship',
+    serious: 'Something serious',
+    relationship: 'Relationship minded',
     dating: 'Dating',
-    meeting_people: 'Meeting people',
-    friends_and_more: 'Friends+',
+    meeting_people: 'Meeting new people',
+    friends_and_more: 'Friends and more',
   };
   return labels[value] || value;
-};
-
-const formatGender = (gender?: string): string => {
-  if (!gender) return '';
-  const labels: Record<string, string> = {
-    woman: 'Woman',
-    man: 'Man',
-    non_binary: 'Non-binary',
-    trans_woman: 'Trans woman',
-    trans_man: 'Trans man',
-  };
-  return labels[gender] || gender;
-};
-
-const formatWantsKids = (value?: string): string | null => {
-  if (!value) return null;
-  const labels: Record<string, string> = {
-    want: 'Wants kids',
-    open: 'Open to kids',
-    not_sure: 'Not sure about kids',
-    dont_want: "Doesn't want kids",
-  };
-  return labels[value] || null;
-};
-
-const formatAlcohol = (value?: string): string | null => {
-  if (!value) return null;
-  const labels: Record<string, string> = {
-    never: "Doesn't drink",
-    socially: 'Drinks socially',
-    regularly: 'Drinks regularly',
-  };
-  return labels[value] || null;
-};
-
-const formatWeed = (value?: string): string | null => {
-  if (!value) return null;
-  const labels: Record<string, string> = {
-    never: 'No weed',
-    socially: '420 friendly',
-    regularly: 'Regular smoker',
-  };
-  return labels[value] || null;
-};
-
-const formatReligion = (value?: string): string | null => {
-  if (!value) return null;
-  const labels: Record<string, string> = {
-    agnostic: 'Agnostic',
-    atheist: 'Atheist',
-    buddhist: 'Buddhist',
-    catholic: 'Catholic',
-    christian: 'Christian',
-    hindu: 'Hindu',
-    jewish: 'Jewish',
-    muslim: 'Muslim',
-    spiritual: 'Spiritual',
-    other: 'Other',
-  };
-  return labels[value] || value.charAt(0).toUpperCase() + value.slice(1);
-};
-
-const formatZodiac = (value?: string): string | null => {
-  if (!value) return null;
-  const labels: Record<string, string> = {
-    aries: 'Aries',
-    taurus: 'Taurus',
-    gemini: 'Gemini',
-    cancer: 'Cancer',
-    leo: 'Leo',
-    virgo: 'Virgo',
-    libra: 'Libra',
-    scorpio: 'Scorpio',
-    sagittarius: 'Sagittarius',
-    capricorn: 'Capricorn',
-    aquarius: 'Aquarius',
-    pisces: 'Pisces',
-  };
-  return labels[value] || value.charAt(0).toUpperCase() + value.slice(1);
 };
 
 // Default prompts when profile doesn't have any
@@ -221,46 +142,17 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
               <Text style={styles.name}>{profile.name}</Text>
               <Text style={styles.age}>{profile.age}</Text>
             </View>
-            {/* Single info bar: gender / location / looking for / vibe */}
-            <Text style={styles.infoBar}>
-              {[
-                formatGender(profile.gender),
-                profile.location ? `${profile.location}${profile.distance ? ` · ${profile.distance}mi` : ''}` : null,
-                profile.lookingFor ? formatLookingFor(profile.lookingFor) : null,
-                profile.kinkLevel ? formatKinkLevel(profile.kinkLevel) : null,
-              ].filter(Boolean).join(' · ')}
-            </Text>
+            {profile.location && (
+              <Text style={styles.location}>
+                {profile.location}
+                {profile.distance && ` · ${profile.distance} mi`}
+              </Text>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
 
           {/* Profile prompts section */}
           <View style={styles.promptsSection}>
-            {/* Optional details tags */}
-            {(() => {
-              const details: string[] = [];
-              if (profile.hasKids) details.push('Has kids');
-              const wantsKidsLabel = formatWantsKids(profile.wantsKids);
-              if (wantsKidsLabel) details.push(wantsKidsLabel);
-              const religionLabel = formatReligion(profile.religion);
-              if (religionLabel) details.push(religionLabel);
-              const alcoholLabel = formatAlcohol(profile.alcohol);
-              if (alcoholLabel) details.push(alcoholLabel);
-              const weedLabel = formatWeed(profile.weed);
-              if (weedLabel) details.push(weedLabel);
-              const zodiacLabel = formatZodiac(profile.zodiac);
-              if (zodiacLabel) details.push(zodiacLabel);
-
-              return details.length > 0 ? (
-                <View style={styles.detailsContainer}>
-                  {details.map((detail, index) => (
-                    <View key={index} style={styles.detailTag}>
-                      <Text style={styles.detailText}>{detail}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null;
-            })()}
-
             {displayPrompts.slice(0, 3).map((prompt, index) => (
               <View key={prompt.id || index} style={styles.promptCard}>
                 <Text style={styles.promptQuestion}>{prompt.question}</Text>
@@ -287,6 +179,41 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
                       <Text style={styles.interestText}>{interest}</Text>
                     </View>
                   ))}
+                </View>
+              </View>
+            )}
+
+            {/* Looking For badge with alignment indicator */}
+            {profile.lookingFor && (
+              <View style={styles.lookingForContainer}>
+                <View style={[
+                  styles.lookingForBadge,
+                  profile.lookingForAlignment === 'perfect' && styles.lookingForPerfect,
+                  profile.lookingForAlignment === 'similar' && styles.lookingForSimilar,
+                ]}>
+                  <View>
+                    <Text style={styles.lookingForBadgeLabel}>Looking for</Text>
+                    {profile.lookingForAlignment && (
+                      <Text style={[
+                        styles.alignmentIndicator,
+                        profile.lookingForAlignment === 'perfect' && styles.alignmentPerfect,
+                        profile.lookingForAlignment === 'similar' && styles.alignmentSimilar,
+                      ]}>
+                        {profile.lookingForAlignment === 'perfect' ? 'Same as you' : 'Similar to you'}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.lookingForBadgeValue}>{formatLookingFor(profile.lookingFor)}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Kink level badge */}
+            {profile.kinkLevel && (
+              <View style={styles.kinkContainer}>
+                <View style={styles.kinkBadge}>
+                  <Text style={styles.kinkLabel}>Vibe</Text>
+                  <Text style={styles.kinkValue}>{formatKinkLevel(profile.kinkLevel)}</Text>
                 </View>
               </View>
             )}
@@ -369,7 +296,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.normal as any,
     color: 'rgba(255,255,255,0.85)',
   },
-  infoBar: {
+  location: {
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.medium as any,
     color: 'rgba(255,255,255,0.7)',
@@ -442,22 +369,72 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.medium as any,
     color: 'rgba(255, 255, 255, 0.85)',
   },
-  detailsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+  kinkContainer: {
     marginBottom: spacing.lg,
   },
-  detailTag: {
-    backgroundColor: colors.bg.tertiary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+  kinkBadge: {
+    backgroundColor: colors.primary.muted,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  detailText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
+  kinkLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
     color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  kinkValue: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.primary.DEFAULT,
+  },
+  lookingForContainer: {
+    marginBottom: spacing.lg,
+  },
+  lookingForBadge: {
+    backgroundColor: colors.tertiary.muted,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lookingForBadgeLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  lookingForBadgeValue: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.tertiary.DEFAULT,
+  },
+  lookingForPerfect: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)', // green tint
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  lookingForSimilar: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)', // blue tint
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  alignmentIndicator: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.medium as any,
+    marginTop: 2,
+  },
+  alignmentPerfect: {
+    color: 'rgb(34, 197, 94)', // green
+  },
+  alignmentSimilar: {
+    color: 'rgb(59, 130, 246)', // blue
   },
   viewMoreButton: {
     flexDirection: 'row',
