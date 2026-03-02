@@ -65,8 +65,10 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 				p.*,
 				EXTRACT(YEAR FROM AGE(p.dob)) AS age,
 				CASE
-					WHEN up.lat IS NOT NULL AND up.lng IS NOT NULL AND up.lat != 0 AND up.lng != 0
-						AND p.lat IS NOT NULL AND p.lng IS NOT NULL AND p.lat != 0 AND p.lng != 0
+					WHEN up.lat IS NOT NULL AND up.lng IS NOT NULL
+						AND up.lat BETWEEN 24 AND 50 AND up.lng BETWEEN -125 AND -66
+						AND p.lat IS NOT NULL AND p.lng IS NOT NULL
+						AND p.lat BETWEEN 24 AND 50 AND p.lng BETWEEN -125 AND -66
 					THEN ROUND((3959 * acos(cos(radians(up.lat)) * cos(radians(p.lat)) * cos(radians(p.lng) - radians(up.lng)) + sin(radians(up.lat)) * sin(radians(p.lat))))::numeric, 0)::int
 					ELSE NULL
 				END AS distance,
