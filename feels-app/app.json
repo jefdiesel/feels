@@ -50,7 +50,14 @@
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Feels uses your location to show you people nearby and calculate distances.",
+          "locationWhenInUsePermission": "Feels uses your location to show you people nearby and calculate distances."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -57,6 +57,193 @@ interface ProfilePrompt {
   answer: string;
 }
 
+// NYC ZIP code to borough and neighborhoods mapping
+const NYC_ZIP_DATA: Record<string, { borough: string; neighborhoods: string[] }> = {
+  // Manhattan
+  '10001': { borough: 'Manhattan', neighborhoods: ['Chelsea'] },
+  '10002': { borough: 'Manhattan', neighborhoods: ['Lower East Side', 'Chinatown'] },
+  '10003': { borough: 'Manhattan', neighborhoods: ['East Village', 'Greenwich Village'] },
+  '10004': { borough: 'Manhattan', neighborhoods: ['Financial District'] },
+  '10005': { borough: 'Manhattan', neighborhoods: ['Financial District'] },
+  '10006': { borough: 'Manhattan', neighborhoods: ['Financial District'] },
+  '10007': { borough: 'Manhattan', neighborhoods: ['TriBeCa', 'Civic Center'] },
+  '10009': { borough: 'Manhattan', neighborhoods: ['East Village', 'Alphabet City'] },
+  '10010': { borough: 'Manhattan', neighborhoods: ['Gramercy', 'Flatiron'] },
+  '10011': { borough: 'Manhattan', neighborhoods: ['Chelsea', 'West Village'] },
+  '10012': { borough: 'Manhattan', neighborhoods: ['SoHo', 'NoHo', 'Greenwich Village'] },
+  '10013': { borough: 'Manhattan', neighborhoods: ['TriBeCa', 'SoHo', 'Chinatown'] },
+  '10014': { borough: 'Manhattan', neighborhoods: ['West Village', 'Greenwich Village'] },
+  '10016': { borough: 'Manhattan', neighborhoods: ['Murray Hill', 'Kips Bay'] },
+  '10017': { borough: 'Manhattan', neighborhoods: ['Midtown East', 'Turtle Bay'] },
+  '10018': { borough: 'Manhattan', neighborhoods: ['Midtown', 'Garment District'] },
+  '10019': { borough: 'Manhattan', neighborhoods: ['Midtown West', 'Hell\'s Kitchen'] },
+  '10020': { borough: 'Manhattan', neighborhoods: ['Midtown', 'Rockefeller Center'] },
+  '10021': { borough: 'Manhattan', neighborhoods: ['Upper East Side'] },
+  '10022': { borough: 'Manhattan', neighborhoods: ['Midtown East', 'Sutton Place'] },
+  '10023': { borough: 'Manhattan', neighborhoods: ['Upper West Side', 'Lincoln Square'] },
+  '10024': { borough: 'Manhattan', neighborhoods: ['Upper West Side'] },
+  '10025': { borough: 'Manhattan', neighborhoods: ['Upper West Side', 'Morningside Heights'] },
+  '10026': { borough: 'Manhattan', neighborhoods: ['Harlem'] },
+  '10027': { borough: 'Manhattan', neighborhoods: ['Harlem', 'Morningside Heights'] },
+  '10028': { borough: 'Manhattan', neighborhoods: ['Upper East Side'] },
+  '10029': { borough: 'Manhattan', neighborhoods: ['East Harlem'] },
+  '10030': { borough: 'Manhattan', neighborhoods: ['Harlem'] },
+  '10031': { borough: 'Manhattan', neighborhoods: ['Hamilton Heights', 'Sugar Hill'] },
+  '10032': { borough: 'Manhattan', neighborhoods: ['Washington Heights'] },
+  '10033': { borough: 'Manhattan', neighborhoods: ['Washington Heights'] },
+  '10034': { borough: 'Manhattan', neighborhoods: ['Inwood'] },
+  '10035': { borough: 'Manhattan', neighborhoods: ['East Harlem'] },
+  '10036': { borough: 'Manhattan', neighborhoods: ['Midtown', 'Times Square', 'Hell\'s Kitchen'] },
+  '10037': { borough: 'Manhattan', neighborhoods: ['Harlem'] },
+  '10038': { borough: 'Manhattan', neighborhoods: ['Financial District', 'Seaport'] },
+  '10039': { borough: 'Manhattan', neighborhoods: ['Harlem'] },
+  '10040': { borough: 'Manhattan', neighborhoods: ['Washington Heights', 'Fort George'] },
+  '10044': { borough: 'Manhattan', neighborhoods: ['Roosevelt Island'] },
+  '10065': { borough: 'Manhattan', neighborhoods: ['Upper East Side', 'Lenox Hill'] },
+  '10069': { borough: 'Manhattan', neighborhoods: ['Upper West Side'] },
+  '10075': { borough: 'Manhattan', neighborhoods: ['Upper East Side'] },
+  '10128': { borough: 'Manhattan', neighborhoods: ['Upper East Side', 'Yorkville'] },
+  '10280': { borough: 'Manhattan', neighborhoods: ['Battery Park City'] },
+  '10282': { borough: 'Manhattan', neighborhoods: ['Battery Park City'] },
+  // Brooklyn
+  '11201': { borough: 'Brooklyn', neighborhoods: ['Brooklyn Heights', 'DUMBO'] },
+  '11203': { borough: 'Brooklyn', neighborhoods: ['East Flatbush'] },
+  '11204': { borough: 'Brooklyn', neighborhoods: ['Bensonhurst'] },
+  '11205': { borough: 'Brooklyn', neighborhoods: ['Fort Greene', 'Clinton Hill'] },
+  '11206': { borough: 'Brooklyn', neighborhoods: ['Williamsburg', 'Bedford-Stuyvesant'] },
+  '11207': { borough: 'Brooklyn', neighborhoods: ['East New York'] },
+  '11208': { borough: 'Brooklyn', neighborhoods: ['East New York'] },
+  '11209': { borough: 'Brooklyn', neighborhoods: ['Bay Ridge'] },
+  '11210': { borough: 'Brooklyn', neighborhoods: ['Flatbush', 'Midwood'] },
+  '11211': { borough: 'Brooklyn', neighborhoods: ['Williamsburg'] },
+  '11212': { borough: 'Brooklyn', neighborhoods: ['Brownsville'] },
+  '11213': { borough: 'Brooklyn', neighborhoods: ['Crown Heights'] },
+  '11214': { borough: 'Brooklyn', neighborhoods: ['Bensonhurst', 'Bath Beach'] },
+  '11215': { borough: 'Brooklyn', neighborhoods: ['Park Slope', 'Windsor Terrace'] },
+  '11216': { borough: 'Brooklyn', neighborhoods: ['Bedford-Stuyvesant'] },
+  '11217': { borough: 'Brooklyn', neighborhoods: ['Boerum Hill', 'Park Slope'] },
+  '11218': { borough: 'Brooklyn', neighborhoods: ['Kensington', 'Windsor Terrace'] },
+  '11219': { borough: 'Brooklyn', neighborhoods: ['Borough Park'] },
+  '11220': { borough: 'Brooklyn', neighborhoods: ['Sunset Park'] },
+  '11221': { borough: 'Brooklyn', neighborhoods: ['Bushwick', 'Bedford-Stuyvesant'] },
+  '11222': { borough: 'Brooklyn', neighborhoods: ['Greenpoint'] },
+  '11223': { borough: 'Brooklyn', neighborhoods: ['Gravesend'] },
+  '11224': { borough: 'Brooklyn', neighborhoods: ['Coney Island', 'Brighton Beach'] },
+  '11225': { borough: 'Brooklyn', neighborhoods: ['Crown Heights', 'Prospect Lefferts Gardens'] },
+  '11226': { borough: 'Brooklyn', neighborhoods: ['Flatbush'] },
+  '11228': { borough: 'Brooklyn', neighborhoods: ['Dyker Heights'] },
+  '11229': { borough: 'Brooklyn', neighborhoods: ['Sheepshead Bay', 'Gerritsen Beach'] },
+  '11230': { borough: 'Brooklyn', neighborhoods: ['Midwood'] },
+  '11231': { borough: 'Brooklyn', neighborhoods: ['Carroll Gardens', 'Red Hook', 'Cobble Hill'] },
+  '11232': { borough: 'Brooklyn', neighborhoods: ['Sunset Park', 'Greenwood'] },
+  '11233': { borough: 'Brooklyn', neighborhoods: ['Bedford-Stuyvesant', 'Ocean Hill'] },
+  '11234': { borough: 'Brooklyn', neighborhoods: ['Canarsie', 'Flatlands'] },
+  '11235': { borough: 'Brooklyn', neighborhoods: ['Sheepshead Bay', 'Brighton Beach'] },
+  '11236': { borough: 'Brooklyn', neighborhoods: ['Canarsie'] },
+  '11237': { borough: 'Brooklyn', neighborhoods: ['Bushwick'] },
+  '11238': { borough: 'Brooklyn', neighborhoods: ['Prospect Heights', 'Fort Greene'] },
+  '11239': { borough: 'Brooklyn', neighborhoods: ['East New York'] },
+  // Queens
+  '11101': { borough: 'Queens', neighborhoods: ['Long Island City'] },
+  '11102': { borough: 'Queens', neighborhoods: ['Astoria'] },
+  '11103': { borough: 'Queens', neighborhoods: ['Astoria'] },
+  '11104': { borough: 'Queens', neighborhoods: ['Sunnyside'] },
+  '11105': { borough: 'Queens', neighborhoods: ['Astoria', 'Ditmars'] },
+  '11106': { borough: 'Queens', neighborhoods: ['Astoria'] },
+  '11354': { borough: 'Queens', neighborhoods: ['Flushing'] },
+  '11355': { borough: 'Queens', neighborhoods: ['Flushing'] },
+  '11356': { borough: 'Queens', neighborhoods: ['College Point'] },
+  '11357': { borough: 'Queens', neighborhoods: ['Whitestone'] },
+  '11358': { borough: 'Queens', neighborhoods: ['Flushing', 'Murray Hill'] },
+  '11360': { borough: 'Queens', neighborhoods: ['Bayside'] },
+  '11361': { borough: 'Queens', neighborhoods: ['Bayside'] },
+  '11362': { borough: 'Queens', neighborhoods: ['Little Neck'] },
+  '11363': { borough: 'Queens', neighborhoods: ['Douglaston'] },
+  '11364': { borough: 'Queens', neighborhoods: ['Oakland Gardens'] },
+  '11365': { borough: 'Queens', neighborhoods: ['Fresh Meadows'] },
+  '11366': { borough: 'Queens', neighborhoods: ['Fresh Meadows'] },
+  '11367': { borough: 'Queens', neighborhoods: ['Kew Gardens Hills'] },
+  '11368': { borough: 'Queens', neighborhoods: ['Corona'] },
+  '11369': { borough: 'Queens', neighborhoods: ['East Elmhurst'] },
+  '11370': { borough: 'Queens', neighborhoods: ['East Elmhurst'] },
+  '11371': { borough: 'Queens', neighborhoods: ['LaGuardia Airport'] },
+  '11372': { borough: 'Queens', neighborhoods: ['Jackson Heights'] },
+  '11373': { borough: 'Queens', neighborhoods: ['Elmhurst'] },
+  '11374': { borough: 'Queens', neighborhoods: ['Rego Park'] },
+  '11375': { borough: 'Queens', neighborhoods: ['Forest Hills'] },
+  '11377': { borough: 'Queens', neighborhoods: ['Woodside'] },
+  '11378': { borough: 'Queens', neighborhoods: ['Maspeth'] },
+  '11379': { borough: 'Queens', neighborhoods: ['Middle Village'] },
+  '11385': { borough: 'Queens', neighborhoods: ['Ridgewood', 'Glendale'] },
+  '11411': { borough: 'Queens', neighborhoods: ['Cambria Heights'] },
+  '11412': { borough: 'Queens', neighborhoods: ['St. Albans'] },
+  '11413': { borough: 'Queens', neighborhoods: ['Springfield Gardens'] },
+  '11414': { borough: 'Queens', neighborhoods: ['Howard Beach'] },
+  '11415': { borough: 'Queens', neighborhoods: ['Kew Gardens'] },
+  '11416': { borough: 'Queens', neighborhoods: ['Ozone Park'] },
+  '11417': { borough: 'Queens', neighborhoods: ['Ozone Park'] },
+  '11418': { borough: 'Queens', neighborhoods: ['Richmond Hill'] },
+  '11419': { borough: 'Queens', neighborhoods: ['South Richmond Hill'] },
+  '11420': { borough: 'Queens', neighborhoods: ['South Ozone Park'] },
+  '11421': { borough: 'Queens', neighborhoods: ['Woodhaven'] },
+  '11422': { borough: 'Queens', neighborhoods: ['Rosedale'] },
+  '11423': { borough: 'Queens', neighborhoods: ['Hollis'] },
+  '11426': { borough: 'Queens', neighborhoods: ['Bellerose'] },
+  '11427': { borough: 'Queens', neighborhoods: ['Queens Village'] },
+  '11428': { borough: 'Queens', neighborhoods: ['Queens Village'] },
+  '11429': { borough: 'Queens', neighborhoods: ['Queens Village'] },
+  '11432': { borough: 'Queens', neighborhoods: ['Jamaica'] },
+  '11433': { borough: 'Queens', neighborhoods: ['Jamaica'] },
+  '11434': { borough: 'Queens', neighborhoods: ['Jamaica'] },
+  '11435': { borough: 'Queens', neighborhoods: ['Jamaica', 'Briarwood'] },
+  '11436': { borough: 'Queens', neighborhoods: ['Jamaica'] },
+  '11691': { borough: 'Queens', neighborhoods: ['Far Rockaway'] },
+  '11692': { borough: 'Queens', neighborhoods: ['Arverne'] },
+  '11693': { borough: 'Queens', neighborhoods: ['Far Rockaway'] },
+  '11694': { borough: 'Queens', neighborhoods: ['Rockaway Park', 'Belle Harbor'] },
+  '11697': { borough: 'Queens', neighborhoods: ['Breezy Point'] },
+  // Bronx
+  '10451': { borough: 'Bronx', neighborhoods: ['Mott Haven', 'Melrose'] },
+  '10452': { borough: 'Bronx', neighborhoods: ['Highbridge', 'Concourse'] },
+  '10453': { borough: 'Bronx', neighborhoods: ['Morris Heights', 'University Heights'] },
+  '10454': { borough: 'Bronx', neighborhoods: ['Mott Haven', 'Port Morris'] },
+  '10455': { borough: 'Bronx', neighborhoods: ['Longwood', 'Melrose'] },
+  '10456': { borough: 'Bronx', neighborhoods: ['Morrisania', 'Claremont'] },
+  '10457': { borough: 'Bronx', neighborhoods: ['Tremont'] },
+  '10458': { borough: 'Bronx', neighborhoods: ['Belmont', 'Fordham'] },
+  '10459': { borough: 'Bronx', neighborhoods: ['Longwood', 'Hunts Point'] },
+  '10460': { borough: 'Bronx', neighborhoods: ['West Farms', 'Crotona Park East'] },
+  '10461': { borough: 'Bronx', neighborhoods: ['Morris Park', 'Pelham Parkway'] },
+  '10462': { borough: 'Bronx', neighborhoods: ['Parkchester', 'Van Nest'] },
+  '10463': { borough: 'Bronx', neighborhoods: ['Kingsbridge', 'Riverdale'] },
+  '10464': { borough: 'Bronx', neighborhoods: ['City Island'] },
+  '10465': { borough: 'Bronx', neighborhoods: ['Throgs Neck', 'Country Club'] },
+  '10466': { borough: 'Bronx', neighborhoods: ['Wakefield', 'Williamsbridge'] },
+  '10467': { borough: 'Bronx', neighborhoods: ['Norwood', 'Williamsbridge'] },
+  '10468': { borough: 'Bronx', neighborhoods: ['Fordham', 'University Heights'] },
+  '10469': { borough: 'Bronx', neighborhoods: ['Eastchester', 'Baychester'] },
+  '10470': { borough: 'Bronx', neighborhoods: ['Woodlawn'] },
+  '10471': { borough: 'Bronx', neighborhoods: ['Riverdale', 'Fieldston'] },
+  '10472': { borough: 'Bronx', neighborhoods: ['Soundview'] },
+  '10473': { borough: 'Bronx', neighborhoods: ['Castle Hill', 'Soundview'] },
+  '10474': { borough: 'Bronx', neighborhoods: ['Hunts Point'] },
+  '10475': { borough: 'Bronx', neighborhoods: ['Co-op City'] },
+  // Staten Island
+  '10301': { borough: 'Staten Island', neighborhoods: ['St. George', 'Tompkinsville'] },
+  '10302': { borough: 'Staten Island', neighborhoods: ['Port Richmond'] },
+  '10303': { borough: 'Staten Island', neighborhoods: ['Mariners Harbor', 'Arlington'] },
+  '10304': { borough: 'Staten Island', neighborhoods: ['Stapleton', 'Grymes Hill'] },
+  '10305': { borough: 'Staten Island', neighborhoods: ['Rosebank', 'South Beach'] },
+  '10306': { borough: 'Staten Island', neighborhoods: ['Midland Beach', 'New Dorp'] },
+  '10307': { borough: 'Staten Island', neighborhoods: ['Tottenville'] },
+  '10308': { borough: 'Staten Island', neighborhoods: ['Great Kills'] },
+  '10309': { borough: 'Staten Island', neighborhoods: ['Charleston', 'Prince\'s Bay'] },
+  '10310': { borough: 'Staten Island', neighborhoods: ['West Brighton', 'New Brighton'] },
+  '10311': { borough: 'Staten Island', neighborhoods: ['Westerleigh'] },
+  '10312': { borough: 'Staten Island', neighborhoods: ['Annadale', 'Eltingville'] },
+  '10314': { borough: 'Staten Island', neighborhoods: ['New Springville', 'Bulls Head'] },
+};
+
 const AVAILABLE_PROMPTS = [
   // Intentions & Energy
   "I'm done playing it safe, now I want...",
@@ -129,6 +316,18 @@ export default function ProfileScreen() {
   const [referralCode, setReferralCode] = useState<string>('');
   const [referralStats, setReferralStats] = useState<{ total_referrals: number; premium_days_earned: number } | null>(null);
   const [loadingReferral, setLoadingReferral] = useState(false);
+
+  // Location state
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [zipInput, setZipInput] = useState('');
+  const [zipData, setZipData] = useState<{ borough: string; neighborhoods: string[] } | null>(null);
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string>('');
+  const [savingLocation, setSavingLocation] = useState(false);
+
+  // Prompt selector - defined early so it can be used in getProfileTips
+  const openPromptSelector = () => {
+    setSelectPromptModalVisible(true);
+  };
 
   // Profile quality tips
   const getProfileTips = () => {
@@ -329,10 +528,6 @@ export default function ProfileScreen() {
     setPromptModalVisible(true);
   };
 
-  const openPromptSelector = () => {
-    setSelectPromptModalVisible(true);
-  };
-
   const selectPrompt = (question: string) => {
     const prompts = user?.prompts || [];
     if (prompts.length >= 3) {
@@ -420,6 +615,61 @@ export default function ProfileScreen() {
     p => !(user?.prompts || []).some(up => up.question === p)
   );
 
+  // Location functions
+  const openLocationModal = () => {
+    setZipInput('');
+    setZipData(null);
+    setSelectedNeighborhood('');
+    setLocationModalVisible(true);
+  };
+
+  const handleZipChange = (zip: string) => {
+    // Only allow numbers
+    const cleanZip = zip.replace(/\D/g, '').slice(0, 5);
+    setZipInput(cleanZip);
+
+    if (cleanZip.length === 5) {
+      const data = NYC_ZIP_DATA[cleanZip];
+      if (data) {
+        setZipData(data);
+        // If only one neighborhood, auto-select it
+        if (data.neighborhoods.length === 1) {
+          setSelectedNeighborhood(data.neighborhoods[0]);
+        } else {
+          setSelectedNeighborhood('');
+        }
+      } else {
+        setZipData(null);
+        setSelectedNeighborhood('');
+      }
+    } else {
+      setZipData(null);
+      setSelectedNeighborhood('');
+    }
+  };
+
+  const saveLocation = async () => {
+    if (!zipData) {
+      Alert.alert('Error', 'Please enter a valid NYC ZIP code');
+      return;
+    }
+
+    setSavingLocation(true);
+    try {
+      // Display: neighborhood if selected, otherwise borough
+      const location = selectedNeighborhood || zipData.borough;
+
+      await profileApi.update({ neighborhood: location });
+      setUser({ ...user!, neighborhood: location });
+      setLocationModalVisible(false);
+    } catch (error: any) {
+      console.error('Save location error:', error);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to save location');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -474,24 +724,61 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Profile Quality Tips */}
-        {profileTips.length > 0 && (
+        {/* Search Filters - Primary Action */}
+        <View style={styles.searchFiltersContainer}>
+          <TouchableOpacity
+            style={styles.searchFiltersButton}
+            onPress={() => router.push('/settings')}
+          >
+            <View style={styles.searchFiltersContent}>
+              <View style={styles.searchFiltersIcon}>
+                <SlidersIcon size={22} color={colors.primary.DEFAULT} />
+              </View>
+              <View>
+                <Text style={styles.searchFiltersTitle}>Search Filters</Text>
+                <Text style={styles.searchFiltersSubtitle}>Age, gender, distance</Text>
+              </View>
+            </View>
+            <ChevronRightIcon size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile Tips or Edit Profile Card */}
+        {user?.bio && user.bio.length >= 20 ? (
+          // Profile is complete enough - show Edit Profile card
           <View style={styles.tipsContainer}>
-            {profileTips.map((tip) => (
-              <TouchableOpacity
-                key={tip.id}
-                style={styles.tipCard}
-                onPress={tip.action}
-                activeOpacity={0.8}
-              >
-                <View style={styles.tipIcon}>
-                  <SparklesIcon size={16} color={colors.secondary.DEFAULT} />
-                </View>
-                <Text style={styles.tipText}>{tip.text}</Text>
-                <ChevronRightIcon size={16} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={styles.editProfileCard}
+              onPress={() => openEditModal('bio')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.editProfileIcon}>
+                <EditIcon size={18} color={colors.primary.DEFAULT} />
+              </View>
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+              <ChevronRightIcon size={16} color={colors.text.tertiary} />
+            </TouchableOpacity>
           </View>
+        ) : (
+          // Profile incomplete - show tips
+          profileTips.length > 0 && (
+            <View style={styles.tipsContainer}>
+              {profileTips.map((tip) => (
+                <TouchableOpacity
+                  key={tip.id}
+                  style={styles.tipCard}
+                  onPress={tip.action}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.tipIcon}>
+                    <SparklesIcon size={16} color={colors.secondary.DEFAULT} />
+                  </View>
+                  <Text style={styles.tipText}>{tip.text}</Text>
+                  <ChevronRightIcon size={16} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )
         )}
 
         {/* Credits Card */}
@@ -628,6 +915,27 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Home/Location Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Home</Text>
+            <TouchableOpacity onPress={openLocationModal}>
+              <Text style={styles.editText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.locationCard} onPress={openLocationModal}>
+            <MapPinIcon size={20} color={colors.primary.DEFAULT} />
+            {user?.neighborhood ? (
+              <Text style={styles.locationText}>{user.neighborhood}</Text>
+            ) : (
+              <Text style={styles.locationPlaceholder}>
+                Set your neighborhood...
+              </Text>
+            )}
+            <ChevronRightIcon size={18} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Prompts Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -675,25 +983,6 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
           )}
-        </View>
-
-        {/* Search Filters - Most Important */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.searchFiltersButton}
-            onPress={() => router.push('/settings')}
-          >
-            <View style={styles.searchFiltersContent}>
-              <View style={styles.searchFiltersIcon}>
-                <SlidersIcon size={22} color={colors.primary.DEFAULT} />
-              </View>
-              <View>
-                <Text style={styles.searchFiltersTitle}>Search Filters</Text>
-                <Text style={styles.searchFiltersSubtitle}>Age, gender, vibe level, distance</Text>
-              </View>
-            </View>
-            <ChevronRightIcon size={20} color={colors.text.tertiary} />
-          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -934,6 +1223,97 @@ export default function ProfileScreen() {
             <Text style={styles.charCount}>
               {promptAnswer.length}/200
             </Text>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Location Modal */}
+      <Modal
+        visible={locationModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLocationModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity
+                onPress={() => setLocationModalVisible(false)}
+                disabled={savingLocation}
+              >
+                <Text style={[styles.modalCancel, savingLocation && { opacity: 0.5 }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Your Location</Text>
+              <TouchableOpacity onPress={saveLocation} disabled={savingLocation || !zipData}>
+                {savingLocation ? (
+                  <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+                ) : (
+                  <Text style={[styles.modalSave, !zipData && { opacity: 0.5 }]}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.locationLabel}>ZIP Code</Text>
+            <TextInput
+              style={styles.zipInput}
+              value={zipInput}
+              onChangeText={handleZipChange}
+              placeholder="Enter your ZIP code"
+              placeholderTextColor={colors.text.disabled}
+              keyboardType="number-pad"
+              maxLength={5}
+              editable={!savingLocation}
+            />
+
+            {zipInput.length === 5 && !zipData && (
+              <Text style={styles.zipError}>Not a valid NYC ZIP code</Text>
+            )}
+
+            {zipData && (
+              <View style={styles.zipResult}>
+                <Text style={styles.zipBorough}>{zipData.borough}</Text>
+
+                {zipData.neighborhoods.length > 1 && (
+                  <>
+                    <Text style={[styles.locationLabel, { marginTop: spacing.lg }]}>
+                      Neighborhood (optional)
+                    </Text>
+                    <View style={styles.neighborhoodOptions}>
+                      {zipData.neighborhoods.map((n) => (
+                        <TouchableOpacity
+                          key={n}
+                          style={[
+                            styles.neighborhoodOption,
+                            selectedNeighborhood === n && styles.neighborhoodOptionSelected,
+                          ]}
+                          onPress={() => setSelectedNeighborhood(
+                            selectedNeighborhood === n ? '' : n
+                          )}
+                        >
+                          <Text
+                            style={[
+                              styles.neighborhoodOptionText,
+                              selectedNeighborhood === n && styles.neighborhoodOptionTextSelected,
+                            ]}
+                          >
+                            {n}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                <Text style={styles.locationPreview}>
+                  Will display as: {selectedNeighborhood || zipData.borough}
+                </Text>
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1211,6 +1591,90 @@ const styles = StyleSheet.create({
     color: colors.text.disabled,
     fontStyle: 'italic',
   },
+  // Location styles
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  locationText: {
+    flex: 1,
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
+  },
+  locationPlaceholder: {
+    flex: 1,
+    fontSize: typography.sizes.base,
+    color: colors.text.disabled,
+    fontStyle: 'italic',
+  },
+  locationLabel: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+  },
+  zipInput: {
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
+    textAlign: 'center',
+    letterSpacing: 4,
+  },
+  zipError: {
+    fontSize: typography.sizes.sm,
+    color: colors.error,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  zipResult: {
+    marginTop: spacing.lg,
+  },
+  zipBorough: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
+    textAlign: 'center',
+  },
+  neighborhoodOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  neighborhoodOption: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
+  neighborhoodOptionSelected: {
+    backgroundColor: colors.primary.muted,
+    borderColor: colors.primary.DEFAULT,
+  },
+  neighborhoodOptionText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium as any,
+    color: colors.text.secondary,
+  },
+  neighborhoodOptionTextSelected: {
+    color: colors.primary.DEFAULT,
+    fontWeight: typography.weights.semibold as any,
+  },
+  locationPreview: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    fontStyle: 'italic',
+  },
   // Prompts styles
   loadingOverlay: {
     padding: spacing.xl,
@@ -1266,7 +1730,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   promptList: {
-    flex: 1,
+    maxHeight: 400,
   },
   promptSelectOption: {
     backgroundColor: colors.bg.tertiary,
@@ -1296,6 +1760,10 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'center',
     marginTop: spacing.xl,
+  },
+  searchFiltersContainer: {
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.lg,
   },
   searchFiltersButton: {
     flexDirection: 'row',
@@ -1481,7 +1949,33 @@ const styles = StyleSheet.create({
   // Profile Tips styles
   tipsContainer: {
     paddingHorizontal: spacing.xl,
+    marginTop: spacing.md,
     gap: spacing.sm,
+  },
+  editProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    gap: spacing.sm,
+  },
+  editProfileIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary.muted,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editProfileText: {
+    flex: 1,
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
+    fontWeight: typography.weights.medium as any,
   },
   tipCard: {
     flexDirection: 'row',

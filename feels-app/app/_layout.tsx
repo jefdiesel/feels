@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SystemUI from 'expo-system-ui';
 import { useAuthStore } from '@/stores/authStore';
+import { useLocationStore } from '@/stores/locationStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Sentry initialization disabled for now - can be re-enabled once build is stable
@@ -28,6 +29,7 @@ const queryClient = new QueryClient({
 function RootLayoutContent() {
   const { isAuthenticated } = useAuthStore();
   const { initPushNotifications } = usePushNotifications();
+  const { updateLocation } = useLocationStore();
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync('#000000');
@@ -39,6 +41,13 @@ function RootLayoutContent() {
       initPushNotifications();
     }
   }, [isAuthenticated, initPushNotifications]);
+
+  // Update location when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      updateLocation();
+    }
+  }, [isAuthenticated, updateLocation]);
 
   return (
     <Stack

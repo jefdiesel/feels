@@ -93,14 +93,14 @@ func (r *ProfileRepository) Update(ctx context.Context, p *profile.Profile) erro
 
 	query := `
 		UPDATE profiles SET
-			name = $2, neighborhood = $3, bio = $4, prompts = $5, kink_level = $6,
-			looking_for = $7, zodiac = $8, religion = $9, has_kids = $10,
-			wants_kids = $11, alcohol = $12, weed = $13, lat = $14, lng = $15,
+			name = $2, zip_code = $3, neighborhood = $4, bio = $5, prompts = $6, kink_level = $7,
+			looking_for = $8, zodiac = $9, religion = $10, has_kids = $11,
+			wants_kids = $12, alcohol = $13, weed = $14, lat = $15, lng = $16,
 			last_active = NOW()
 		WHERE user_id = $1
 	`
 	result, err := r.db.Exec(ctx, query,
-		p.UserID, p.Name, p.Neighborhood, p.Bio, promptsJSON, p.KinkLevel,
+		p.UserID, p.Name, p.ZipCode, p.Neighborhood, p.Bio, promptsJSON, p.KinkLevel,
 		p.LookingFor, p.Zodiac, p.Religion, p.HasKids,
 		p.WantsKids, p.Alcohol, p.Weed, p.Lat, p.Lng,
 	)

@@ -112,6 +112,7 @@ type CreateProfileRequest struct {
 
 type UpdateProfileRequest struct {
 	Name         *string  `json:"name,omitempty"`
+	ZipCode      *string  `json:"zip_code,omitempty"`
 	Neighborhood *string  `json:"neighborhood,omitempty"`
 	Bio          *string  `json:"bio,omitempty"`
 	Prompts      []Prompt `json:"prompts,omitempty"`

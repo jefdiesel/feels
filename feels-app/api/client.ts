@@ -102,6 +102,8 @@ export const feedApi = {
 
   superlikeWithMessage: (targetUserId: string, message: string) =>
     api.post(`/feed/superlike/${targetUserId}/message`, { message }),
+
+  debug: () => api.get('/feed/debug'),
 };
 
 export const matchesApi = {

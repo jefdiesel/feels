@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { profileApi } from '@/api/client';
+import { useFeedStore } from '@/stores/feedStore';
 import { ArrowLeftIcon, MinusIcon, PlusIcon, CheckIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
@@ -22,24 +23,16 @@ const GENDER_OPTIONS = [
   { label: 'Trans', value: 'trans' },
 ];
 
-interface Preferences {
-  age_min: number;
-  age_max: number;
-  distance_miles: number;
-  genders_seeking: string[];
-  visible_to_genders: string[];
-}
-
 export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [preferences, setPreferences] = useState<Preferences>({
-    age_min: 18,
-    age_max: 99,
-    distance_miles: 25,
-    genders_seeking: [],
-    visible_to_genders: [],
-  });
+
+  // Use strings for text inputs to allow proper editing
+  const [ageMin, setAgeMin] = useState('18');
+  const [ageMax, setAgeMax] = useState('99');
+  const [distance, setDistance] = useState('25');
+  const [gendersSeeking, setGendersSeeking] = useState<string[]>([]);
+  const [visibleToGenders, setVisibleToGenders] = useState<string[]>([]);
 
   useEffect(() => {
     loadPreferences();
@@ -49,13 +42,11 @@ export default function SettingsScreen() {
     try {
       const response = await profileApi.getPreferences();
       const data = response.data;
-      setPreferences({
-        age_min: data.age_min ?? 18,
-        age_max: data.age_max ?? 99,
-        distance_miles: data.distance_miles ?? 25,
-        genders_seeking: data.genders_seeking ?? [],
-        visible_to_genders: data.visible_to_genders ?? [],
-      });
+      setAgeMin(String(data.age_min ?? 18));
+      setAgeMax(String(data.age_max ?? 99));
+      setDistance(String(data.distance_miles ?? 25));
+      setGendersSeeking(data.genders_seeking ?? []);
+      setVisibleToGenders(data.visible_to_genders ?? []);
     } catch (error: any) {
       console.error('Failed to load preferences:', error);
     } finally {
@@ -64,66 +55,84 @@ export default function SettingsScreen() {
   };
 
   const handleSave = async () => {
-    if (preferences.age_min > preferences.age_max) {
+    // Parse and validate values
+    const minAge = parseInt(ageMin, 10) || 18;
+    const maxAge = parseInt(ageMax, 10) || 99;
+    const distMiles = parseInt(distance, 10) || 25;
+
+    // Clamp values to valid ranges
+    const clampedMinAge = Math.min(99, Math.max(18, minAge));
+    const clampedMaxAge = Math.min(99, Math.max(18, maxAge));
+    const clampedDistance = Math.min(100, Math.max(1, distMiles));
+
+    if (clampedMinAge > clampedMaxAge) {
       Alert.alert('Invalid Age Range', 'Minimum age cannot be greater than maximum age.');
+      return;
+    }
+
+    if (gendersSeeking.length === 0) {
+      Alert.alert('Select Genders', 'Please select at least one gender to see in your feed.');
       return;
     }
 
     setSaving(true);
     try {
       await profileApi.updatePreferences({
-        age_min: preferences.age_min,
-        age_max: preferences.age_max,
-        distance_miles: preferences.distance_miles,
-        genders_seeking: preferences.genders_seeking,
-        visible_to_genders: preferences.visible_to_genders,
+        age_min: clampedMinAge,
+        age_max: clampedMaxAge,
+        distance_miles: clampedDistance,
+        genders_seeking: gendersSeeking,
+        visible_to_genders: visibleToGenders,
       });
+      // Clear feed so it refreshes with new preferences
+      useFeedStore.getState().reset();
       router.back();
     } catch (error: any) {
       console.error('Failed to save preferences:', error);
-      Alert.alert('Error', error.response?.data?.error || 'Failed to save preferences.');
+      const status = error.response?.status;
+      const serverError = error.response?.data?.error;
+      const msg = serverError
+        ? `${serverError} (${status})`
+        : error.message || 'Failed to save preferences';
+      Alert.alert('Error', msg);
       setSaving(false);
     }
   };
 
-  const toggleSelection = (
-    field: 'genders_seeking' | 'visible_to_genders',
-    value: string
-  ) => {
-    setPreferences((prev) => {
-      const current = prev[field];
-      const updated = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value];
-      return { ...prev, [field]: updated };
-    });
+  const toggleGendersSeeking = (value: string) => {
+    setGendersSeeking((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
   };
 
-  const handleAgeChange = (field: 'age_min' | 'age_max', text: string) => {
-    const numValue = parseInt(text, 10);
-    if (text === '') {
-      setPreferences((prev) => ({ ...prev, [field]: field === 'age_min' ? 18 : 99 }));
-    } else if (!isNaN(numValue)) {
-      const clampedValue = Math.min(99, Math.max(18, numValue));
-      setPreferences((prev) => ({ ...prev, [field]: clampedValue }));
-    }
-  };
-
-  const handleDistanceChange = (text: string) => {
-    const numValue = parseInt(text, 10);
-    if (text === '') {
-      setPreferences((prev) => ({ ...prev, distance_miles: 1 }));
-    } else if (!isNaN(numValue)) {
-      const clampedValue = Math.min(100, Math.max(1, numValue));
-      setPreferences((prev) => ({ ...prev, distance_miles: clampedValue }));
-    }
+  const toggleVisibleTo = (value: string) => {
+    setVisibleToGenders((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
   };
 
   const adjustDistance = (delta: number) => {
-    setPreferences((prev) => {
-      const newValue = Math.min(100, Math.max(1, prev.distance_miles + delta));
-      return { ...prev, distance_miles: newValue };
-    });
+    const current = parseInt(distance, 10) || 25;
+    let newValue: number;
+
+    if (delta > 0) {
+      // Increasing: 1→2→3→4→5→10→15→20→25→...
+      if (current < 5) {
+        newValue = current + 1;
+      } else {
+        newValue = current + 5;
+      }
+    } else {
+      // Decreasing: ...→25→20→15→10→5→4→3→2→1
+      if (current <= 5) {
+        newValue = current - 1;
+      } else {
+        newValue = current - 5;
+      }
+    }
+
+    newValue = Math.min(100, Math.max(1, newValue));
+    setDistance(String(newValue));
   };
 
   if (loading) {
@@ -157,12 +166,13 @@ export default function SettingsScreen() {
               <Text style={styles.inputLabel}>Min</Text>
               <TextInput
                 style={styles.ageInput}
-                value={preferences.age_min.toString()}
-                onChangeText={(text) => handleAgeChange('age_min', text)}
+                value={ageMin}
+                onChangeText={setAgeMin}
                 keyboardType="number-pad"
                 placeholder="18"
                 placeholderTextColor={colors.text.disabled}
                 maxLength={2}
+                selectTextOnFocus
               />
             </View>
             <Text style={styles.ageSeparator}>to</Text>
@@ -170,12 +180,13 @@ export default function SettingsScreen() {
               <Text style={styles.inputLabel}>Max</Text>
               <TextInput
                 style={styles.ageInput}
-                value={preferences.age_max.toString()}
-                onChangeText={(text) => handleAgeChange('age_max', text)}
+                value={ageMax}
+                onChangeText={setAgeMax}
                 keyboardType="number-pad"
                 placeholder="99"
                 placeholderTextColor={colors.text.disabled}
                 maxLength={2}
+                selectTextOnFocus
               />
             </View>
           </View>
@@ -194,12 +205,13 @@ export default function SettingsScreen() {
             <View style={styles.distanceInputWrapper}>
               <TextInput
                 style={styles.distanceInput}
-                value={preferences.distance_miles.toString()}
-                onChangeText={handleDistanceChange}
+                value={distance}
+                onChangeText={setDistance}
                 keyboardType="number-pad"
                 placeholder="25"
                 placeholderTextColor={colors.text.disabled}
                 maxLength={3}
+                selectTextOnFocus
               />
               <Text style={styles.distanceUnit}>miles</Text>
             </View>
@@ -219,12 +231,12 @@ export default function SettingsScreen() {
           <Text style={styles.sectionHint}>Select all that apply</Text>
           <View style={styles.optionsContainer}>
             {GENDER_OPTIONS.map((gender) => {
-              const isSelected = preferences.genders_seeking.includes(gender.value);
+              const isSelected = gendersSeeking.includes(gender.value);
               return (
                 <TouchableOpacity
                   key={gender.value}
                   style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
-                  onPress={() => toggleSelection('genders_seeking', gender.value)}
+                  onPress={() => toggleGendersSeeking(gender.value)}
                 >
                   {isSelected && (
                     <CheckIcon size={16} color={colors.primary.DEFAULT} />
@@ -244,12 +256,12 @@ export default function SettingsScreen() {
           <Text style={styles.sectionHint}>Who can see your profile</Text>
           <View style={styles.optionsContainer}>
             {GENDER_OPTIONS.map((gender) => {
-              const isSelected = preferences.visible_to_genders.includes(gender.value);
+              const isSelected = visibleToGenders.includes(gender.value);
               return (
                 <TouchableOpacity
                   key={gender.value}
                   style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
-                  onPress={() => toggleSelection('visible_to_genders', gender.value)}
+                  onPress={() => toggleVisibleTo(gender.value)}
                 >
                   {isSelected && (
                     <CheckIcon size={16} color={colors.primary.DEFAULT} />

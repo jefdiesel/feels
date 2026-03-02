@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useFeedStore } from '@/stores/feedStore';
+import { feedApi } from '@/api/client';
 import { useCreditsStore } from '@/stores/creditsStore';
 import SwipeCard from '@/components/SwipeCard';
 import ActionBar from '@/components/ActionBar';
@@ -111,6 +112,19 @@ export default function FeedScreen() {
   }
 
   if (!currentProfile) {
+    const showDebug = async () => {
+      try {
+        const res = await feedApi.debug();
+        const d = res.data;
+        Alert.alert(
+          'Feed Debug',
+          `Total profiles: ${d.total_profiles}\nAlready seen: ${d.already_seen}\nGender match: ${d.gender_match}\nAge match: ${d.age_match}\n\nPrefs: ages ${d.pref_age_min}-${d.pref_age_max}, ${d.pref_distance}mi, ${d.pref_genders_count} genders\n\nYour lat: ${d.user_lat || 'null'}, lng: ${d.user_lng || 'null'}`
+        );
+      } catch (e: any) {
+        Alert.alert('Debug Error', e.message);
+      }
+    };
+
     return (
       <View style={styles.centered}>
         <View style={styles.emptyIconContainer}>
@@ -118,6 +132,9 @@ export default function FeedScreen() {
         </View>
         <Text style={styles.emptyTitle}>No more profiles</Text>
         <Text style={styles.emptyText}>Check back later for new people</Text>
+        <TouchableOpacity onPress={showDebug} style={{ marginTop: 20, padding: 10 }}>
+          <Text style={{ color: colors.text.tertiary }}>Debug Info</Text>
+        </TouchableOpacity>
       </View>
     );
   }

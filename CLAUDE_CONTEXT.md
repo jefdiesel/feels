@@ -9,10 +9,18 @@
 
 ## Critical Facts
 
-### The APK is Pre-Built
-- Frontend changes require rebuilding the APK with `eas build`
+### The APK is Pre-Built - BUILD IT LOCALLY
+- Frontend changes require rebuilding the APK **LOCALLY**
+- **DO NOT use `eas build`** - use local gradle build
 - You CANNOT test frontend changes by editing files - the emulator runs a compiled APK
 - Only backend changes (pushed to git) take effect immediately via Railway deploy
+
+**BUILD COMMAND:**
+```bash
+source ~/.nvm/nvm.sh && nvm use default
+cd feels-app/android && ./gradlew assembleRelease
+```
+APK output: `feels-app/android/app/build/outputs/apk/release/app-release.apk`
 
 ### Backend Deploys from Git
 - Push to `main` → Railway auto-deploys
@@ -41,9 +49,19 @@ The feed query (`internal/repository/feed.go`) filters profiles by:
 10. (For browse) distance NULL or within range
 
 ### Common "No Profiles" Causes
+- **CHECK COORDINATES FIRST**: Android emulator sends Mountain View CA (37.42, -122.08), not NYC
 - User swiped through all 200 test profiles (check `already_seen` count)
 - `genders_seeking` is empty or only contains genders not in seed data
 - Distance calculation returning huge numbers (bad lat/lng like 0,0)
+
+### FIRST THING TO CHECK when "no profiles"
+```sql
+SELECT lat, lng FROM profiles WHERE user_id = (SELECT id FROM users WHERE email = 'user1@test.com');
+```
+If lat ~37.4 and lng ~-122: FIX IT:
+```sql
+UPDATE profiles SET lat = 40.7128, lng = -74.0060 WHERE user_id = (SELECT id FROM users WHERE email = 'user1@test.com');
+```
 
 ## Debug Endpoint
 
@@ -55,7 +73,7 @@ The feed query (`internal/repository/feed.go`) filters profiles by:
 - `user_lat`, `user_lng`: user's coordinates (×1000)
 - `pref_*`: user's preference values
 
-## Don't Do This
+## Don't Do This (Claude's Fuckups)
 
 1. **Don't assume user profile issues** without evidence - check the data
 2. **Don't suggest frontend changes** when testing with APK
@@ -63,6 +81,32 @@ The feed query (`internal/repository/feed.go`) filters profiles by:
 4. **Don't make up problems** - if user says "it worked before", something specific changed
 5. **Don't add console.log for debugging** - user can't see metro logs with APK
 6. **Don't explain GPS/coordinates** to user - just fix the code
+7. **Don't push frontend changes without rebuilding APK** - ALWAYS rebuild locally
+8. **Don't use eas build (cloud)** - use local gradle build
+9. **Don't be vague** - give specific commands, not suggestions
+10. **Don't ask "what do you see"** - check the database and logs yourself
+11. **Don't guess at issues** - query the actual data first
+12. **Don't forget the emulator sends Mountain View coords** - ALWAYS check lat/lng FIRST
+13. **Don't tell user to "set emulator location"** - they don't know how, just fix backend
+
+## Test Account
+
+- **Email:** user1@test.com
+- **Password:** password123
+- **Must have NYC coords:** lat=40.7128, lng=-74.0060 (backend now ignores Mountain View coords)
+
+## APK Build (LOCAL ONLY)
+
+The APK is at: `feels-app/android/app/build/outputs/apk/release/app-release.apk`
+
+Build script: `feels-app/build-apk.sh`
+
+Node path must be set for gradle:
+```bash
+export PATH="/Users/jef/.nvm/versions/node/v24.11.1/bin:$PATH"
+```
+
+settings.gradle has hardcoded node path - if node version changes, update it.
 
 ## File Locations
 

@@ -173,6 +173,9 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req *Upda
 	if req.Name != nil {
 		profile.Name = *req.Name
 	}
+	if req.ZipCode != nil {
+		profile.ZipCode = *req.ZipCode
+	}
 	if req.Neighborhood != nil {
 		profile.Neighborhood = req.Neighborhood
 	}

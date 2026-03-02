@@ -95,7 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         platform: Platform.OS,
         totp_code: totpCode,
       });
-      const { access_token, refresh_token, user } = response.data;
+      const { access_token, refresh_token } = response.data;
 
       await storage.setItem('accessToken', access_token);
       await storage.setItem('refreshToken', refresh_token);
@@ -103,10 +103,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         accessToken: access_token,
         refreshToken: refresh_token,
-        user,
         isAuthenticated: true,
-        isLoading: false,
       });
+
+      // Fetch complete user data (includes profile: name, bio, photos, prompts)
+      try {
+        const userResponse = await api.get('/users/me');
+        set({ user: userResponse.data, isLoading: false });
+      } catch {
+        // Profile might not exist yet, that's ok
+        set({ isLoading: false });
+      }
     } catch (error: any) {
       set({ isLoading: false });
       // Extract error message with better fallbacks
@@ -202,7 +209,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (accessToken) {
         set({ accessToken, refreshToken, isAuthenticated: true });
 
-        // Fetch user profile
+        // Fetch user data (now includes profile: name, bio, photos, prompts, etc.)
         try {
           const response = await api.get('/users/me');
           set({ user: response.data });
@@ -285,7 +292,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         platform: Platform.OS,
       });
 
-      const { access_token, refresh_token, user } = response.data;
+      const { access_token, refresh_token } = response.data;
 
       await storage.setItem('accessToken', access_token);
       await storage.setItem('refreshToken', refresh_token);
@@ -293,10 +300,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         accessToken: access_token,
         refreshToken: refresh_token,
-        user,
         isAuthenticated: true,
-        isLoading: false,
       });
+
+      // Fetch complete user data (includes profile: name, bio, photos, prompts)
+      try {
+        const userResponse = await api.get('/users/me');
+        set({ user: userResponse.data, isLoading: false });
+      } catch {
+        // Profile might not exist yet, that's ok
+        set({ isLoading: false });
+      }
     } catch (error: any) {
       set({ isLoading: false });
       let msg = 'Invalid or expired magic link';
