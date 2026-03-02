@@ -360,7 +360,9 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 			resp.Name = profileResp.Profile.Name
 			resp.Bio = profileResp.Profile.Bio
 			resp.Age = profileResp.Age
-			resp.Neighborhood = profileResp.Profile.Neighborhood
+			if profileResp.Profile.Neighborhood != nil {
+				resp.Neighborhood = *profileResp.Profile.Neighborhood
+			}
 			resp.IsVerified = profileResp.Profile.IsVerified
 			resp.LookingFor = profileResp.Profile.LookingFor
 			resp.Prompts = profileResp.Profile.Prompts

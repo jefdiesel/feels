@@ -37,15 +37,15 @@ func (r *ProfileRepository) Create(ctx context.Context, p *profile.Profile) erro
 		INSERT INTO profiles (
 			user_id, name, dob, gender, zip_code, neighborhood, bio, prompts,
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
-			alcohol, weed, lat, lng, is_verified, last_active, created_at
+			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
 		)
 	`
 	_, err = r.db.Exec(ctx, query,
 		p.UserID, p.Name, p.DOB, p.Gender, p.ZipCode, p.Neighborhood, p.Bio, promptsJSON,
 		p.KinkLevel, p.LookingFor, p.Zodiac, p.Religion, p.HasKids, p.WantsKids,
-		p.Alcohol, p.Weed, p.Lat, p.Lng, p.IsVerified, p.LastActive, p.CreatedAt,
+		p.Alcohol, p.Weed, p.WorkForMoney, p.WorkForPassion, p.Lat, p.Lng, p.IsVerified, p.LastActive, p.CreatedAt,
 	)
 	if err != nil {
 		if isDuplicateKeyError(err) {
@@ -60,14 +60,14 @@ func (r *ProfileRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (
 	query := `
 		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
-			alcohol, weed, lat, lng, is_verified, last_active, created_at, share_code
+			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at, share_code
 		FROM profiles WHERE user_id = $1
 	`
 	var p profile.Profile
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
 		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
-		&p.Alcohol, &p.Weed, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
+		&p.Alcohol, &p.Weed, &p.WorkForMoney, &p.WorkForPassion, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -95,14 +95,14 @@ func (r *ProfileRepository) Update(ctx context.Context, p *profile.Profile) erro
 		UPDATE profiles SET
 			name = $2, zip_code = $3, neighborhood = $4, bio = $5, prompts = $6, kink_level = $7,
 			looking_for = $8, zodiac = $9, religion = $10, has_kids = $11,
-			wants_kids = $12, alcohol = $13, weed = $14, lat = $15, lng = $16,
-			last_active = NOW()
+			wants_kids = $12, alcohol = $13, weed = $14, work_for_money = $15, work_for_passion = $16,
+			lat = $17, lng = $18, last_active = NOW()
 		WHERE user_id = $1
 	`
 	result, err := r.db.Exec(ctx, query,
 		p.UserID, p.Name, p.ZipCode, p.Neighborhood, p.Bio, promptsJSON, p.KinkLevel,
 		p.LookingFor, p.Zodiac, p.Religion, p.HasKids,
-		p.WantsKids, p.Alcohol, p.Weed, p.Lat, p.Lng,
+		p.WantsKids, p.Alcohol, p.Weed, p.WorkForMoney, p.WorkForPassion, p.Lat, p.Lng,
 	)
 	if err != nil {
 		return err
@@ -372,14 +372,14 @@ func (r *ProfileRepository) GetByShareCode(ctx context.Context, code string) (*p
 	query := `
 		SELECT user_id, name, dob, gender, zip_code, neighborhood, bio, COALESCE(prompts, '[]'::jsonb),
 			kink_level, looking_for, zodiac, religion, has_kids, wants_kids,
-			alcohol, weed, lat, lng, is_verified, last_active, created_at, share_code
+			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at, share_code
 		FROM profiles WHERE share_code = $1
 	`
 	var p profile.Profile
 	err := r.db.QueryRow(ctx, query, code).Scan(
 		&p.UserID, &p.Name, &p.DOB, &p.Gender, &p.ZipCode, &p.Neighborhood, &p.Bio, &p.Prompts,
 		&p.KinkLevel, &p.LookingFor, &p.Zodiac, &p.Religion, &p.HasKids, &p.WantsKids,
-		&p.Alcohol, &p.Weed, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
+		&p.Alcohol, &p.Weed, &p.WorkForMoney, &p.WorkForPassion, &p.Lat, &p.Lng, &p.IsVerified, &p.LastActive, &p.CreatedAt, &p.ShareCode,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

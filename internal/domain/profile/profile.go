@@ -45,11 +45,13 @@ type Profile struct {
 	Religion     *string    `json:"religion,omitempty"`
 	HasKids      *bool      `json:"has_kids,omitempty"`
 	WantsKids    *string    `json:"wants_kids,omitempty"`
-	Alcohol      *string    `json:"alcohol,omitempty"`
-	Weed         *string    `json:"weed,omitempty"`
-	Lat          *float64   `json:"lat,omitempty"`
-	Lng          *float64   `json:"lng,omitempty"`
-	IsVerified   bool       `json:"is_verified"`
+	Alcohol        *string    `json:"alcohol,omitempty"`
+	Weed           *string    `json:"weed,omitempty"`
+	WorkForMoney   *string    `json:"work_for_money,omitempty"`
+	WorkForPassion *string    `json:"work_for_passion,omitempty"`
+	Lat            *float64   `json:"lat,omitempty"`
+	Lng            *float64   `json:"lng,omitempty"`
+	IsVerified     bool       `json:"is_verified"`
 	LastActive   time.Time  `json:"last_active"`
 	CreatedAt    time.Time  `json:"created_at"`
 	Photos       []Photo    `json:"photos"`
@@ -104,10 +106,12 @@ type CreateProfileRequest struct {
 	Religion     *string  `json:"religion,omitempty"`
 	HasKids      *bool    `json:"has_kids,omitempty"`
 	WantsKids    *string  `json:"wants_kids,omitempty"`
-	Alcohol      *string  `json:"alcohol,omitempty"`
-	Weed         *string  `json:"weed,omitempty"`
-	Lat          *float64 `json:"lat,omitempty"`
-	Lng          *float64 `json:"lng,omitempty"`
+	Alcohol        *string  `json:"alcohol,omitempty"`
+	Weed           *string  `json:"weed,omitempty"`
+	WorkForMoney   *string  `json:"work_for_money,omitempty"`
+	WorkForPassion *string  `json:"work_for_passion,omitempty"`
+	Lat            *float64 `json:"lat,omitempty"`
+	Lng            *float64 `json:"lng,omitempty"`
 }
 
 type UpdateProfileRequest struct {
@@ -122,10 +126,12 @@ type UpdateProfileRequest struct {
 	Religion     *string  `json:"religion,omitempty"`
 	HasKids      *bool    `json:"has_kids,omitempty"`
 	WantsKids    *string  `json:"wants_kids,omitempty"`
-	Alcohol      *string  `json:"alcohol,omitempty"`
-	Weed         *string  `json:"weed,omitempty"`
-	Lat          *float64 `json:"lat,omitempty"`
-	Lng          *float64 `json:"lng,omitempty"`
+	Alcohol        *string  `json:"alcohol,omitempty"`
+	Weed           *string  `json:"weed,omitempty"`
+	WorkForMoney   *string  `json:"work_for_money,omitempty"`
+	WorkForPassion *string  `json:"work_for_passion,omitempty"`
+	Lat            *float64 `json:"lat,omitempty"`
+	Lng            *float64 `json:"lng,omitempty"`
 }
 
 type UpdatePreferencesRequest struct {

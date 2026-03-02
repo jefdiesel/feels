@@ -104,7 +104,7 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 		SELECT
 			user_id, name, dob, gender, zip_code, neighborhood, bio,
 			kink_level, COALESCE(looking_for, ARRAY[]::TEXT[]) as looking_for, zodiac, religion, has_kids, wants_kids,
-			alcohol, weed, lat, lng, is_verified, last_active, created_at,
+			alcohol, weed, work_for_money, work_for_passion, lat, lng, is_verified, last_active, created_at,
 			age, distance, priority
 		FROM candidates
 		WHERE (priority <= 3) OR (
@@ -138,7 +138,7 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 		err := rows.Scan(
 			&fp.UserID, &fp.Name, &fp.DOB, &fp.Gender, &fp.ZipCode, &fp.Neighborhood, &fp.Bio,
 			&fp.KinkLevel, &fp.LookingFor, &fp.Zodiac, &fp.Religion, &fp.HasKids, &fp.WantsKids,
-			&fp.Alcohol, &fp.Weed, &fp.Lat, &fp.Lng, &fp.IsVerified, &fp.LastActive, &fp.CreatedAt,
+			&fp.Alcohol, &fp.Weed, &fp.WorkForMoney, &fp.WorkForPassion, &fp.Lat, &fp.Lng, &fp.IsVerified, &fp.LastActive, &fp.CreatedAt,
 			&fp.Age, &fp.Distance, &priority,
 		)
 		if err != nil {
