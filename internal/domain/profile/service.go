@@ -209,11 +209,18 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req *Upda
 	if req.Weed != nil {
 		profile.Weed = req.Weed
 	}
-	if req.Lat != nil {
-		profile.Lat = req.Lat
-	}
-	if req.Lng != nil {
-		profile.Lng = req.Lng
+	// Skip Android emulator default coords (Mountain View, CA ~37.42, -122.08)
+	// This prevents emulator GPS from overwriting real user locations
+	isMountainView := req.Lat != nil && req.Lng != nil &&
+		*req.Lat > 37.4 && *req.Lat < 37.5 &&
+		*req.Lng > -122.1 && *req.Lng < -122.0
+	if !isMountainView {
+		if req.Lat != nil {
+			profile.Lat = req.Lat
+		}
+		if req.Lng != nil {
+			profile.Lng = req.Lng
+		}
 	}
 
 	if err := s.repo.Update(ctx, profile); err != nil {
