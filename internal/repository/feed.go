@@ -22,8 +22,20 @@ func NewFeedRepository(db *pgxpool.Pool) *FeedRepository {
 
 // GetFeedProfiles returns profiles for the feed based on the algorithm
 func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, prefs *profile.Preferences, limit int) ([]feed.FeedProfile, error) {
-	log.Printf("[DEBUG] GetFeedProfiles: userID=%s, genders_seeking=%v, age_min=%d, age_max=%d, distance=%d",
+	log.Printf("[FEED] user=%s genders=%v age=%d-%d dist=%d",
 		userID, prefs.GendersSeeking, prefs.AgeMin, prefs.AgeMax, prefs.DistanceMiles)
+
+	// Debug: check user profile exists
+	var userLat, userLng *float64
+	var userGender *string
+	r.db.QueryRow(ctx, `SELECT lat, lng, gender FROM profiles WHERE user_id = $1`, userID).Scan(&userLat, &userLng, &userGender)
+	log.Printf("[FEED] user profile: lat=%v lng=%v gender=%v", userLat, userLng, userGender)
+
+	// Debug: count total and already seen
+	var total, seen int
+	r.db.QueryRow(ctx, `SELECT COUNT(*) FROM profiles WHERE user_id != $1`, userID).Scan(&total)
+	r.db.QueryRow(ctx, `SELECT COUNT(*) FROM (SELECT liked_id FROM likes WHERE liker_id = $1 UNION SELECT passed_id FROM passes WHERE passer_id = $1) x`, userID).Scan(&seen)
+	log.Printf("[FEED] total=%d already_seen=%d", total, seen)
 	// Complex query implementing the feed algorithm
 	// Priority: qualified_superlike > qualified_like > gap_superlike > browse
 	query := `
