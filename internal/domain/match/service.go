@@ -29,6 +29,7 @@ type MatchDeletedPayload struct {
 
 type MatchRepository interface {
 	GetByID(ctx context.Context, matchID uuid.UUID) (*Match, error)
+	GetMatchWithProfile(ctx context.Context, matchID, userID uuid.UUID) (*MatchWithProfile, error)
 	GetUserMatches(ctx context.Context, userID uuid.UUID) ([]MatchWithProfile, error)
 	Delete(ctx context.Context, matchID, userID uuid.UUID) error
 	IsUserInMatch(ctx context.Context, matchID, userID uuid.UUID) (bool, error)
@@ -82,19 +83,9 @@ func (s *Service) GetMatches(ctx context.Context, userID uuid.UUID) ([]MatchWith
 	return s.matchRepo.GetUserMatches(ctx, userID)
 }
 
-// GetMatch returns a specific match
-func (s *Service) GetMatch(ctx context.Context, matchID, userID uuid.UUID) (*Match, error) {
-	match, err := s.matchRepo.GetByID(ctx, matchID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Verify user is in the match
-	if match.User1ID != userID && match.User2ID != userID {
-		return nil, errors.New("not authorized")
-	}
-
-	return match, nil
+// GetMatch returns a specific match with the other user's profile
+func (s *Service) GetMatch(ctx context.Context, matchID, userID uuid.UUID) (*MatchWithProfile, error) {
+	return s.matchRepo.GetMatchWithProfile(ctx, matchID, userID)
 }
 
 // Unmatch removes a match, deletes messages, and notifies the other user

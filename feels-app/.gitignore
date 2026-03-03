@@ -33,5 +33,8 @@ yarn-error.*
 # Local env files
 .env*.local
 
+# Node symlink for gradle builds
+node
+
 # Testing
 coverage/

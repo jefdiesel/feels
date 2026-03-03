@@ -17,11 +17,19 @@ import { ArrowLeftIcon, MinusIcon, PlusIcon, CheckIcon } from '@/components/Icon
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 const GENDER_OPTIONS = [
-  { label: 'Woman', value: 'woman' },
-  { label: 'Man', value: 'man' },
+  { label: 'Women', value: 'woman' },
+  { label: 'Men', value: 'man' },
   { label: 'Non-binary', value: 'non_binary' },
   { label: 'Trans', value: 'trans' },
 ];
+
+// Per-gender presentation settings
+type GenderPresentation = {
+  enabled: boolean;
+  bio?: string;
+  age_min?: number;
+  age_max?: number;
+};
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
@@ -33,6 +41,7 @@ export default function SettingsScreen() {
   const [distance, setDistance] = useState('25');
   const [gendersSeeking, setGendersSeeking] = useState<string[]>([]);
   const [visibleToGenders, setVisibleToGenders] = useState<string[]>([]);
+  const [genderPresentations, setGenderPresentations] = useState<Record<string, GenderPresentation>>({});
 
   useEffect(() => {
     loadPreferences();
@@ -47,6 +56,7 @@ export default function SettingsScreen() {
       setDistance(String(data.distance_miles ?? 25));
       setGendersSeeking(data.genders_seeking ?? []);
       setVisibleToGenders(data.visible_to_genders ?? []);
+      setGenderPresentations(data.gender_presentations ?? {});
     } catch (error: any) {
       console.error('Failed to load preferences:', error);
     } finally {
@@ -83,6 +93,7 @@ export default function SettingsScreen() {
         distance_miles: clampedDistance,
         genders_seeking: gendersSeeking,
         visible_to_genders: visibleToGenders,
+        gender_presentations: genderPresentations,
       });
       // Clear feed so it refreshes with new preferences
       useFeedStore.getState().reset();
@@ -275,6 +286,67 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Per-Gender Presentation Settings */}
+        {visibleToGenders.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Customize by Gender</Text>
+            <Text style={styles.sectionHint}>Set different age ranges or add notes for specific genders</Text>
+
+            {visibleToGenders.map((gender) => {
+              const genderLabel = GENDER_OPTIONS.find(g => g.value === gender)?.label || gender;
+              const presentation = genderPresentations[gender] || {};
+
+              const updatePresentation = (updates: Partial<GenderPresentation>) => {
+                setGenderPresentations(prev => ({
+                  ...prev,
+                  [gender]: { ...prev[gender], enabled: true, ...updates }
+                }));
+              };
+
+              return (
+                <View key={gender} style={styles.genderPresentationCard}>
+                  <Text style={styles.genderPresentationTitle}>For {genderLabel}</Text>
+
+                  {/* Age range override */}
+                  <View style={styles.genderAgeRow}>
+                    <Text style={styles.genderAgeLabel}>Age range:</Text>
+                    <TextInput
+                      style={styles.genderAgeInput}
+                      value={presentation.age_min?.toString() || ''}
+                      onChangeText={(val) => updatePresentation({ age_min: val ? parseInt(val, 10) : undefined })}
+                      keyboardType="number-pad"
+                      placeholder={ageMin}
+                      placeholderTextColor={colors.text.disabled}
+                      maxLength={2}
+                    />
+                    <Text style={styles.genderAgeSeparator}>-</Text>
+                    <TextInput
+                      style={styles.genderAgeInput}
+                      value={presentation.age_max?.toString() || ''}
+                      onChangeText={(val) => updatePresentation({ age_max: val ? parseInt(val, 10) : undefined })}
+                      keyboardType="number-pad"
+                      placeholder={ageMax}
+                      placeholderTextColor={colors.text.disabled}
+                      maxLength={2}
+                    />
+                  </View>
+
+                  {/* Bio addendum */}
+                  <TextInput
+                    style={styles.genderBioInput}
+                    value={presentation.bio || ''}
+                    onChangeText={(val) => updatePresentation({ bio: val || undefined })}
+                    placeholder={`Add a note only for ${genderLabel.toLowerCase()}...`}
+                    placeholderTextColor={colors.text.disabled}
+                    multiline
+                    maxLength={200}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Save Button */}
         <View style={styles.section}>
           <TouchableOpacity
@@ -450,6 +522,55 @@ const styles = StyleSheet.create({
   },
   optionTextSelected: {
     color: colors.primary.DEFAULT,
+  },
+  // Per-gender presentation
+  genderPresentationCard: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
+  genderPresentationTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  genderAgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  genderAgeLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginRight: spacing.md,
+  },
+  genderAgeInput: {
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    width: 50,
+    textAlign: 'center',
+  },
+  genderAgeSeparator: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    marginHorizontal: spacing.sm,
+  },
+  genderBioInput: {
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    minHeight: 60,
+    textAlignVertical: 'top',
   },
   // Save button
   saveButton: {

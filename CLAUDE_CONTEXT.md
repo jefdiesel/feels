@@ -10,6 +10,9 @@
 ## Critical Facts
 
 ### The APK is Pre-Built - BUILD IT LOCALLY
+- **ALWAYS rebuild the APK after ANY frontend changes** - don't wait for user to ask
+- After fixing frontend code, immediately run `./build-apk.sh`
+- **ALWAYS install to emulator after building**: `/Users/jef/Library/Android/sdk/platform-tools/adb install -r feels-app/android/app/build/outputs/apk/release/app-release.apk`
 - Frontend changes require rebuilding the APK **LOCALLY**
 - **DO NOT use `eas build`** - use local gradle build
 - You CANNOT test frontend changes by editing files - the emulator runs a compiled APK

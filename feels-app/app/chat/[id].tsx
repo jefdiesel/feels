@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { matchesApi, safetyApi, api } from '@/api/client';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { useCrypto } from '@/hooks/useCrypto';
+// import { useCrypto } from '@/hooks/useCrypto';  // Disabled - causing crashes
 import { useAuthStore } from '@/stores/authStore';
 import {
   ArrowLeftIcon,
@@ -61,12 +61,12 @@ interface MessagesResponse {
 
 interface MatchDetails {
   id: string;
-  user: {
-    id: string;
+  other_user: {
+    user_id: string;
     name: string;
-    photo: string;
+    photos?: { url: string }[];
   };
-  image_permission: boolean;
+  image_enabled: boolean;
 }
 
 const REPORT_REASONS = [
@@ -81,8 +81,6 @@ const REPORT_REASONS = [
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [message, setMessage] = useState('');
-  const [encryptionReady, setEncryptionReady] = useState(false);
-  const [otherUserPublicKey, setOtherUserPublicKey] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState<string | null>(null);
@@ -98,87 +96,30 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const queryClient = useQueryClient();
   const { getPublicKey, uploadPublicKey } = useAuthStore();
-  const {
-    generateKeyPair,
-    getStoredPublicKey,
-    encryptMessage,
-    decryptMessage,
-    hasKeyPair,
-    isCryptoAvailable,
-  } = useCrypto();
+  // Crypto disabled for now - was causing crashes
+  const encryptionReady = false;
+  const otherUserPublicKey = null as string | null;
 
-  // Initialize encryption keys
-  useEffect(() => {
-    const initEncryption = async () => {
-      if (!isCryptoAvailable()) {
-        return;
-      }
+  // Encryption disabled for now
 
-      try {
-        const hasKeys = await hasKeyPair();
-        let publicKey: string | null = null;
-
-        if (!hasKeys) {
-          publicKey = await generateKeyPair();
-          await uploadPublicKey(publicKey);
-        } else {
-          publicKey = await getStoredPublicKey();
-        }
-
-        setEncryptionReady(true);
-      } catch (error) {
-        console.error('Failed to initialize encryption:', error);
-      }
-    };
-
-    initEncryption();
-  }, []);
-
-  const { data: match } = useQuery({
+  const { data: match, isLoading: matchLoading, error: matchError } = useQuery({
     queryKey: ['match', id],
     queryFn: async () => {
       const response = await matchesApi.getMatch(id!);
       return response.data as MatchDetails;
     },
+    enabled: !!id,
   });
 
-  // Fetch other user's public key
-  useEffect(() => {
-    const fetchOtherUserKey = async () => {
-      if (match?.user?.id) {
-        const key = await getPublicKey(match.user.id);
-        setOtherUserPublicKey(key);
-      }
-    };
-    fetchOtherUserKey();
-  }, [match?.user?.id, getPublicKey]);
+  // Encryption disabled for now
 
-  // Decrypt messages helper
+  // Decrypt messages helper (encryption disabled)
   const decryptMessages = useCallback(async (msgs: Message[]): Promise<Message[]> => {
-    if (!otherUserPublicKey || !encryptionReady) {
-      return msgs;
-    }
-
-    const decryptedMsgs = await Promise.all(
-      msgs.map(async (msg) => {
-        if (msg.encrypted_content && !msg.is_mine) {
-          try {
-            const decryptedContent = await decryptMessage(otherUserPublicKey, msg.encrypted_content);
-            return { ...msg, content: decryptedContent };
-          } catch (error) {
-            console.error('Failed to decrypt message:', error);
-            return { ...msg, content: '[Unable to decrypt message]' };
-          }
-        }
-        return msg;
-      })
-    );
-
-    return decryptedMsgs;
-  }, [otherUserPublicKey, encryptionReady, decryptMessage]);
+    return msgs;
+  }, []);
 
   const { data: messagesData, isLoading } = useQuery({
-    queryKey: ['messages', id, otherUserPublicKey],
+    queryKey: ['messages', id],
     queryFn: async () => {
       const response = await matchesApi.getMessages(id!);
       const data = response.data as MessagesResponse;
@@ -186,8 +127,7 @@ export default function ChatScreen() {
       if (data.image_status) {
         setImageStatus(data.image_status);
       }
-      const decrypted = await decryptMessages(data.messages || []);
-      return { ...data, messages: decrypted };
+      return { ...data, messages: data.messages || [] };
     },
     enabled: !!id,
   });
@@ -196,17 +136,6 @@ export default function ChatScreen() {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      if (encryptionReady && otherUserPublicKey) {
-        try {
-          const encryptedContent = await encryptMessage(otherUserPublicKey, content);
-          return api.post(`/matches/${id}/messages`, {
-            content: content,
-            encrypted_content: encryptedContent,
-          });
-        } catch (error) {
-          console.error('Encryption failed, sending unencrypted:', error);
-        }
-      }
       return matchesApi.sendMessage(id!, content);
     },
     onSuccess: () => {
@@ -249,7 +178,7 @@ export default function ChatScreen() {
   });
 
   const blockMutation = useMutation({
-    mutationFn: () => safetyApi.block(match?.user.id!),
+    mutationFn: () => safetyApi.block(match?.other_user.user_id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matches'] });
       router.back();
@@ -257,7 +186,7 @@ export default function ChatScreen() {
   });
 
   const reportMutation = useMutation({
-    mutationFn: () => safetyApi.report(match?.user.id!, selectedReportReason!, reportDetails || undefined),
+    mutationFn: () => safetyApi.report(match?.other_user.user_id!, selectedReportReason!, reportDetails || undefined),
     onSuccess: () => {
       setReportModalVisible(false);
       Alert.alert('Report Submitted', 'Thank you for helping keep Feels safe.');
@@ -272,7 +201,7 @@ export default function ChatScreen() {
       }
       if (data.type === 'message_read' && data.payload?.match_id === id) {
         // Mark all sent messages as read
-        queryClient.setQueryData(['messages', id, otherUserPublicKey], (old: any) => {
+        queryClient.setQueryData(['messages', id], (old: any) => {
           if (!old?.messages) return old;
           return {
             ...old,
@@ -375,7 +304,7 @@ export default function ChatScreen() {
     setMenuVisible(false);
     Alert.alert(
       'Unmatch',
-      `Are you sure you want to unmatch with ${match?.user.name}? This cannot be undone.`,
+      `Are you sure you want to unmatch with ${match?.other_user.name}? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Unmatch', style: 'destructive', onPress: () => unmatchMutation.mutate() },
@@ -387,7 +316,7 @@ export default function ChatScreen() {
     setMenuVisible(false);
     Alert.alert(
       'Block User',
-      `Block ${match?.user.name}? They won't be able to see your profile or message you.`,
+      `Block ${match?.other_user.name}? They won't be able to see your profile or message you.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Block', style: 'destructive', onPress: () => blockMutation.mutate() },
@@ -446,6 +375,48 @@ export default function ChatScreen() {
     return <LockIcon size={22} color={colors.text.tertiary} />;
   };
 
+  // Show loading state
+  if (matchLoading || isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeftIcon size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerName}>Loading...</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (matchError) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeftIcon size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerName}>Error</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={{ color: colors.error, textAlign: 'center' }}>
+            Failed to load chat. Please try again.
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 16, padding: 12, backgroundColor: colors.primary.DEFAULT, borderRadius: 8 }}
+            onPress={() => router.back()}
+          >
+            <Text style={{ color: colors.text.primary }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -458,15 +429,15 @@ export default function ChatScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.profileInfo}>
-          {match?.user.photo && (
+          {match?.other_user.photos?.[0]?.url && (
             <Image
-              source={{ uri: match.user.photo }}
+              source={{ uri: match.other_user.photos?.[0]?.url }}
               style={styles.headerAvatar}
               contentFit="cover"
             />
           )}
           <View>
-            <Text style={styles.headerName}>{match?.user.name || 'Chat'}</Text>
+            <Text style={styles.headerName}>{match?.other_user.name || 'Chat'}</Text>
             {otherUserTyping && (
               <Text style={styles.typingIndicator}>typing...</Text>
             )}
@@ -575,7 +546,7 @@ export default function ChatScreen() {
         <View style={styles.reportOverlay}>
           <View style={styles.reportContent}>
             <View style={styles.reportHeader}>
-              <Text style={styles.reportTitle}>Report {match?.user.name}</Text>
+              <Text style={styles.reportTitle}>Report {match?.other_user.name}</Text>
               <TouchableOpacity onPress={() => setReportModalVisible(false)}>
                 <XIcon size={24} color={colors.text.secondary} />
               </TouchableOpacity>
@@ -644,7 +615,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
+    borderBottomColor: colors.border.light,
+    backgroundColor: colors.bg.secondary,
   },
   backButton: {
     width: 44,
@@ -750,10 +722,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: spacing.md,
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing['3xl'],
     gap: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
+    borderTopColor: colors.border.light,
+    backgroundColor: colors.bg.secondary,
   },
   input: {
     flex: 1,

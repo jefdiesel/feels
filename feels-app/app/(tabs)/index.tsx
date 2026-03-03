@@ -12,7 +12,6 @@ import { useFeedStore } from '@/stores/feedStore';
 import { feedApi } from '@/api/client';
 import { useCreditsStore } from '@/stores/creditsStore';
 import SwipeCard from '@/components/SwipeCard';
-import ActionBar from '@/components/ActionBar';
 import ProfileOverlay from '@/components/ProfileOverlay';
 import { CoinIcon, AlertCircleIcon, SparkleIcon, PartyPopperIcon, ChevronRightIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
@@ -175,12 +174,6 @@ export default function FeedScreen() {
         onExpandProfile={() => setShowProfile(true)}
       />
 
-      {/* Bottom action bar */}
-      <ActionBar
-        onLike={() => handleSwipe('like')}
-        onPass={() => handleSwipe('pass')}
-        onSuperlike={() => handleSwipe('superlike')}
-      />
 
       {/* Profile overlay */}
       <ProfileOverlay

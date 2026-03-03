@@ -65,6 +65,50 @@ func (r *MatchRepository) GetByUsers(ctx context.Context, user1ID, user2ID uuid.
 	return &m, nil
 }
 
+// GetMatchWithProfile gets a specific match with the other user's profile
+func (r *MatchRepository) GetMatchWithProfile(ctx context.Context, matchID, userID uuid.UUID) (*match.MatchWithProfile, error) {
+	query := `
+		SELECT
+			m.id,
+			m.created_at,
+			p.user_id, p.name, p.dob, p.gender, p.zip_code, p.neighborhood, p.bio,
+			p.kink_level, p.looking_for, p.zodiac, p.religion, p.has_kids, p.wants_kids,
+			p.alcohol, p.weed, p.lat, p.lng, p.is_verified, p.last_active, p.created_at,
+			COALESCE(ip.enabled, false) AS image_enabled
+		FROM matches m
+		JOIN profiles p ON p.user_id = CASE WHEN m.user1_id = $2 THEN m.user2_id ELSE m.user1_id END
+		LEFT JOIN image_permissions ip ON ip.match_id = m.id AND ip.user_id = $2
+		WHERE m.id = $1 AND (m.user1_id = $2 OR m.user2_id = $2)
+	`
+
+	var mwp match.MatchWithProfile
+	err := r.db.QueryRow(ctx, query, matchID, userID).Scan(
+		&mwp.ID, &mwp.CreatedAt,
+		&mwp.OtherUser.UserID, &mwp.OtherUser.Name, &mwp.OtherUser.DOB, &mwp.OtherUser.Gender,
+		&mwp.OtherUser.ZipCode, &mwp.OtherUser.Neighborhood, &mwp.OtherUser.Bio,
+		&mwp.OtherUser.KinkLevel, &mwp.OtherUser.LookingFor, &mwp.OtherUser.Zodiac,
+		&mwp.OtherUser.Religion, &mwp.OtherUser.HasKids, &mwp.OtherUser.WantsKids,
+		&mwp.OtherUser.Alcohol, &mwp.OtherUser.Weed, &mwp.OtherUser.Lat, &mwp.OtherUser.Lng,
+		&mwp.OtherUser.IsVerified, &mwp.OtherUser.LastActive, &mwp.OtherUser.CreatedAt,
+		&mwp.ImageEnabled,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrMatchNotFound
+		}
+		return nil, err
+	}
+
+	// Fetch photos for the other user
+	photos, err := r.getPhotos(ctx, mwp.OtherUser.UserID)
+	if err != nil {
+		return nil, err
+	}
+	mwp.OtherUser.Photos = photos
+
+	return &mwp, nil
+}
+
 // GetUserMatches gets all matches for a user with other user's profile
 func (r *MatchRepository) GetUserMatches(ctx context.Context, userID uuid.UUID) ([]match.MatchWithProfile, error) {
 	query := `

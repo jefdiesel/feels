@@ -1,11 +1,11 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
-import { FlameIcon, FlameFilledIcon, MessageIcon, MessageFilledIcon, UserIcon, UserFilledIcon } from '@/components/Icons';
+import { HeartIcon, HeartFilledIcon, MessageIcon, MessageFilledIcon, UserIcon, UserFilledIcon } from '@/components/Icons';
 import { colors, layout } from '@/constants/theme';
 
 interface TabIconProps {
   focused: boolean;
-  icon: 'flame' | 'message' | 'user';
+  icon: 'heart' | 'message' | 'user';
 }
 
 function TabIcon({ focused, icon }: TabIconProps) {
@@ -14,11 +14,11 @@ function TabIcon({ focused, icon }: TabIconProps) {
 
   const renderIcon = () => {
     switch (icon) {
-      case 'flame':
+      case 'heart':
         return focused ? (
-          <FlameFilledIcon size={size} color={color} />
+          <HeartFilledIcon size={size} color={color} />
         ) : (
-          <FlameIcon size={size} color={color} />
+          <HeartIcon size={size} color={color} />
         );
       case 'message':
         return focused ? (
@@ -57,7 +57,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="flame" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="heart" focused={focused} />,
         }}
       />
       <Tabs.Screen

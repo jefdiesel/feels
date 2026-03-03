@@ -65,24 +65,48 @@ export const useLocationStore = create<LocationState>((set, get) => ({
       const isValidLocation = latitude !== 0 && longitude !== 0 &&
         Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
 
-      // Update local state
-      set({
-        latitude: isValidLocation ? latitude : null,
-        longitude: isValidLocation ? longitude : null,
-        isLoading: false,
-        lastUpdated: Date.now(),
-      });
+      // Detect Android emulator default coords (Mountain View, CA)
+      // These are useless for NYC-based app
+      const isMountainView = Math.abs(latitude - 37.4220) < 0.01 &&
+        Math.abs(longitude - (-122.084)) < 0.01;
 
-      // Only send to backend if location looks valid
-      if (isValidLocation) {
-        try {
-          await api.put('/profile', { lat: latitude, lng: longitude });
-          console.log('Sent location to backend:', latitude, longitude);
-        } catch (apiError) {
-          console.error('Failed to update location on server:', apiError);
-        }
-      } else {
+      if (isMountainView) {
+        console.log('Detected emulator default location (Mountain View), ignoring');
+        set({
+          isLoading: false,
+          error: 'Using emulator? Set location manually in your profile.',
+        });
+        return;
+      }
+
+      if (!isValidLocation) {
         console.log('Skipping invalid location:', latitude, longitude);
+        set({
+          isLoading: false,
+          error: 'Could not get valid location',
+        });
+        return;
+      }
+
+      // Send to backend first, only update local state on success
+      try {
+        await api.put('/profile', { lat: latitude, lng: longitude });
+        console.log('Sent location to backend:', latitude, longitude);
+
+        // Backend confirmed - now update local state
+        set({
+          latitude,
+          longitude,
+          isLoading: false,
+          lastUpdated: Date.now(),
+          error: null,
+        });
+      } catch (apiError: any) {
+        console.error('Failed to update location on server:', apiError);
+        set({
+          isLoading: false,
+          error: 'Failed to save location. Try again.',
+        });
       }
     } catch (error: any) {
       console.error('Failed to get location:', error);
