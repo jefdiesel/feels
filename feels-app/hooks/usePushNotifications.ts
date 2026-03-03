@@ -143,7 +143,7 @@ export function usePushNotifications() {
       if (data?.type === 'new_message' && data.matchId) {
         queryClient.invalidateQueries({ queryKey: ['messages', data.matchId] });
         queryClient.invalidateQueries({ queryKey: ['matches'] });
-      } else if (data?.type === 'new_match') {
+      } else if (data?.type === 'new_match' || data?.type === 'match_created') {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
       }
     });

@@ -58,6 +58,7 @@ interface Match {
     is_mine: boolean;
   };
   is_new: boolean;
+  unread_count: number;
 }
 
 export default function MatchesScreen() {
@@ -80,6 +81,7 @@ export default function MatchesScreen() {
         is_mine: m.last_message.sender_id === user?.id,
       } : undefined,
       is_new: !m.last_message,
+      unread_count: m.unread_count || 0,
     }));
   }, [user?.id]);
 
@@ -113,7 +115,7 @@ export default function MatchesScreen() {
   // Listen for new messages via WebSocket
   useWebSocket({
     onMessage: (data) => {
-      if (data.type === 'new_message' || data.type === 'new_match') {
+      if (data.type === 'new_message' || data.type === 'new_match' || data.type === 'match_created') {
         fetchMatches(false);
       }
     },
@@ -122,7 +124,14 @@ export default function MatchesScreen() {
   const refetch = () => fetchMatches(false);
 
   const newMatches = matches?.filter((m) => m.is_new) || [];
-  const conversations = matches?.filter((m) => !m.is_new && m.last_message) || [];
+  const conversations = (matches?.filter((m) => !m.is_new && m.last_message) || [])
+    .sort((a, b) => {
+      // Unread messages first
+      if (a.unread_count > 0 && b.unread_count === 0) return -1;
+      if (b.unread_count > 0 && a.unread_count === 0) return 1;
+      // Then by most recent message
+      return new Date(b.last_message!.created_at).getTime() - new Date(a.last_message!.created_at).getTime();
+    });
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -240,11 +249,19 @@ export default function MatchesScreen() {
                 <View style={styles.messageContent}>
                   <View style={styles.messageHeader}>
                     <Text style={styles.messageName}>{match.user.name}</Text>
-                    <Text style={styles.messageTime}>
-                      {formatTime(match.last_message!.created_at)}
-                    </Text>
+                    <View style={styles.messageHeaderRight}>
+                      {match.unread_count > 0 && (
+                        <HeartFilledIcon size={14} color={colors.primary.DEFAULT} />
+                      )}
+                      <Text style={styles.messageTime}>
+                        {formatTime(match.last_message!.created_at)}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={styles.messagePreview} numberOfLines={1}>
+                  <Text style={[
+                    styles.messagePreview,
+                    match.unread_count > 0 && styles.messagePreviewUnread
+                  ]} numberOfLines={1}>
                     {match.last_message!.is_mine && 'You: '}
                     {match.last_message!.content}
                   </Text>
@@ -392,6 +409,11 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold as any,
     color: colors.text.primary,
   },
+  messageHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   messageTime: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
@@ -399,5 +421,9 @@ const styles = StyleSheet.create({
   messagePreview: {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
+  },
+  messagePreviewUnread: {
+    color: colors.text.primary,
+    fontWeight: typography.weights.semibold as any,
   },
 });

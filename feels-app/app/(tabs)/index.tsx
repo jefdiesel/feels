@@ -8,9 +8,12 @@ import {
   Alert,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFeedStore } from '@/stores/feedStore';
-import { feedApi } from '@/api/client';
+import { feedApi, matchesApi } from '@/api/client';
 import { useCreditsStore } from '@/stores/creditsStore';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { Image } from 'expo-image';
 import SwipeCard from '@/components/SwipeCard';
 import ProfileOverlay from '@/components/ProfileOverlay';
 import { CoinIcon, AlertCircleIcon, SparkleIcon, PartyPopperIcon, ChevronRightIcon } from '@/components/Icons';
@@ -31,6 +34,39 @@ export default function FeedScreen() {
   } = useCreditsStore();
   const [showProfile, setShowProfile] = useState(false);
   const [matchAnimation, setMatchAnimation] = useState(false);
+  const [matchId, setMatchId] = useState<string | null>(null);
+  const [matchedProfile, setMatchedProfile] = useState<{ name: string; photo: string } | null>(null);
+  const [isPushMatch, setIsPushMatch] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Listen for match_created from WebSocket (when someone else likes you back)
+  useWebSocket({
+    onMessage: (data) => {
+      if (data.type === 'match_created' && data.payload?.match_id) {
+        setMatchId(data.payload.match_id);
+        setIsPushMatch(true);
+        // Fetch the match details to get the other person's info
+        fetchMatchDetails(data.payload.match_id);
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      }
+    },
+  });
+
+  const fetchMatchDetails = async (id: string) => {
+    try {
+      const response = await matchesApi.getMatch(id);
+      if (response.data?.other_user) {
+        setMatchedProfile({
+          name: response.data.other_user.name,
+          photo: response.data.other_user.photos?.[0]?.url || '',
+        });
+        setMatchAnimation(true);
+      }
+    } catch (e) {
+      // Still show match animation even if we can't get details
+      setMatchAnimation(true);
+    }
+  };
 
   // Reload profiles when screen gains focus (e.g., after settings change)
   useFocusEffect(
@@ -81,10 +117,16 @@ export default function FeedScreen() {
       }
 
       setShowProfile(false);
-      const isMatch = await swipe(action);
-      if (isMatch) {
+      const swipedProfile = currentProfile;
+      const result = await swipe(action);
+      if (result?.matched && result?.match_id) {
+        setMatchId(result.match_id);
+        setIsPushMatch(false);
+        setMatchedProfile({
+          name: swipedProfile.name,
+          photo: swipedProfile.photos?.[0]?.url || '',
+        });
         setMatchAnimation(true);
-        setTimeout(() => setMatchAnimation(false), 2000);
       }
     },
     [swipe, bonusLikes, hasEnoughCredits, useBonusLike, useCredits]
@@ -186,15 +228,83 @@ export default function FeedScreen() {
         }}
       />
 
-      {/* Match animation overlay */}
-      {matchAnimation && (
-        <View style={styles.matchOverlay}>
-          <View style={styles.matchIconContainer}>
-            <PartyPopperIcon size={64} color={colors.primary.DEFAULT} />
-          </View>
+      {/* Match animation overlay - full screen for swipe match */}
+      {matchAnimation && !isPushMatch && (
+        <TouchableOpacity
+          style={styles.matchOverlay}
+          activeOpacity={0.95}
+          onPress={() => {
+            setMatchAnimation(false);
+            if (matchId) {
+              router.push(`/chat/${matchId}`);
+              setMatchId(null);
+              setMatchedProfile(null);
+            }
+          }}
+        >
+          {matchedProfile?.photo ? (
+            <Image
+              source={{ uri: matchedProfile.photo }}
+              style={styles.matchPhoto}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.matchIconContainer}>
+              <PartyPopperIcon size={64} color={colors.primary.DEFAULT} />
+            </View>
+          )}
           <Text style={styles.matchText}>It's a Match!</Text>
-          <Text style={styles.matchSubtext}>Start a conversation now</Text>
-        </View>
+          {matchedProfile?.name && (
+            <Text style={styles.matchName}>You and {matchedProfile.name} liked each other</Text>
+          )}
+          <Text style={styles.matchSubtext}>Tap to start chatting</Text>
+          <TouchableOpacity
+            style={styles.matchDismiss}
+            onPress={(e) => {
+              e.stopPropagation();
+              setMatchAnimation(false);
+              setMatchId(null);
+              setMatchedProfile(null);
+            }}
+          >
+            <Text style={styles.matchDismissText}>Keep swiping</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
+
+      {/* Push match toast - small notification at top */}
+      {matchAnimation && isPushMatch && (
+        <TouchableOpacity
+          style={styles.pushMatchToast}
+          activeOpacity={0.9}
+          onPress={() => {
+            setMatchAnimation(false);
+            setIsPushMatch(false);
+            if (matchId) {
+              router.push(`/chat/${matchId}`);
+              setMatchId(null);
+              setMatchedProfile(null);
+            }
+          }}
+        >
+          {matchedProfile?.photo ? (
+            <Image
+              source={{ uri: matchedProfile.photo }}
+              style={styles.pushMatchAvatar}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.pushMatchAvatarPlaceholder}>
+              <PartyPopperIcon size={24} color={colors.primary.DEFAULT} />
+            </View>
+          )}
+          <View style={styles.pushMatchContent}>
+            <Text style={styles.pushMatchTitle}>New Match!</Text>
+            <Text style={styles.pushMatchName}>
+              {matchedProfile?.name || 'Someone'} liked you back
+            </Text>
+          </View>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -309,6 +419,74 @@ const styles = StyleSheet.create({
   },
   matchSubtext: {
     fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+  },
+  matchDismiss: {
+    marginTop: spacing.xl,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  matchDismissText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+  },
+  matchPhoto: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: spacing['2xl'],
+    borderWidth: 3,
+    borderColor: colors.primary.DEFAULT,
+  },
+  matchName: {
+    fontSize: typography.sizes.lg,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  pushMatchToast: {
+    position: 'absolute',
+    top: 60,
+    left: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: colors.primary.DEFAULT,
+  },
+  pushMatchAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: colors.primary.DEFAULT,
+  },
+  pushMatchAvatarPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary.muted,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pushMatchContent: {
+    flex: 1,
+  },
+  pushMatchTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    color: colors.primary.DEFAULT,
+  },
+  pushMatchName: {
+    fontSize: typography.sizes.sm,
     color: colors.text.secondary,
   },
 });

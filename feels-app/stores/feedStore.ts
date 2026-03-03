@@ -111,7 +111,7 @@ interface FeedState {
 
   loadProfiles: (forceRefresh?: boolean) => Promise<void>;
   nextProfile: () => void;
-  swipe: (action: 'like' | 'pass' | 'superlike') => Promise<boolean>;
+  swipe: (action: 'like' | 'pass' | 'superlike') => Promise<{ matched: boolean; match_id?: string } | null>;
   reset: () => void;
 }
 
@@ -171,14 +171,17 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     const { profiles, currentIndex } = get();
     const profile = profiles[currentIndex];
 
-    if (!profile) return false;
+    if (!profile) return null;
 
     try {
       const response = await feedApi.swipe(profile.id, action);
       get().nextProfile();
 
-      // Return true if it's a match (backend returns { matched: bool, match_id?: string })
-      return response.data?.matched || false;
+      // Return match result (backend returns { matched: bool, match_id?: string })
+      return {
+        matched: response.data?.matched || false,
+        match_id: response.data?.match_id,
+      };
     } catch (error: any) {
       // Show specific error from backend
       const status = error.response?.status;

@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { HeartIcon, HeartFilledIcon, MessageIcon, MessageFilledIcon, UserIcon, UserFilledIcon } from '@/components/Icons';
 import { matchesApi } from '@/api/client';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { colors, layout, typography, spacing } from '@/constants/theme';
 
 interface TabIconProps {
@@ -53,17 +54,28 @@ function TabIcon({ focused, icon, badge }: TabIconProps) {
 
 // Hook to get total unread message count
 function useUnreadCount() {
+  const queryClient = useQueryClient();
+
   const { data } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
       const response = await matchesApi.getMatches();
       return response.data || [];
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
-  const totalUnread = data?.reduce((sum: number, match: any) => sum + (match.unread_count || 0), 0) || 0;
-  return totalUnread;
+  // Listen for WebSocket events to update badge instantly
+  useWebSocket({
+    onMessage: (wsData) => {
+      if (wsData.type === 'new_message' || wsData.type === 'new_match' || wsData.type === 'match_created' || wsData.type === 'message_read') {
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      }
+    },
+  });
+
+  // Count conversations with unread messages, not total unread messages
+  const unreadConversations = data?.filter((match: any) => match.unread_count > 0).length || 0;
+  return unreadConversations;
 }
 
 export default function TabLayout() {
