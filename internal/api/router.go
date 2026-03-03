@@ -288,9 +288,9 @@ func (r *Router) setupRoutes(
 		router.Group(func(protected chi.Router) {
 			protected.Use(r.authMw.Authenticate)
 
-			// Phone verification routes
-			protected.Post("/auth/phone/send", authHandler.SendPhoneCode)
-			protected.Post("/auth/phone/verify", authHandler.VerifyPhone)
+			// Phone verification routes (for adding/verifying phone to existing account)
+			protected.Post("/auth/phone/add", authHandler.SendPhoneCode)
+			protected.Post("/auth/phone/confirm", authHandler.VerifyPhone)
 
 			// 2FA routes (disabled until needed)
 			// protected.Post("/auth/2fa/setup", authHandler.Setup2FA)
