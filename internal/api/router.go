@@ -22,8 +22,8 @@ import (
 	"github.com/feels/feels/internal/domain/settings"
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
+	"github.com/feels/feels/internal/otp"
 	"github.com/feels/feels/internal/repository"
-	"github.com/feels/feels/internal/sms"
 	"github.com/feels/feels/internal/storage"
 	"github.com/feels/feels/internal/websocket"
 	"github.com/go-chi/chi/v5"
@@ -114,11 +114,10 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		}
 	}
 
-	// Initialize SMS service
-	smsService := sms.NewService(sms.Config{
-		AccountSID: cfg.SMS.AccountSID,
-		AuthToken:  cfg.SMS.AuthToken,
-		FromNumber: cfg.SMS.FromNumber,
+	// Initialize OTP service (Telnyx SMS)
+	otpService := otp.NewService(db, otp.Config{
+		TelnyxAPIKey:     cfg.Telnyx.APIKey,
+		TelnyxFromNumber: cfg.Telnyx.FromNumber,
 	})
 
 	// Initialize services
@@ -128,7 +127,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		cfg.JWT.AccessExpiry,
 		cfg.JWT.RefreshExpiry,
 	)
-	userService.SetSMSService(smsService)
+	userService.SetSMSService(otpService)
 
 	profileService := profile.NewService(profileRepo, s3Client)
 	// Payment service is initialized later and will be set on profile service
@@ -188,6 +187,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
 	authHandler := handlers.NewAuthHandler(userService, profileService, emailService, cfg.IsDevelopment())
+	authHandler.SetOTPService(otpService)
 	profileHandler := handlers.NewProfileHandler(profileService)
 	feedHandler := handlers.NewFeedHandler(feedService)
 	feedHandler.SetSubscriptionChecker(paymentService)
@@ -260,7 +260,11 @@ func (r *Router) setupRoutes(
 	r.mux.Route("/api/v1", func(router chi.Router) {
 		// Auth routes (public) with rate limiting
 		router.Route("/auth", func(auth chi.Router) {
-			// Rate limited auth endpoints (5 req/min)
+			// Phone-first auth (primary flow)
+			auth.With(magicLinkRateLimiter.Limit).Post("/phone/send", authHandler.SendPhoneOTP)
+			auth.With(authRateLimiter.Limit).Post("/phone/login", authHandler.PhoneLogin)
+
+			// Legacy email/password auth
 			auth.With(authRateLimiter.Limit).Post("/register", authHandler.Register)
 			auth.With(authRateLimiter.Limit).Post("/login", authHandler.Login)
 			auth.Post("/refresh", authHandler.Refresh)
@@ -284,9 +288,9 @@ func (r *Router) setupRoutes(
 		router.Group(func(protected chi.Router) {
 			protected.Use(r.authMw.Authenticate)
 
-			// Phone verification routes (disabled until Twilio configured)
-			// protected.Post("/auth/phone/send", authHandler.SendPhoneCode)
-			// protected.Post("/auth/phone/verify", authHandler.VerifyPhone)
+			// Phone verification routes
+			protected.Post("/auth/phone/send", authHandler.SendPhoneCode)
+			protected.Post("/auth/phone/verify", authHandler.VerifyPhone)
 
 			// 2FA routes (disabled until needed)
 			// protected.Post("/auth/2fa/setup", authHandler.Setup2FA)

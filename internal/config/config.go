@@ -15,6 +15,7 @@ type Config struct {
 	Stripe     StripeConfig
 	Email      EmailConfig
 	SMS        SMSConfig
+	Telnyx     TelnyxConfig
 	Sentry     SentryConfig
 	OpenAI     OpenAIConfig
 	Moderation ModerationConfig
@@ -23,6 +24,11 @@ type Config struct {
 type SMSConfig struct {
 	AccountSID string
 	AuthToken  string
+	FromNumber string
+}
+
+type TelnyxConfig struct {
+	APIKey     string
 	FromNumber string
 }
 
@@ -124,6 +130,10 @@ func Load() *Config {
 			AccountSID: getEnv("TWILIO_ACCOUNT_SID", ""),
 			AuthToken:  getEnv("TWILIO_AUTH_TOKEN", ""),
 			FromNumber: getEnv("TWILIO_FROM_NUMBER", ""),
+		},
+		Telnyx: TelnyxConfig{
+			APIKey:     getEnv("TELNYX_API_KEY", ""),
+			FromNumber: getEnv("TELNYX_FROM_NUMBER", ""),
 		},
 		Sentry: SentryConfig{
 			DSN:         getEnv("SENTRY_DSN", ""),

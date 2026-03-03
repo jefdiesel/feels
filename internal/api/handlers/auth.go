@@ -3,13 +3,17 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/feels/feels/internal/api/middleware"
 	"github.com/feels/feels/internal/domain/profile"
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
+	"github.com/feels/feels/internal/otp"
 	"github.com/feels/feels/internal/repository"
 	"github.com/google/uuid"
 )
@@ -18,6 +22,7 @@ type AuthHandler struct {
 	userService    *user.Service
 	profileService *profile.Service
 	emailService   *email.Service
+	otpService     *otp.Service
 	isDev          bool
 }
 
@@ -28,6 +33,11 @@ func NewAuthHandler(userService *user.Service, profileService *profile.Service, 
 		emailService:   emailService,
 		isDev:          isDev,
 	}
+}
+
+// SetOTPService sets the OTP service for phone-based auth
+func (h *AuthHandler) SetOTPService(svc *otp.Service) {
+	h.otpService = svc
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -394,4 +404,161 @@ func jsonResponse(w http.ResponseWriter, data interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(data)
+}
+
+// Phone-first auth types
+type PhoneAuthRequest struct {
+	Phone string `json:"phone"`
+}
+
+type PhoneLoginRequest struct {
+	Phone    string `json:"phone"`
+	Code     string `json:"code"`
+	DeviceID string `json:"device_id"`
+	Platform string `json:"platform,omitempty"`
+}
+
+type PhoneAuthResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+	IsNewUser    bool   `json:"is_new_user"`
+}
+
+// normalizePhone normalizes a US phone number to E.164 format
+func normalizePhone(phone string) (string, error) {
+	// Remove all non-digit characters
+	digits := regexp.MustCompile(`\D`).ReplaceAllString(phone, "")
+
+	// Handle different formats
+	switch len(digits) {
+	case 10:
+		// 2125551234 -> +12125551234
+		return "+1" + digits, nil
+	case 11:
+		if digits[0] == '1' {
+			// 12125551234 -> +12125551234
+			return "+" + digits, nil
+		}
+		return "", fmt.Errorf("invalid phone number")
+	default:
+		if len(digits) > 11 && digits[0:1] == "1" {
+			// Already has country code, just add +
+			return "+" + digits[:11], nil
+		}
+		return "", fmt.Errorf("invalid phone number: expected 10 digits, got %d", len(digits))
+	}
+}
+
+// SendPhoneOTP sends an OTP to the phone number (public endpoint)
+func (h *AuthHandler) SendPhoneOTP(w http.ResponseWriter, r *http.Request) {
+	var req PhoneAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Phone == "" {
+		jsonError(w, "phone number required", http.StatusBadRequest)
+		return
+	}
+
+	phone, err := normalizePhone(req.Phone)
+	if err != nil {
+		jsonError(w, "invalid US phone number", http.StatusBadRequest)
+		return
+	}
+
+	if h.otpService == nil {
+		jsonError(w, "SMS service not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := h.otpService.SendOTP(r.Context(), phone); err != nil {
+		log.Printf("[AUTH] Failed to send OTP to %s: %v", phone, err)
+		if errors.Is(err, otp.ErrSendFailed) {
+			jsonError(w, "failed to send SMS", http.StatusServiceUnavailable)
+		} else {
+			jsonError(w, "failed to send verification code", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Return masked phone for confirmation
+	masked := phone[:5] + strings.Repeat("*", len(phone)-7) + phone[len(phone)-2:]
+	jsonResponse(w, map[string]string{
+		"message": "verification code sent",
+		"phone":   masked,
+	}, http.StatusOK)
+}
+
+// PhoneLogin verifies OTP and logs in or creates the user
+func (h *AuthHandler) PhoneLogin(w http.ResponseWriter, r *http.Request) {
+	var req PhoneLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Phone == "" || req.Code == "" {
+		jsonError(w, "phone and code required", http.StatusBadRequest)
+		return
+	}
+
+	if req.DeviceID == "" {
+		jsonError(w, "device_id required", http.StatusBadRequest)
+		return
+	}
+
+	phone, err := normalizePhone(req.Phone)
+	if err != nil {
+		jsonError(w, "invalid US phone number", http.StatusBadRequest)
+		return
+	}
+
+	if h.otpService == nil {
+		jsonError(w, "SMS service not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Verify the OTP
+	valid, err := h.otpService.VerifyOTP(r.Context(), phone, req.Code)
+	if err != nil || !valid {
+		jsonError(w, "invalid or expired code", http.StatusUnauthorized)
+		return
+	}
+
+	// OTP verified - check if user exists
+	isNewUser := false
+	existingUser, err := h.userService.GetByPhone(r.Context(), phone)
+
+	var userID uuid.UUID
+	if err != nil || existingUser == nil {
+		// Create new user with phone
+		isNewUser = true
+		newUser, err := h.userService.CreateWithPhone(r.Context(), phone, req.DeviceID, req.Platform)
+		if err != nil {
+			log.Printf("[AUTH] Failed to create user for phone %s: %v", phone, err)
+			jsonError(w, "failed to create account", http.StatusInternalServerError)
+			return
+		}
+		userID = newUser.ID
+	} else {
+		userID = existingUser.ID
+	}
+
+	// Generate tokens
+	authResp, err := h.userService.GenerateTokens(r.Context(), userID, req.DeviceID, req.Platform)
+	if err != nil {
+		log.Printf("[AUTH] Failed to generate tokens for user %s: %v", userID, err)
+		jsonError(w, "failed to create session", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, PhoneAuthResponse{
+		AccessToken:  authResp.AccessToken,
+		RefreshToken: authResp.RefreshToken,
+		ExpiresIn:    authResp.ExpiresIn,
+		IsNewUser:    isNewUser,
+	}, http.StatusOK)
 }

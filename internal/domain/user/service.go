@@ -101,6 +101,78 @@ func (s *Service) SetSMSService(sms SMSService) {
 	s.smsService = sms
 }
 
+// GetByPhone returns a user by their phone number
+func (s *Service) GetByPhone(ctx context.Context, phone string) (*User, error) {
+	return s.repo.GetByPhone(ctx, phone)
+}
+
+// CreateWithPhone creates a new user with just a phone number (phone-first auth)
+func (s *Service) CreateWithPhone(ctx context.Context, phone, deviceID, platform string) (*User, error) {
+	// Check if phone is blocked
+	blocked, err := s.repo.IsPhoneBlocked(ctx, phone)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrPhoneBlocked
+	}
+
+	// Check if phone already exists
+	existing, err := s.repo.GetByPhone(ctx, phone)
+	if err == nil && existing != nil {
+		return nil, ErrPhoneExists
+	}
+
+	now := time.Now()
+	user := &User{
+		ID:              uuid.New(),
+		Email:           phone + "@phone.feels.local", // Placeholder email for phone-only users
+		PasswordHash:    "",                           // No password for phone auth
+		EmailVerified:   false,
+		Phone:           &phone,
+		PhoneVerified:   true, // Already verified via OTP
+		PhoneVerifiedAt: &now,
+		DeviceID:        &deviceID,
+		TOTPEnabled:     false,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	if err := s.repo.Create(ctx, user); err != nil {
+		return nil, err
+	}
+
+	// Create device session
+	session := &DeviceSession{
+		ID:         uuid.New(),
+		UserID:     user.ID,
+		DeviceID:   deviceID,
+		Platform:   platform,
+		LastActive: now,
+		CreatedAt:  now,
+	}
+	_ = s.repo.UpsertDeviceSession(ctx, session)
+
+	return user, nil
+}
+
+// GenerateTokens creates access and refresh tokens for a user (public wrapper)
+func (s *Service) GenerateTokens(ctx context.Context, userID uuid.UUID, deviceID, platform string) (*AuthResponse, error) {
+	// Update device session
+	now := time.Now()
+	session := &DeviceSession{
+		ID:         uuid.New(),
+		UserID:     userID,
+		DeviceID:   deviceID,
+		Platform:   platform,
+		LastActive: now,
+		CreatedAt:  now,
+	}
+	_ = s.repo.UpsertDeviceSession(ctx, session)
+
+	return s.generateTokens(ctx, userID)
+}
+
 func (s *Service) Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if !isValidEmail(email) {

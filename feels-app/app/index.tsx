@@ -14,7 +14,7 @@ export default function IndexScreen() {
         if (useAuthStore.getState().isAuthenticated) {
           router.replace('/(tabs)');
         } else {
-          router.replace('/(auth)/login');
+          router.replace('/(auth)/phone' as any);
         }
       }, 100);
     };

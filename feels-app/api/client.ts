@@ -67,6 +67,17 @@ api.interceptors.response.use(
 
 // API endpoint functions
 export const authApi = {
+  // Phone-first auth (primary flow)
+  sendPhoneOTP: (phone: string) =>
+    api.post<{ message: string; phone: string }>('/auth/phone/send', { phone }),
+
+  phoneLogin: (phone: string, code: string, deviceId: string, platform?: string) =>
+    api.post<{ access_token: string; refresh_token: string; expires_in: number; is_new_user: boolean }>(
+      '/auth/phone/login',
+      { phone, code, device_id: deviceId, platform }
+    ),
+
+  // Legacy email/password auth
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
 
@@ -75,18 +86,6 @@ export const authApi = {
 
   refresh: (refreshToken: string) =>
     api.post('/auth/refresh', { refresh_token: refreshToken }),
-
-  // Phone verification (disabled until Twilio configured)
-  // sendPhoneCode: (phone: string) =>
-  //   api.post('/auth/phone/send', { phone }),
-  // verifyPhone: (phone: string, code: string) =>
-  //   api.post('/auth/phone/verify', { phone, code }),
-
-  // 2FA (disabled until needed)
-  // setup2FA: () =>
-  //   api.post<{ secret: string; qr_code: string; backup_codes: string[] }>(
-  //     '/auth/2fa/setup'
-  //   ),
 };
 
 export const feedApi = {

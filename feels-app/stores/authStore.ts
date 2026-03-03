@@ -47,6 +47,7 @@ interface AuthState {
   logout: () => Promise<void>;
   loadTokens: () => Promise<void>;
   setUser: (user: User) => void;
+  setTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   getDeviceId: () => Promise<string>;
   sendPhoneCode: (phone: string) => Promise<void>;
   verifyPhone: (phone: string, code: string) => Promise<void>;
@@ -272,6 +273,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: (user: User) => {
     set({ user });
+  },
+
+  // Set tokens directly (for phone auth)
+  setTokens: async (accessToken: string, refreshToken: string) => {
+    await storage.setItem('accessToken', accessToken);
+    await storage.setItem('refreshToken', refreshToken);
+
+    set({
+      accessToken,
+      refreshToken,
+      isAuthenticated: true,
+    });
+
+    // Fetch user data
+    try {
+      const userResponse = await api.get('/users/me');
+      set({ user: userResponse.data });
+    } catch {
+      // Profile might not exist yet for new users
+    }
   },
 
   // Magic link methods
