@@ -1,14 +1,17 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { HeartIcon, HeartFilledIcon, MessageIcon, MessageFilledIcon, UserIcon, UserFilledIcon } from '@/components/Icons';
-import { colors, layout } from '@/constants/theme';
+import { matchesApi } from '@/api/client';
+import { colors, layout, typography, spacing } from '@/constants/theme';
 
 interface TabIconProps {
   focused: boolean;
   icon: 'heart' | 'message' | 'user';
+  badge?: number;
 }
 
-function TabIcon({ focused, icon }: TabIconProps) {
+function TabIcon({ focused, icon, badge }: TabIconProps) {
   const color = focused ? colors.primary.DEFAULT : colors.text.tertiary;
   const size = layout.tabBar.iconSize;
 
@@ -39,11 +42,33 @@ function TabIcon({ focused, icon }: TabIconProps) {
     <View style={[styles.tabIconContainer, focused && styles.tabIconFocused]}>
       {renderIcon()}
       {focused && <View style={styles.indicator} />}
+      {badge && badge > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+        </View>
+      )}
     </View>
   );
 }
 
+// Hook to get total unread message count
+function useUnreadCount() {
+  const { data } = useQuery({
+    queryKey: ['matches'],
+    queryFn: async () => {
+      const response = await matchesApi.getMatches();
+      return response.data || [];
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  const totalUnread = data?.reduce((sum: number, match: any) => sum + (match.unread_count || 0), 0) || 0;
+  return totalUnread;
+}
+
 export default function TabLayout() {
+  const unreadCount = useUnreadCount();
+
   return (
     <Tabs
       screenOptions={{
@@ -63,7 +88,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="matches"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="message" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="message" focused={focused} badge={unreadCount} />,
         }}
       />
       <Tabs.Screen
@@ -102,5 +127,22 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.primary.DEFAULT,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: colors.error,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: colors.text.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold as any,
   },
 });

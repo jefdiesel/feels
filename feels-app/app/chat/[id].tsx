@@ -14,6 +14,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,8 +40,9 @@ import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 interface Message {
   id: string;
-  content: string;
+  content?: string;
   encrypted_content?: string;
+  image_url?: string;
   is_mine: boolean;
   created_at: string;
   sender_id: string;
@@ -95,7 +97,7 @@ export default function ChatScreen() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const queryClient = useQueryClient();
-  const { getPublicKey, uploadPublicKey } = useAuthStore();
+  const { user, getPublicKey, uploadPublicKey } = useAuthStore();
   // Crypto disabled for now - was causing crashes
   const encryptionReady = false;
   const otherUserPublicKey = null as string | null;
@@ -127,9 +129,17 @@ export default function ChatScreen() {
       if (data.image_status) {
         setImageStatus(data.image_status);
       }
-      return { ...data, messages: data.messages || [] };
+      // Add is_mine based on sender_id comparison
+      // Sort by created_at descending (newest first) for inverted FlatList
+      const messagesWithIsMine = (data.messages || [])
+        .map((msg: any) => ({
+          ...msg,
+          is_mine: msg.sender_id === user?.id,
+        }))
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return { ...data, messages: messagesWithIsMine };
     },
-    enabled: !!id,
+    enabled: !!id && !!user?.id,
   });
 
   const messages = messagesData?.messages || [];
@@ -138,7 +148,34 @@ export default function ChatScreen() {
     mutationFn: async (content: string) => {
       return matchesApi.sendMessage(id!, content);
     },
-    onSuccess: () => {
+    onMutate: async (content: string) => {
+      // Optimistic update - add message immediately
+      await queryClient.cancelQueries({ queryKey: ['messages', id] });
+      const previousMessages = queryClient.getQueryData(['messages', id]);
+
+      const optimisticMessage: Message = {
+        id: `temp-${Date.now()}`,
+        content,
+        is_mine: true,
+        created_at: new Date().toISOString(),
+        sender_id: user?.id || '',
+      };
+
+      queryClient.setQueryData(['messages', id], (old: any) => ({
+        ...old,
+        messages: [optimisticMessage, ...(old?.messages || [])],
+      }));
+
+      return { previousMessages };
+    },
+    onError: (_err, _content, context) => {
+      // Rollback on error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(['messages', id], context.previousMessages);
+      }
+    },
+    onSettled: () => {
+      // Refetch to get the real message with correct ID
       queryClient.invalidateQueries({ queryKey: ['messages', id] });
     },
   });
@@ -196,10 +233,23 @@ export default function ChatScreen() {
   // WebSocket for real-time messages
   useWebSocket({
     onMessage: (data) => {
-      if (data.type === 'new_message' && data.payload?.message?.match_id === id) {
-        queryClient.invalidateQueries({ queryKey: ['messages', id] });
+      console.log('[WS] Received:', data.type, data.payload?.message?.match_id, 'expected:', id);
+      if (data.type === 'new_message' && String(data.payload?.message?.match_id) === id) {
+        // Directly add the new message to the cache for instant display
+        const newMsg = data.payload.message;
+        queryClient.setQueryData(['messages', id], (old: any) => {
+          if (!old?.messages) return old;
+          // Check if message already exists
+          if (old.messages.some((m: Message) => m.id === newMsg.id)) {
+            return old;
+          }
+          return {
+            ...old,
+            messages: [{ ...newMsg, is_mine: newMsg.sender_id === user?.id }, ...old.messages],
+          };
+        });
       }
-      if (data.type === 'message_read' && data.payload?.match_id === id) {
+      if (data.type === 'message_read' && String(data.payload?.match_id) === id) {
         // Mark all sent messages as read
         queryClient.setQueryData(['messages', id], (old: any) => {
           if (!old?.messages) return old;
@@ -213,13 +263,13 @@ export default function ChatScreen() {
           };
         });
       }
-      if (data.type === 'typing_start' && data.payload?.match_id === id) {
+      if (data.type === 'typing_start' && String(data.payload?.match_id) === id) {
         setOtherUserTyping(true);
       }
-      if (data.type === 'typing_stop' && data.payload?.match_id === id) {
+      if (data.type === 'typing_stop' && String(data.payload?.match_id) === id) {
         setOtherUserTyping(false);
       }
-      if ((data.type === 'image_enabled' || data.type === 'image_disabled') && data.payload?.match_id === id) {
+      if ((data.type === 'image_enabled' || data.type === 'image_disabled') && String(data.payload?.match_id) === id) {
         const enabled = data.type === 'image_enabled';
         setImageStatus((prev) => ({
           ...prev,
@@ -276,6 +326,77 @@ export default function ChatScreen() {
 
     sendMessageMutation.mutate(message);
     setMessage('');
+  };
+
+  const handlePickImage = () => {
+    Alert.alert(
+      'Send Image',
+      'Choose image source',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission needed', 'Camera permission is required to take photos.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              uploadAndSendImage(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Gallery',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission needed', 'Photo library permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              uploadAndSendImage(result.assets[0].uri);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const uploadAndSendImage = async (uri: string) => {
+    try {
+      // Upload to backend
+      const formData = new FormData();
+      const filename = uri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      formData.append('image', {
+        uri,
+        name: filename,
+        type,
+      } as any);
+
+      const response = await matchesApi.uploadImage(id!, formData);
+      if (response.data?.url) {
+        // Send message with image URL
+        await matchesApi.sendMessage(id!, undefined, response.data.url);
+        queryClient.invalidateQueries({ queryKey: ['messages', id] });
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to send image');
+    }
   };
 
   const handleImageToggle = () => {
@@ -347,9 +468,18 @@ export default function ChatScreen() {
       style={[
         styles.messageBubble,
         item.is_mine ? styles.myMessage : styles.theirMessage,
+        item.image_url && styles.imageBubble,
       ]}
     >
-      <Text style={styles.messageText}>{item.content}</Text>
+      {item.image_url ? (
+        <Image
+          source={{ uri: item.image_url }}
+          style={styles.messageImage}
+          contentFit="cover"
+        />
+      ) : (
+        <Text style={styles.messageText}>{item.content}</Text>
+      )}
       <View style={styles.messageFooter}>
         <Text style={styles.messageTime}>{formatTime(item.created_at)}</Text>
         {item.is_mine && (
@@ -480,11 +610,18 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
           inverted
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
         />
 
         {/* Input */}
         <View style={styles.inputContainer}>
+          {imageStatus.both_enabled && (
+            <TouchableOpacity
+              style={styles.imageButton}
+              onPress={handlePickImage}
+            >
+              <CameraIcon size={24} color={colors.primary.DEFAULT} />
+            </TouchableOpacity>
+          )}
           <TextInput
             style={styles.input}
             placeholder="Type a message..."
@@ -493,6 +630,10 @@ export default function ChatScreen() {
             onChangeText={handleTextChange}
             multiline
             maxLength={1000}
+            autoComplete="off"
+            autoCorrect={true}
+            textContentType="none"
+            importantForAutofill="no"
           />
           <TouchableOpacity
             style={[
@@ -681,7 +822,8 @@ const styles = StyleSheet.create({
   },
   messageList: {
     padding: spacing.lg,
-    flexDirection: 'column-reverse',
+    paddingTop: spacing.md,
+    flexGrow: 1,
   },
   messageBubble: {
     maxWidth: '75%',
@@ -717,6 +859,20 @@ const styles = StyleSheet.create({
   },
   readReceipt: {
     marginLeft: 2,
+  },
+  imageBubble: {
+    padding: spacing.xs,
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: borderRadius.lg,
+  },
+  imageButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputContainer: {
     flexDirection: 'row',

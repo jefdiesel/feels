@@ -57,18 +57,6 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	hub := websocket.NewHub()
 	go hub.Run()
 
-	// Configure WebSocket allowed origins based on environment
-	if cfg.IsProduction() {
-		websocket.AllowedOrigins = []string{"https://feelsfun.app", "https://www.feelsfun.app"}
-	} else {
-		websocket.AllowedOrigins = []string{
-			"http://localhost:8081",
-			"http://127.0.0.1:8081",
-			"http://localhost:19006",
-			"http://127.0.0.1:19006",
-		}
-	}
-
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	profileRepo := repository.NewProfileRepository(db)

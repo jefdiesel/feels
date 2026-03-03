@@ -115,9 +115,10 @@ export const matchesApi = {
   getMessages: (matchId: string) =>
     api.get(`/matches/${matchId}/messages`),
 
-  sendMessage: (matchId: string, content: string, encryptedContent?: string) =>
+  sendMessage: (matchId: string, content?: string, imageUrl?: string, encryptedContent?: string) =>
     api.post(`/matches/${matchId}/messages`, {
       content,
+      image_url: imageUrl,
       encrypted_content: encryptedContent,
     }),
 

@@ -3,6 +3,7 @@ import { Platform, Alert } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 
 // Configure how notifications are handled when app is in foreground
@@ -24,6 +25,7 @@ export function usePushNotifications() {
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
+  const queryClient = useQueryClient();
 
   // Register for push notifications
   const registerForPushNotifications = useCallback(async (): Promise<string | null> => {
@@ -135,6 +137,15 @@ export function usePushNotifications() {
     // Listener for notifications received while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
       setNotification(notification);
+
+      // Invalidate relevant queries based on notification type
+      const data = notification.request.content.data;
+      if (data?.type === 'new_message' && data.matchId) {
+        queryClient.invalidateQueries({ queryKey: ['messages', data.matchId] });
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      } else if (data?.type === 'new_match') {
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      }
     });
 
     // Listener for when user interacts with notification

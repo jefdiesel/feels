@@ -29,6 +29,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       const ws = new WebSocket(`${WS_URL}?token=${token}`);
 
       ws.onopen = () => {
+        console.log('[WS] Connected to', WS_URL);
         reconnectAttemptsRef.current = 0;
         options.onConnect?.();
       };
@@ -36,17 +37,20 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('[WS] Message received:', data.type);
           options.onMessage?.(data);
         } catch {
           // Invalid JSON, ignore
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (error) => {
+        console.log('[WS] Error:', error);
         // Error handled in onclose
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        console.log('[WS] Disconnected:', event.code, event.reason);
         options.onDisconnect?.();
         wsRef.current = null;
 

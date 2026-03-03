@@ -9,10 +9,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { matchesApi } from '@/api/client';
 import { useAuthStore } from '@/stores/authStore';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { HeartFilledIcon, MessageIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing, shadows } from '@/constants/theme';
 
@@ -101,6 +102,22 @@ export default function MatchesScreen() {
   useEffect(() => {
     fetchMatches();
   }, [fetchMatches]);
+
+  // Refetch when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchMatches(false);
+    }, [fetchMatches])
+  );
+
+  // Listen for new messages via WebSocket
+  useWebSocket({
+    onMessage: (data) => {
+      if (data.type === 'new_message' || data.type === 'new_match') {
+        fetchMatches(false);
+      }
+    },
+  });
 
   const refetch = () => fetchMatches(false);
 
