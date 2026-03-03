@@ -23,19 +23,26 @@ func NewAuthMiddleware(userService *user.Service) *AuthMiddleware {
 
 func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var tokenString string
+
+		// First try Authorization header
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "missing authorization header", http.StatusUnauthorized)
-			return
+		if authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+				tokenString = parts[1]
+			}
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			http.Error(w, "invalid authorization header format", http.StatusUnauthorized)
-			return
+		// For WebSocket connections, also check query parameter
+		if tokenString == "" {
+			tokenString = r.URL.Query().Get("token")
 		}
 
-		tokenString := parts[1]
+		if tokenString == "" {
+			http.Error(w, "missing authorization", http.StatusUnauthorized)
+			return
+		}
 		claims, err := m.userService.ValidateAccessToken(tokenString)
 		if err != nil {
 			http.Error(w, "invalid or expired token", http.StatusUnauthorized)
