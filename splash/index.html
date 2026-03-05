@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feels - Dating with intention</title>
+    <meta name="description" content="Feels is a dating app for people who know what they want. Connect authentically with people who share your vibe.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💜</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 64px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #FF1493, #FF69B4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+        
+        .tagline {
+            font-size: 24px;
+            color: #a0a0b0;
+            margin-bottom: 48px;
+            font-weight: 300;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 32px;
+            margin-bottom: 48px;
+            width: 100%;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #FF69B4;
+        }
+        
+        .feature-desc {
+            font-size: 14px;
+            color: #a0a0b0;
+            line-height: 1.5;
+        }
+        
+        .cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, #FF1493, #FF69B4);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 24px;
+        }
+        
+        .cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(255, 20, 147, 0.4);
+        }
+        
+        .coming-soon {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .store-badges {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+            opacity: 0.5;
+        }
+        
+        .store-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #a0a0b0;
+        }
+        
+        footer {
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        footer a {
+            color: #a0a0b0;
+            text-decoration: none;
+            margin: 0 16px;
+            font-size: 14px;
+        }
+        
+        footer a:hover {
+            color: #FF69B4;
+        }
+        
+        .contact {
+            margin-top: 16px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="logo">feels</h1>
+        <p class="tagline">Dating with intention</p>
+        
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">✨</div>
+                <h3 class="feature-title">Be Authentic</h3>
+                <p class="feature-desc">Share your real vibe with prompts that spark genuine connections</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h3 class="feature-title">Stay Safe</h3>
+                <p class="feature-desc">Phone verification and profile moderation keep the community trusted</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💜</div>
+                <h3 class="feature-title">Find Your Match</h3>
+                <p class="feature-desc">Connect with people who share your energy and intentions</p>
+            </div>
+        </div>
+        
+        <p class="coming-soon">Coming soon to iOS and Android</p>
+        <div class="store-badges">
+            <span class="store-badge">App Store</span>
+            <span class="store-badge">Google Play</span>
+        </div>
+    </div>
+    
+    <footer>
+        <div>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="mailto:support@feelsfun.app">Contact</a>
+        </div>
+        <p class="contact">© 2026 Feels App. All rights reserved.</p>
+    </footer>
+</body>
+</html>
