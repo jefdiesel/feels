@@ -262,6 +262,8 @@ func (h *AuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "invalid magic link", http.StatusBadRequest)
 		case errors.Is(err, user.ErrDeviceRequired):
 			jsonError(w, "device_id is required", http.StatusBadRequest)
+		case errors.Is(err, user.ErrDeviceRegistered):
+			jsonError(w, "this device already has an account - please log in instead", http.StatusConflict)
 		default:
 			jsonError(w, "verification failed", http.StatusInternalServerError)
 		}

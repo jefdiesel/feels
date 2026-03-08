@@ -56,7 +56,7 @@ interface AuthState {
 
   // Magic link auth
   sendMagicLink: (email: string) => Promise<void>;
-  verifyMagicLink: (token: string) => Promise<void>;
+  verifyMagicLink: (token: string) => Promise<{ isNewUser: boolean }>;
 
   // Public key management for E2E encryption
   uploadPublicKey: (publicKey: string) => Promise<void>;
@@ -338,7 +338,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         platform: Platform.OS,
       });
 
-      const { access_token, refresh_token } = response.data;
+      const { access_token, refresh_token, is_new_user } = response.data;
 
       await storage.setItem('accessToken', access_token);
       await storage.setItem('refreshToken', refresh_token);
@@ -357,6 +357,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Profile might not exist yet, that's ok
         set({ isLoading: false });
       }
+
+      return { isNewUser: is_new_user };
     } catch (error: any) {
       set({ isLoading: false });
       let msg = 'Invalid or expired magic link';

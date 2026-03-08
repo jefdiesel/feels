@@ -699,7 +699,7 @@ func (s *Service) SendMagicLink(ctx context.Context, email string) (string, erro
 }
 
 // VerifyMagicLink validates a magic link token and returns auth tokens
-func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkRequest) (*AuthResponse, error) {
+func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkRequest) (*MagicLinkAuthResponse, error) {
 	if req.DeviceID == "" {
 		return nil, ErrDeviceRequired
 	}
@@ -726,6 +726,7 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkReque
 	}
 
 	var user *User
+	isNewUser := false
 	if link.UserID != nil {
 		// Existing user
 		user, err = s.repo.GetByID(ctx, *link.UserID)
@@ -734,6 +735,19 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkReque
 		}
 	} else {
 		// New user - create account
+		isNewUser = true
+
+		// Check if device already has an account (anti-multi-accounting)
+		if req.DeviceID != "" {
+			existingDevice, err := s.repo.GetByDeviceID(ctx, req.DeviceID)
+			if err != nil {
+				return nil, err
+			}
+			if existingDevice != nil {
+				return nil, ErrDeviceRegistered
+			}
+		}
+
 		now := time.Now()
 		user = &User{
 			ID:            uuid.New(),
@@ -762,7 +776,18 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkReque
 	}
 	_ = s.repo.UpsertDeviceSession(ctx, session)
 
-	return s.generateTokens(ctx, user.ID)
+	// Generate tokens
+	authResp, err := s.generateTokens(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MagicLinkAuthResponse{
+		AccessToken:  authResp.AccessToken,
+		RefreshToken: authResp.RefreshToken,
+		ExpiresIn:    authResp.ExpiresIn,
+		IsNewUser:    isNewUser,
+	}, nil
 }
 
 // SetPublicKey stores or updates a user's public key for E2E encryption

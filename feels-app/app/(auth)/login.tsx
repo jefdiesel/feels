@@ -49,8 +49,12 @@ export default function LoginScreen() {
 
     setError('');
     try {
-      await verifyMagicLink(token);
-      router.replace('/(tabs)');
+      const { isNewUser } = await verifyMagicLink(token);
+      if (isNewUser) {
+        router.replace('/(auth)/onboarding');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
       setError(e.message || 'Invalid or expired link');
     }
@@ -61,10 +65,6 @@ export default function LoginScreen() {
     setToken('');
     setError('');
     setSuccess('');
-  };
-
-  const goToPhone = () => {
-    router.replace('/(auth)/phone' as any);
   };
 
   return (
@@ -120,13 +120,6 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.linkButton}
-                onPress={goToPhone}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.linkText}>Sign in with phone instead</Text>
-              </TouchableOpacity>
             </>
           )}
 

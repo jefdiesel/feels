@@ -119,6 +119,14 @@ type VerifyMagicLinkRequest struct {
 	Platform string `json:"platform,omitempty"`
 }
 
+// MagicLinkAuthResponse includes auth tokens and whether the user is new
+type MagicLinkAuthResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+	IsNewUser    bool   `json:"is_new_user"`
+}
+
 // UserPublicKey represents a user's public key for E2E encryption
 type UserPublicKey struct {
 	ID        uuid.UUID `json:"id"`
