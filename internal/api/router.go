@@ -277,6 +277,9 @@ func (r *Router) setupRoutes(
 			auth.Post("/magic/verify", authHandler.VerifyMagicLink)
 		})
 
+		// Magic link redirect (public GET - handles email link clicks)
+		router.Get("/auth/magic", authHandler.MagicLinkRedirect)
+
 		// Payment webhook (public - called by Stripe)
 		router.Post("/payments/webhook", paymentHandler.Webhook)
 

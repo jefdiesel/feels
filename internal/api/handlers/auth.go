@@ -273,6 +273,90 @@ func (h *AuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, resp, http.StatusOK)
 }
 
+// MagicLinkRedirect handles the web redirect to the app deep link
+// This is called when the user clicks the link in their email
+func (h *AuthHandler) MagicLinkRedirect(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
+		return
+	}
+
+	// Redirect to the app using the custom URL scheme
+	appLink := fmt.Sprintf("feelsfun://magic?token=%s", token)
+
+	// Return an HTML page that attempts the redirect and shows a fallback
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opening Feels...</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0a0a0a;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { color: #e85d75; margin-bottom: 20px; }
+    p { color: #888; margin-bottom: 30px; }
+    a {
+      display: inline-block;
+      background-color: #e85d75;
+      color: white;
+      padding: 16px 32px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+    .code {
+      background: #1a1a1a;
+      padding: 15px 25px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 24px;
+      letter-spacing: 4px;
+      margin: 20px 0;
+      user-select: all;
+    }
+  </style>
+  <script>
+    // Try to open the app immediately
+    window.location.href = "%s";
+
+    // If still here after 2 seconds, show the manual option
+    setTimeout(function() {
+      document.getElementById('fallback').style.display = 'block';
+    }, 2000);
+  </script>
+</head>
+<body>
+  <h1>feels</h1>
+  <p>Opening the app...</p>
+
+  <div id="fallback" style="display: none;">
+    <p>If the app didn't open, copy this code and paste it in the app:</p>
+    <div class="code">%s</div>
+    <p style="margin-top: 30px;">
+      <a href="%s">Try Again</a>
+    </p>
+  </div>
+</body>
+</html>`, appLink, token, appLink)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(html))
+}
+
 // SetPublicKey stores the user's public key for E2E encryption
 func (h *AuthHandler) SetPublicKey(w http.ResponseWriter, r *http.Request) {
 	uid, ok := middleware.GetUserID(r.Context())

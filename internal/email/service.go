@@ -122,9 +122,9 @@ func (s *Service) Send(ctx context.Context, email *Email) error {
 
 // SendMagicLink sends a magic link email
 func (s *Service) SendMagicLink(ctx context.Context, toEmail, token, appName string) error {
-	// Deep link format for mobile app - scheme://path?params
-	// Using feelsfun:// scheme as configured in app.json
-	magicLink := fmt.Sprintf("feelsfun://magic?token=%s", token)
+	// Use HTTPS link that redirects to app - email clients block custom schemes
+	// The /auth/magic endpoint will redirect to feelsfun://magic?token=xxx
+	webLink := fmt.Sprintf("https://api.feelsfun.app/auth/magic?token=%s", token)
 
 	html := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -143,7 +143,7 @@ func (s *Service) SendMagicLink(ctx context.Context, toEmail, token, appName str
   </div>
 </body>
 </html>
-`, appName, magicLink)
+`, appName, webLink)
 
 	text := fmt.Sprintf(`Sign in to %s
 
@@ -153,7 +153,7 @@ Click this link to sign in:
 This link expires in 15 minutes.
 
 If you didn't request this email, you can safely ignore it.
-`, appName, magicLink)
+`, appName, webLink)
 
 	return s.Send(ctx, &Email{
 		To:      []string{toEmail},
