@@ -464,3 +464,10 @@ func (r *UserRepository) ClearDeviceID(ctx context.Context, deviceID string) err
 	_, err := r.db.Exec(ctx, query, deviceID)
 	return err
 }
+
+// ClearAllDeviceIDs removes all device IDs (for testing/admin purposes)
+func (r *UserRepository) ClearAllDeviceIDs(ctx context.Context) error {
+	query := `UPDATE users SET device_id = NULL`
+	_, err := r.db.Exec(ctx, query)
+	return err
+}

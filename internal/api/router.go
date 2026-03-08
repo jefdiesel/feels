@@ -261,6 +261,9 @@ func (r *Router) setupRoutes(
 	// Magic link redirect (root level - handles email link clicks)
 	r.mux.Get("/auth/magic", authHandler.MagicLinkRedirect)
 
+	// Temp admin endpoint to clear device IDs for testing
+	r.mux.Post("/admin/clear-devices", authHandler.ClearAllDevices)
+
 	// API v1 routes
 	r.mux.Route("/api/v1", func(router chi.Router) {
 		// Auth routes (public) with rate limiting

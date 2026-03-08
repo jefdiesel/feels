@@ -43,6 +43,7 @@ type Repository interface {
 	GetByDeviceID(ctx context.Context, deviceID string) (*User, error)
 	Update(ctx context.Context, u *User) error
 	ClearDeviceID(ctx context.Context, deviceID string) error
+	ClearAllDeviceIDs(ctx context.Context) error
 	CreateRefreshToken(ctx context.Context, token *RefreshToken) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*RefreshToken, error)
 	DeleteRefreshToken(ctx context.Context, tokenHash string) error
@@ -838,4 +839,9 @@ func (s *Service) GetPublicKeys(ctx context.Context, userIDs []uuid.UUID) (map[u
 		}
 	}
 	return result, nil
+}
+
+// ClearAllDeviceIDs clears all device IDs (for testing)
+func (s *Service) ClearAllDeviceIDs(ctx context.Context) error {
+	return s.repo.ClearAllDeviceIDs(ctx)
 }

@@ -273,6 +273,16 @@ func (h *AuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, resp, http.StatusOK)
 }
 
+// ClearAllDevices clears all device IDs (for testing)
+func (h *AuthHandler) ClearAllDevices(w http.ResponseWriter, r *http.Request) {
+	// This is a temporary endpoint for testing - remove in production
+	if err := h.userService.ClearAllDeviceIDs(r.Context()); err != nil {
+		jsonError(w, "failed to clear devices", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, map[string]string{"status": "cleared"}, http.StatusOK)
+}
+
 // MagicLinkRedirect handles the web redirect to the app deep link
 // This is called when the user clicks the link in their email
 func (h *AuthHandler) MagicLinkRedirect(w http.ResponseWriter, r *http.Request) {
