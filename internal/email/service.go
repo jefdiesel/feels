@@ -122,8 +122,9 @@ func (s *Service) Send(ctx context.Context, email *Email) error {
 
 // SendMagicLink sends a magic link email
 func (s *Service) SendMagicLink(ctx context.Context, toEmail, token, appName string) error {
-	// Deep link format for mobile app
-	magicLink := fmt.Sprintf("feels://auth/magic?token=%s", token)
+	// Deep link format for mobile app - scheme://path?params
+	// Using feelsfun:// scheme as configured in app.json
+	magicLink := fmt.Sprintf("feelsfun://magic?token=%s", token)
 
 	html := fmt.Sprintf(`
 <!DOCTYPE html>

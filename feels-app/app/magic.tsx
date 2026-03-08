@@ -21,11 +21,15 @@ export default function MagicLinkScreen() {
 
     const verify = async () => {
       try {
-        await verifyMagicLink(token);
+        const { isNewUser } = await verifyMagicLink(token);
         setStatus('success');
-        // Redirect to main app after success
+        // Redirect based on whether new or returning user
         setTimeout(() => {
-          router.replace('/(tabs)');
+          if (isNewUser) {
+            router.replace('/(auth)/onboarding');
+          } else {
+            router.replace('/(tabs)');
+          }
         }, 1500);
       } catch (err: any) {
         setStatus('error');
