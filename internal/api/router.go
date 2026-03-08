@@ -258,6 +258,9 @@ func (r *Router) setupRoutes(
 	r.mux.Get("/ready", healthHandler.Ready)
 	r.mux.Get("/live", healthHandler.Live)
 
+	// Magic link redirect (root level - handles email link clicks)
+	r.mux.Get("/auth/magic", authHandler.MagicLinkRedirect)
+
 	// API v1 routes
 	r.mux.Route("/api/v1", func(router chi.Router) {
 		// Auth routes (public) with rate limiting
@@ -277,8 +280,6 @@ func (r *Router) setupRoutes(
 			auth.Post("/magic/verify", authHandler.VerifyMagicLink)
 		})
 
-		// Magic link redirect (public GET - handles email link clicks)
-		router.Get("/auth/magic", authHandler.MagicLinkRedirect)
 
 		// Payment webhook (public - called by Stripe)
 		router.Post("/payments/webhook", paymentHandler.Webhook)
