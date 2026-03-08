@@ -104,6 +104,8 @@ type Preferences struct {
 	// Per-gender presentation settings (bio addendum, tags, age ranges)
 	// Key is gender string (e.g., "man", "woman")
 	GenderPresentations map[string]*GenderPresentation `json:"gender_presentations,omitempty"`
+	// Private mode - only visible to existing matches (premium feature)
+	IsPrivate bool `json:"is_private"`
 }
 
 type CreateProfileRequest struct {
@@ -163,6 +165,7 @@ type UpdatePreferencesRequest struct {
 	HardBlockAgeMin     *int                           `json:"hard_block_age_min,omitempty"`
 	HardBlockAgeMax     *int                           `json:"hard_block_age_max,omitempty"`
 	GenderPresentations map[string]*GenderPresentation `json:"gender_presentations,omitempty"`
+	IsPrivate           *bool                          `json:"is_private,omitempty"`
 }
 
 type ProfileResponse struct {

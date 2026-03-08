@@ -92,14 +92,14 @@ export const feedApi = {
   getProfiles: (limit = 10) =>
     api.get('/feed', { params: { limit } }),
 
-  swipe: (targetUserId: string, action: 'like' | 'pass' | 'superlike') =>
-    api.post(`/feed/${action}/${targetUserId}`),
+  swipe: (targetUserId: string, action: 'like' | 'pass' | 'superlike' | 'premiumlike') =>
+    api.post(`/feed/${action === 'premiumlike' ? 'superlike' : action}/${targetUserId}`),
 
   getDailyPicks: () => api.get('/feed/daily-picks'),
 
   rewind: () => api.post('/feed/rewind'),
 
-  superlikeWithMessage: (targetUserId: string, message: string) =>
+  premiumLikeWithMessage: (targetUserId: string, message: string) =>
     api.post(`/feed/superlike/${targetUserId}/message`, { message }),
 
   debug: () => api.get('/feed/debug'),
@@ -167,7 +167,7 @@ export const profileApi = {
     bio: string;
     neighborhood?: string;
     kink_level?: string;
-    looking_for?: string;
+    looking_for?: string[]; // Backend expects array
     prompts?: ProfilePrompt[];
   }) => api.post('/profile', data),
 
@@ -187,6 +187,7 @@ export const profileApi = {
     age_max?: number;
     distance_miles?: number;
     visible_to_genders?: string[];
+    is_private?: boolean;
   }) => api.put('/profile/preferences', data),
 
   uploadPhoto: (formData: FormData) =>
@@ -298,7 +299,7 @@ export interface NotificationSettings {
   new_matches: boolean;
   new_messages: boolean;
   likes_received: boolean;
-  super_likes: boolean;
+  premium_likes: boolean;
   promotions: boolean;
 }
 

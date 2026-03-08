@@ -32,8 +32,12 @@ const FAQ_ITEMS: FAQItem[] = [
     answer: 'Complete your profile with clear photos and interesting prompts. Be active on the app - users who engage regularly see more profiles. Consider upgrading to Premium for features like unlimited likes and seeing who liked you.',
   },
   {
-    question: 'What are credits used for?',
-    answer: 'Credits are used for Super Likes (5 credits each). You receive 10 free credits daily. Premium subscribers get additional credits monthly.',
+    question: 'How do daily likes work?',
+    answer: 'Free users get 10 likes per day, resetting at midnight. When you match with someone, you can earn bonus likes (up to 10). Premium subscribers get 30 daily likes plus 2 Premium Likes per day that skip the queue.',
+  },
+  {
+    question: 'What does Premium include?',
+    answer: 'Premium subscribers get: 30 daily likes (vs 10 for free), 2 Premium Likes per day (your like jumps to the front), 2 profile boosts per month, and no ads. Premium Likes also let you reach people outside your normal age range.',
   },
   {
     question: 'How does image sharing work?',

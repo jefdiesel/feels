@@ -21,6 +21,7 @@ var (
 	ErrVerificationUnavailable    = errors.New("verification requires quarterly or annual subscription")
 	ErrAlreadyVerified            = errors.New("profile is already verified")
 	ErrVerificationAlreadyPending = errors.New("verification already submitted and pending review")
+	ErrPremiumRequired            = errors.New("premium subscription required")
 )
 
 type Repository interface {
@@ -311,6 +312,16 @@ func (s *Service) UpdatePreferences(ctx context.Context, userID uuid.UUID, req *
 		for gender, presentation := range req.GenderPresentations {
 			prefs.GenderPresentations[gender] = presentation
 		}
+	}
+	if req.IsPrivate != nil {
+		// Private mode requires premium subscription
+		if *req.IsPrivate && s.subChecker != nil {
+			hasSubscription, _ := s.subChecker.HasQualifyingSubscription(ctx, userID)
+			if !hasSubscription {
+				return nil, ErrPremiumRequired
+			}
+		}
+		prefs.IsPrivate = *req.IsPrivate
 	}
 
 	if err := s.repo.UpdatePreferences(ctx, prefs); err != nil {

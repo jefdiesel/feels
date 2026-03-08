@@ -28,6 +28,7 @@ import {
   MapPinIcon,
   CoinIcon,
   HeartFilledIcon,
+  StarFilledIcon,
   CrownIcon,
   SlidersIcon,
   BellIcon,
@@ -285,10 +286,10 @@ const AVAILABLE_PROMPTS = [
 export default function ProfileScreen() {
   const { user, setUser, logout } = useAuthStore();
   const {
-    balance,
+    dailyLikesRemaining,
     bonusLikes,
     subscription,
-    isLowCredits,
+    isLowLikes,
     loadCredits,
     loadSubscription,
   } = useCreditsStore();
@@ -988,7 +989,7 @@ export default function ProfileScreen() {
           )
         )}
 
-        {/* Credits Card */}
+        {/* Daily Likes Card */}
         <TouchableOpacity
           style={styles.creditsCard}
           onPress={() => setCreditsExpanded(!creditsExpanded)}
@@ -997,27 +998,32 @@ export default function ProfileScreen() {
           <View style={styles.creditsHeader}>
             <View style={styles.creditsMainRow}>
               <View style={styles.creditsItem}>
-                <CoinIcon size={22} color={colors.secondary.DEFAULT} />
+                <HeartFilledIcon size={22} color={colors.primary.DEFAULT} />
                 <View>
-                  <Text style={styles.creditsValue}>{balance}</Text>
-                  <Text style={styles.creditsLabel}>Credits</Text>
+                  <Text style={styles.creditsValue}>
+                    {dailyLikesRemaining() === -1 ? '∞' : dailyLikesRemaining()}
+                  </Text>
+                  <Text style={styles.creditsLabel}>Daily Likes</Text>
                 </View>
-                {isLowCredits() && (
+                {isLowLikes() && (
                   <View style={styles.lowCreditsIndicator}>
                     <Text style={styles.lowCreditsText}>Low</Text>
                   </View>
                 )}
               </View>
 
-              <View style={styles.creditsDivider} />
-
-              <View style={styles.creditsItem}>
-                <HeartFilledIcon size={22} color={colors.primary.DEFAULT} />
-                <View>
-                  <Text style={styles.creditsValue}>{bonusLikes}</Text>
-                  <Text style={styles.creditsLabel}>Bonus Likes</Text>
-                </View>
-              </View>
+              {bonusLikes > 0 && (
+                <>
+                  <View style={styles.creditsDivider} />
+                  <View style={styles.creditsItem}>
+                    <StarFilledIcon size={22} color={colors.secondary.DEFAULT} />
+                    <View>
+                      <Text style={styles.creditsValue}>{bonusLikes}</Text>
+                      <Text style={styles.creditsLabel}>Bonus</Text>
+                    </View>
+                  </View>
+                </>
+              )}
 
               {subscription && subscription.status === 'active' && (
                 <>
@@ -1046,12 +1052,12 @@ export default function ProfileScreen() {
           {creditsExpanded && (
             <View style={styles.creditsBreakdown}>
               <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Super Likes cost</Text>
-                <Text style={styles.breakdownValue}>5 credits each</Text>
+                <Text style={styles.breakdownLabel}>Daily likes</Text>
+                <Text style={styles.breakdownValue}>10 free, resets at midnight</Text>
               </View>
               <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Daily bonus</Text>
-                <Text style={styles.breakdownValue}>+10 credits</Text>
+                <Text style={styles.breakdownLabel}>Bonus likes</Text>
+                <Text style={styles.breakdownValue}>Earn from matches (max 10)</Text>
               </View>
               {subscription && (
                 <View style={styles.breakdownRow}>
@@ -1069,7 +1075,7 @@ export default function ProfileScreen() {
                   setPremiumModalVisible(true);
                 }}
               >
-                <Text style={styles.getMoreText}>Get More Credits</Text>
+                <Text style={styles.getMoreText}>Get Unlimited Likes</Text>
               </TouchableOpacity>
             </View>
           )}

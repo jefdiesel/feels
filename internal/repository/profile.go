@@ -261,7 +261,8 @@ func (r *ProfileRepository) GetPreferences(ctx context.Context, userID uuid.UUID
 	query := `
 		SELECT user_id, genders_seeking, age_min, age_max, distance_miles,
 			include_trans, visible_to_genders, hard_block_genders,
-			hard_block_age_min, hard_block_age_max, COALESCE(gender_presentations, '{}'::jsonb)
+			hard_block_age_min, hard_block_age_max, COALESCE(gender_presentations, '{}'::jsonb),
+			COALESCE(is_private, false)
 		FROM preferences WHERE user_id = $1
 	`
 	var p profile.Preferences
@@ -270,6 +271,7 @@ func (r *ProfileRepository) GetPreferences(ctx context.Context, userID uuid.UUID
 		&p.UserID, &p.GendersSeeking, &p.AgeMin, &p.AgeMax, &p.DistanceMiles,
 		&p.IncludeTrans, &p.VisibleToGenders, &p.HardBlockGenders,
 		&p.HardBlockAgeMin, &p.HardBlockAgeMax, &genderPresentationsJSON,
+		&p.IsPrivate,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -298,13 +300,15 @@ func (r *ProfileRepository) UpdatePreferences(ctx context.Context, p *profile.Pr
 		UPDATE preferences SET
 			genders_seeking = $2, age_min = $3, age_max = $4, distance_miles = $5,
 			include_trans = $6, visible_to_genders = $7, hard_block_genders = $8,
-			hard_block_age_min = $9, hard_block_age_max = $10, gender_presentations = $11
+			hard_block_age_min = $9, hard_block_age_max = $10, gender_presentations = $11,
+			is_private = $12
 		WHERE user_id = $1
 	`
 	result, err := r.db.Exec(ctx, query,
 		p.UserID, p.GendersSeeking, p.AgeMin, p.AgeMax, p.DistanceMiles,
 		p.IncludeTrans, p.VisibleToGenders, p.HardBlockGenders,
 		p.HardBlockAgeMin, p.HardBlockAgeMax, genderPresentationsJSON,
+		p.IsPrivate,
 	)
 	if err != nil {
 		return err

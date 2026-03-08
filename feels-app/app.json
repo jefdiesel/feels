@@ -5,13 +5,18 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "feels",
+    "scheme": "feelsfun",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "backgroundColor": "#000000",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.feels.app",
+      "bundleIdentifier": "app.feelsfun",
       "backgroundColor": "#000000",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -22,7 +27,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.feels.app",
+      "package": "app.feelsfun",
       "backgroundColor": "#000000",
       "intentFilters": [
         {
@@ -30,7 +35,7 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "feels"
+              "scheme": "feelsfun"
             }
           ],
           "category": [
@@ -38,6 +43,10 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -54,8 +63,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Feels uses your location to show you people nearby and calculate distances.",
-          "locationWhenInUsePermission": "Feels uses your location to show you people nearby and calculate distances."
+          "locationAlwaysAndWhenInUsePermission": "FeelsFun uses your location to show you people nearby and calculate distances.",
+          "locationWhenInUsePermission": "FeelsFun uses your location to show you people nearby and calculate distances."
         }
       ]
     ],

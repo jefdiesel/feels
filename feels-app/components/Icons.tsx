@@ -197,6 +197,10 @@ export function RefreshIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
   return <Feather name="refresh-cw" size={size} color={color} />;
 }
 
+export function RewindIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
+  return <Feather name="rotate-ccw" size={size} color={color} />;
+}
+
 export function AlertCircleIcon({ size = 24, color = '#FFFFFF' }: IconProps) {
   return <Feather name="alert-circle" size={size} color={color} />;
 }

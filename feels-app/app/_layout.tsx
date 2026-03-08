@@ -10,6 +10,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useLocationStore } from '@/stores/locationStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { RevenueCatProvider } from '@/providers/RevenueCatProvider';
 
 // Sentry initialization disabled for now - can be re-enabled once build is stable
 // import * as Sentry from '@sentry/react-native';
@@ -78,10 +79,12 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000000' }}>
-        <StatusBar style="light" translucent backgroundColor="transparent" />
-        <RootLayoutContent />
-      </GestureHandlerRootView>
+      <RevenueCatProvider>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000000' }}>
+          <StatusBar style="light" translucent backgroundColor="transparent" />
+          <RootLayoutContent />
+        </GestureHandlerRootView>
+      </RevenueCatProvider>
     </QueryClientProvider>
   );
 }

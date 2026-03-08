@@ -101,6 +101,8 @@ func (r *FeedRepository) GetFeedProfiles(ctx context.Context, userID uuid.UUID, 
 				AND p.user_id NOT IN (SELECT * FROM already_seen)
 				AND p.user_id NOT IN (SELECT * FROM matched_users)
 				AND p.user_id NOT IN (SELECT * FROM shadowbanned_users)
+				-- Private mode: exclude users who are private (unless they liked us first)
+				AND (COALESCE(target_prefs.is_private, false) = false OR l.id IS NOT NULL)
 				-- Visibility: user must be visible to our gender (skip check if our gender is NULL)
 				AND (target_prefs.visible_to_genders IS NULL OR up.gender IS NULL OR up.gender = ANY(target_prefs.visible_to_genders))
 				-- Hard blocks: user hasn't hard-blocked our gender (skip check if our gender is NULL)
@@ -634,16 +636,16 @@ func (r *FeedRepository) CreateLikeWithMessageAtomic(ctx context.Context, like *
 // This ensures credits are not lost if the like creation fails
 // Parameters:
 //   - like: the like to create
-//   - isSuperlike: whether this is a superlike (costs credits)
+//   - isPremiumLike: whether this is a premium like (uses daily premium like limit, not credits)
 //   - dailyLikeLimit: the daily like limit for free users
-//   - superlikeCost: the credit cost for superlikes
+//   - premiumLikesPerDay: the daily premium like limit (e.g., 2)
 //   - matchUser1ID, matchUser2ID: ordered user IDs for match creation
 func (r *FeedRepository) CreateLikeWithCreditAtomic(
 	ctx context.Context,
 	like *feed.Like,
-	isSuperlike bool,
+	isPremiumLike bool,
 	dailyLikeLimit int,
-	superlikeCost int,
+	premiumLikesPerDay int,
 	matchUser1ID, matchUser2ID uuid.UUID,
 ) (*feed.LikeResult, *feed.CreditCheckResult, error) {
 	tx, err := r.db.Begin(ctx)
@@ -654,19 +656,44 @@ func (r *FeedRepository) CreateLikeWithCreditAtomic(
 
 	creditResult := &feed.CreditCheckResult{}
 
-	if isSuperlike {
-		// Superlikes always cost credits - deduct atomically
-		deductQuery := `
-			UPDATE credits
-			SET balance = balance - $2
-			WHERE user_id = $1 AND balance >= $2
-			RETURNING balance
+	if isPremiumLike {
+		// Premium likes use daily allowance (2/day) - increment premium_likes_used atomically
+		// First, check if user has subscription
+		subQuery := `
+			SELECT 1 FROM subscriptions
+			WHERE user_id = $1 AND status = 'active' AND current_period_end > NOW()
+			LIMIT 1
 		`
-		var newBalance int
-		err = tx.QueryRow(ctx, deductQuery, like.LikerID, superlikeCost).Scan(&newBalance)
+		var hasSub int
+		err = tx.QueryRow(ctx, subQuery, like.LikerID).Scan(&hasSub)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, nil, ErrInsufficientCredits
+				return nil, nil, errors.New("premium like requires subscription")
+			}
+			return nil, nil, err
+		}
+
+		// Use premium like - atomically check limit and increment
+		premiumQuery := `
+			UPDATE credits
+			SET premium_likes_used = CASE
+				WHEN last_reset IS NULL OR last_reset::date < CURRENT_DATE THEN 1
+				ELSE premium_likes_used + 1
+			END,
+			last_reset = CURRENT_DATE
+			WHERE user_id = $1
+			AND (
+				last_reset IS NULL
+				OR last_reset::date < CURRENT_DATE
+				OR premium_likes_used < $2
+			)
+			RETURNING premium_likes_used
+		`
+		var used int
+		err = tx.QueryRow(ctx, premiumQuery, like.LikerID, premiumLikesPerDay).Scan(&used)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, ErrPremiumLikeLimitReached
 			}
 			return nil, nil, err
 		}
@@ -785,12 +812,12 @@ func (r *FeedRepository) CreateLikeWithCreditAtomic(
 	return result, creditResult, nil
 }
 
-// CreateLikeWithMessageAndCreditAtomic creates a superlike with message while atomically deducting credits
+// CreateLikeWithMessageAndCreditAtomic creates a premium like with message while atomically using premium like allowance
 func (r *FeedRepository) CreateLikeWithMessageAndCreditAtomic(
 	ctx context.Context,
 	like *feed.Like,
 	message string,
-	superlikeCost int,
+	premiumLikesPerDay int,
 	matchUser1ID, matchUser2ID uuid.UUID,
 ) (*feed.LikeResult, error) {
 	tx, err := r.db.Begin(ctx)
@@ -799,18 +826,42 @@ func (r *FeedRepository) CreateLikeWithMessageAndCreditAtomic(
 	}
 	defer tx.Rollback(ctx)
 
-	// Superlikes always cost credits - deduct atomically
-	deductQuery := `
-		UPDATE credits
-		SET balance = balance - $2
-		WHERE user_id = $1 AND balance >= $2
-		RETURNING balance
+	// Check subscription
+	subQuery := `
+		SELECT 1 FROM subscriptions
+		WHERE user_id = $1 AND status = 'active' AND current_period_end > NOW()
+		LIMIT 1
 	`
-	var newBalance int
-	err = tx.QueryRow(ctx, deductQuery, like.LikerID, superlikeCost).Scan(&newBalance)
+	var hasSub int
+	err = tx.QueryRow(ctx, subQuery, like.LikerID).Scan(&hasSub)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrInsufficientCredits
+			return nil, errors.New("premium like requires subscription")
+		}
+		return nil, err
+	}
+
+	// Use premium like allowance atomically
+	premiumQuery := `
+		UPDATE credits
+		SET premium_likes_used = CASE
+			WHEN last_reset IS NULL OR last_reset::date < CURRENT_DATE THEN 1
+			ELSE premium_likes_used + 1
+		END,
+		last_reset = CURRENT_DATE
+		WHERE user_id = $1
+		AND (
+			last_reset IS NULL
+			OR last_reset::date < CURRENT_DATE
+			OR premium_likes_used < $2
+		)
+		RETURNING premium_likes_used
+	`
+	var used int
+	err = tx.QueryRow(ctx, premiumQuery, like.LikerID, premiumLikesPerDay).Scan(&used)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPremiumLikeLimitReached
 		}
 		return nil, err
 	}

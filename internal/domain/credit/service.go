@@ -29,6 +29,9 @@ type Repository interface {
 	IncrementDailyLikes(ctx context.Context, userID uuid.UUID) error
 	CanUseDailyLike(ctx context.Context, userID uuid.UUID, limit int) (bool, int, error)
 	HasSubscription(ctx context.Context, userID uuid.UUID) (bool, error)
+	// Premium like operations
+	UsePremiumLike(ctx context.Context, userID uuid.UUID) error
+	UsePremiumLikeAtomic(ctx context.Context, userID uuid.UUID) error
 	// Atomic operations to prevent race conditions
 	UseBonusLikeAtomic(ctx context.Context, userID uuid.UUID) error
 	UseDailyLikeAtomic(ctx context.Context, userID uuid.UUID, limit int) error
@@ -61,16 +64,24 @@ func (s *Service) GetBalance(ctx context.Context, userID uuid.UUID) (*BalanceRes
 	}
 
 	resp := &BalanceResponse{
-		Balance:         credit.Balance,
-		BonusLikes:      credit.BonusLikes,
-		DailyLikesUsed:  dailyLikes.Count,
-		DailyLikesLimit: FreeDailyLikeLimit,
-		HasSubscription: hasSub,
+		Balance:           credit.Balance,
+		BonusLikes:        credit.BonusLikes,
+		DailyLikesUsed:    dailyLikes.Count,
+		DailyLikesLimit:   FreeDailyLikeLimit,
+		PremiumLikesUsed:  0,
+		PremiumLikesLimit: 0,
+		BoostsUsed:        0,
+		BoostsLimit:       0,
+		HasSubscription:   hasSub,
 	}
 
-	// Subscribers have unlimited daily likes
+	// Premium subscribers get more daily likes and premium features
 	if hasSub {
-		resp.DailyLikesLimit = -1 // -1 means unlimited
+		resp.DailyLikesLimit = PremiumDailyLikeLimit
+		resp.PremiumLikesUsed = credit.PremiumLikesUsed
+		resp.PremiumLikesLimit = PremiumLikesPerDay
+		resp.BoostsUsed = credit.BoostsUsed
+		resp.BoostsLimit = BoostsPerWeek
 	}
 
 	return resp, nil
@@ -160,18 +171,28 @@ func (s *Service) UseLike(ctx context.Context, userID uuid.UUID) error {
 	return s.repo.IncrementDailyLikes(ctx, userID)
 }
 
-// CanSuperlike checks if a user can perform a superlike
-func (s *Service) CanSuperlike(ctx context.Context, userID uuid.UUID) (bool, error) {
+// CanPremiumLike checks if a premium user can perform a premium like
+func (s *Service) CanPremiumLike(ctx context.Context, userID uuid.UUID) (bool, error) {
+	// Must have subscription
+	hasSub, err := s.repo.HasSubscription(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if !hasSub {
+		return false, nil
+	}
+
+	// Check daily premium like limit
 	credit, err := s.repo.GetCredit(ctx, userID)
 	if err != nil {
 		return false, err
 	}
-	return credit.Balance >= CostSuperlike, nil
+	return credit.PremiumLikesUsed < PremiumLikesPerDay, nil
 }
 
-// UseSuperlike deducts credits for a superlike
-func (s *Service) UseSuperlike(ctx context.Context, userID uuid.UUID) error {
-	return s.repo.DeductCredits(ctx, userID, CostSuperlike)
+// UsePremiumLike records a premium like usage
+func (s *Service) UsePremiumLike(ctx context.Context, userID uuid.UUID) error {
+	return s.repo.UsePremiumLike(ctx, userID)
 }
 
 // AddBonusLikes adds bonus likes when queue is cleared
@@ -257,7 +278,7 @@ func (s *Service) UseLikeAtomic(ctx context.Context, userID uuid.UUID) error {
 	return s.repo.UseDailyLikeAtomic(ctx, userID, FreeDailyLikeLimit)
 }
 
-// UseSuperlikeAtomic atomically checks and deducts credits for a superlike
-func (s *Service) UseSuperlikeAtomic(ctx context.Context, userID uuid.UUID) error {
-	return s.repo.DeductCreditsAtomic(ctx, userID, CostSuperlike)
+// UsePremiumLikeAtomic atomically checks and records a premium like
+func (s *Service) UsePremiumLikeAtomic(ctx context.Context, userID uuid.UUID) error {
+	return s.repo.UsePremiumLikeAtomic(ctx, userID)
 }

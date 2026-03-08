@@ -8,58 +8,70 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckIcon, CrownIcon, StarFilledIcon, SparkleIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
-import { paymentsApi, Plan, PlanType, Subscription } from '@/api/client';
+import { useRevenueCat, PurchasesPackage } from '@/hooks/useRevenueCat';
 
 interface PremiumModalProps {
   visible: boolean;
   onClose: () => void;
+  feature?: string; // Optional: which feature triggered the modal
 }
 
-// Map plan types to display info
-const PLAN_DISPLAY = {
-  monthly: {
+// Premium features (same for all plans, just pricing differs)
+const PREMIUM_FEATURES = [
+  '50 daily likes (vs 20 free)',
+  '3 Premium Likes per day',
+  'Unlimited rewinds',
+  '1 boost per week',
+  'Private mode',
+  'Skip the like queue',
+];
+
+// Package identifier mapping for display
+interface PackageDisplay {
+  icon: string;
+  color: string;
+  popular?: boolean;
+  name: string;
+}
+
+// Map RevenueCat package identifiers to display info
+const PACKAGE_DISPLAY: Record<string, PackageDisplay> = {
+  '$rc_monthly': {
     icon: 'sparkle',
     color: colors.tertiary.DEFAULT,
-    features: [
-      'Unlimited likes',
-      'See who liked you',
-      'Rewind last swipe',
-      'Priority support',
-    ],
+    name: 'Monthly',
   },
-  quarterly: {
+  '$rc_three_month': {
     icon: 'star',
     color: colors.primary.DEFAULT,
     popular: true,
-    features: [
-      'Unlimited likes',
-      'See who liked you',
-      'Unlimited rewinds',
-      '5 Super Likes per day',
-      'Profile verification badge',
-      'Boost your profile weekly',
-      'Priority support',
-    ],
+    name: 'Quarterly',
   },
-  annual: {
+  '$rc_annual': {
     icon: 'crown',
     color: colors.secondary.DEFAULT,
-    features: [
-      'Unlimited likes',
-      'See who liked you',
-      'Unlimited rewinds',
-      'Unlimited Super Likes',
-      'Profile verification badge',
-      'Boost your profile daily',
-      'Message before matching',
-      'Incognito mode',
-      'Priority support',
-    ],
+    name: 'Annual',
+  },
+  // Custom identifiers (if you use them instead of defaults)
+  'monthly': {
+    icon: 'sparkle',
+    color: colors.tertiary.DEFAULT,
+    name: 'Monthly',
+  },
+  'quarterly': {
+    icon: 'star',
+    color: colors.primary.DEFAULT,
+    popular: true,
+    name: 'Quarterly',
+  },
+  'annual': {
+    icon: 'crown',
+    color: colors.secondary.DEFAULT,
+    name: 'Annual',
   },
 };
 
@@ -67,100 +79,87 @@ export default function PremiumModal({
   visible,
   onClose,
 }: PremiumModalProps) {
-  const [plans, setPlans] = useState<Record<PlanType, Plan> | null>(null);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const {
+    offerings,
+    isPremium,
+    isLoading: rcLoading,
+    purchasePackage,
+    restorePurchases,
+    getOfferings,
+  } = useRevenueCat();
+
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState<PlanType | null>(null);
+  const [purchasingPackage, setPurchasingPackage] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
-      loadData();
+      loadOfferings();
     }
   }, [visible]);
 
-  const loadData = async () => {
+  const loadOfferings = async () => {
     setLoading(true);
-    try {
-      const [plansRes, subRes] = await Promise.all([
-        paymentsApi.getPlans(),
-        paymentsApi.getSubscription(),
-      ]);
-      setPlans(plansRes.data);
-      setSubscription(subRes.data.subscription);
-    } catch (error) {
-      console.error('Failed to load payment data:', error);
-    } finally {
-      setLoading(false);
-    }
+    await getOfferings();
+    setLoading(false);
   };
 
-  const handleSelectPlan = async (planType: PlanType) => {
-    setCheckoutLoading(planType);
+  const handleSelectPackage = async (pkg: PurchasesPackage) => {
+    setPurchasingPackage(pkg.identifier);
     try {
-      // Use deep link URLs for Stripe to redirect back to the app
-      const successUrl = 'feels://payment/success';
-      const cancelUrl = 'feels://payment/cancel';
-
-      const response = await paymentsApi.createCheckout(planType, successUrl, cancelUrl);
-      const { checkout_url } = response.data;
-
-      // Open Stripe checkout in browser
-      const supported = await Linking.canOpenURL(checkout_url);
-      if (supported) {
-        await Linking.openURL(checkout_url);
+      const success = await purchasePackage(pkg);
+      if (success) {
+        Alert.alert('Welcome to Premium!', 'Your subscription is now active.');
         onClose();
-      } else {
-        Alert.alert('Error', 'Unable to open payment page. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Failed to create checkout:', error);
-      if (error.response?.status === 409) {
-        Alert.alert('Already Subscribed', 'You already have an active subscription.');
-      } else {
-        Alert.alert('Error', 'Failed to start checkout. Please try again.');
       }
     } finally {
-      setCheckoutLoading(null);
+      setPurchasingPackage(null);
     }
   };
 
-  const handleManageSubscription = async () => {
-    try {
-      const returnUrl = 'feels://payment/portal';
-      const response = await paymentsApi.createPortal(returnUrl);
-      const { url } = response.data;
-
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Unable to open billing portal. Please try again.');
-      }
-    } catch (error) {
-      console.error('Failed to create portal session:', error);
-      Alert.alert('Error', 'Failed to open billing portal. Please try again.');
+  const handleRestore = async () => {
+    setLoading(true);
+    const restored = await restorePurchases();
+    setLoading(false);
+    if (restored) {
+      onClose();
     }
   };
 
-  const formatPrice = (amount: number, currency: string, interval: string, intervalCount: number) => {
-    const price = (amount / 100).toFixed(2);
-    const currencySymbol = currency === 'usd' ? '$' : currency.toUpperCase();
-    const periodLabel = intervalCount === 1
-      ? `/${interval}`
-      : `/${intervalCount} ${interval}s`;
-    return `${currencySymbol}${price}${periodLabel}`;
+  const formatPrice = (pkg: PurchasesPackage): string => {
+    return pkg.product.priceString;
   };
 
-  const formatMonthlyPrice = (amount: number, intervalCount: number, interval: string) => {
-    let monthlyAmount: number;
-    if (interval === 'year') {
-      monthlyAmount = amount / 12;
-    } else if (interval === 'month' && intervalCount > 1) {
-      monthlyAmount = amount / intervalCount;
+  const formatPeriod = (pkg: PurchasesPackage): string => {
+    const period = pkg.product.subscriptionPeriod;
+    if (!period) return '';
+
+    if (period.includes('P1M')) return '/month';
+    if (period.includes('P3M')) return '/3 months';
+    if (period.includes('P1Y')) return '/year';
+    return '';
+  };
+
+  const formatMonthlyPrice = (pkg: PurchasesPackage): string | null => {
+    const price = pkg.product.price;
+    const period = pkg.product.subscriptionPeriod;
+
+    if (!period || period.includes('P1M')) return null;
+
+    let monthlyPrice: number;
+    if (period.includes('P3M')) {
+      monthlyPrice = price / 3;
+    } else if (period.includes('P1Y')) {
+      monthlyPrice = price / 12;
     } else {
       return null;
     }
-    return `$${(monthlyAmount / 100).toFixed(2)}/mo`;
+
+    // Format with currency symbol
+    const currencyCode = pkg.product.currencyCode || 'USD';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+    }).format(monthlyPrice) + '/mo';
   };
 
   const renderTierIcon = (icon: string, color: string) => {
@@ -176,7 +175,15 @@ export default function PremiumModal({
     }
   };
 
-  if (loading) {
+  const getPackageDisplay = (pkg: PurchasesPackage): PackageDisplay => {
+    return PACKAGE_DISPLAY[pkg.identifier] || {
+      icon: 'sparkle',
+      color: colors.primary.DEFAULT,
+      name: pkg.product.title || pkg.identifier,
+    };
+  };
+
+  if (loading || rcLoading) {
     return (
       <Modal
         visible={visible}
@@ -193,7 +200,9 @@ export default function PremiumModal({
     );
   }
 
-  const planOrder: PlanType[] = ['monthly', 'quarterly', 'annual'];
+  // Get packages sorted by price
+  const packages = offerings?.availablePackages || [];
+  const sortedPackages = [...packages].sort((a, b) => a.product.price - b.product.price);
 
   return (
     <Modal
@@ -220,104 +229,100 @@ export default function PremiumModal({
             Get more matches and stand out from the crowd
           </Text>
 
-          {subscription && subscription.status === 'active' && (
+          {isPremium && (
             <View style={styles.currentPlan}>
-              <Text style={styles.currentPlanLabel}>Current Plan</Text>
-              <Text style={styles.currentPlanName}>
-                {subscription.plan_type.charAt(0).toUpperCase() +
-                  subscription.plan_type.slice(1)}
-              </Text>
+              <Text style={styles.currentPlanLabel}>Current Status</Text>
+              <Text style={styles.currentPlanName}>Premium Active</Text>
               <Text style={styles.currentPlanExpiry}>
-                {subscription.canceled_at
-                  ? `Expires ${new Date(subscription.current_period_end).toLocaleDateString()}`
-                  : `Renews ${new Date(subscription.current_period_end).toLocaleDateString()}`}
+                Manage your subscription in device settings
               </Text>
-              <TouchableOpacity
-                style={styles.manageButton}
-                onPress={handleManageSubscription}
-              >
-                <Text style={styles.manageButtonText}>Manage Subscription</Text>
-              </TouchableOpacity>
             </View>
           )}
 
-          {planOrder.map((planType) => {
-            const plan = plans?.[planType];
-            if (!plan) return null;
+          {sortedPackages.length === 0 ? (
+            <View style={styles.noPackages}>
+              <Text style={styles.noPackagesText}>
+                Subscription plans are being configured. Please check back soon.
+              </Text>
+            </View>
+          ) : (
+            sortedPackages.map((pkg) => {
+              const display = getPackageDisplay(pkg);
+              const isLoading = purchasingPackage === pkg.identifier;
+              const monthlyPrice = formatMonthlyPrice(pkg);
 
-            const display = PLAN_DISPLAY[planType];
-            const isCurrentPlan =
-              subscription?.plan_type === planType &&
-              subscription?.status === 'active';
-            const isLoading = checkoutLoading === planType;
-            const monthlyPrice = formatMonthlyPrice(plan.amount, plan.interval_count, plan.interval);
-
-            return (
-              <View
-                key={planType}
-                style={[
-                  styles.tierCard,
-                  display.popular && styles.popularTierCard,
-                  isCurrentPlan && styles.currentTierCard,
-                ]}
-              >
-                {display.popular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>BEST VALUE</Text>
-                  </View>
-                )}
-
-                <View style={styles.tierHeader}>
-                  <View style={styles.tierNameContainer}>
-                    {renderTierIcon(display.icon, display.color)}
-                    <Text style={[styles.tierName, { color: display.color }]}>
-                      {plan.name}
-                    </Text>
-                  </View>
-                  <View style={styles.priceContainer}>
-                    <Text style={styles.tierPrice}>
-                      {formatPrice(plan.amount, plan.currency, plan.interval, plan.interval_count)}
-                    </Text>
-                    {monthlyPrice && (
-                      <Text style={styles.monthlyPrice}>{monthlyPrice}</Text>
-                    )}
-                  </View>
-                </View>
-
-                <View style={styles.featuresList}>
-                  {display.features.map((feature, index) => (
-                    <View key={index} style={styles.featureRow}>
-                      <CheckIcon size={16} color={colors.success} />
-                      <Text style={styles.featureText}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <TouchableOpacity
+              return (
+                <View
+                  key={pkg.identifier}
                   style={[
-                    styles.selectButton,
-                    { backgroundColor: display.color },
-                    isCurrentPlan && styles.currentButton,
+                    styles.tierCard,
+                    display.popular && styles.popularTierCard,
+                    isPremium && styles.currentTierCard,
                   ]}
-                  onPress={() => !isCurrentPlan && handleSelectPlan(planType)}
-                  disabled={isCurrentPlan || isLoading}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.text.primary} />
-                  ) : (
-                    <Text style={styles.selectButtonText}>
-                      {isCurrentPlan ? 'Current Plan' : 'Subscribe'}
-                    </Text>
+                  {display.popular && (
+                    <View style={styles.popularBadge}>
+                      <Text style={styles.popularBadgeText}>BEST VALUE</Text>
+                    </View>
                   )}
-                </TouchableOpacity>
-              </View>
-            );
-          })}
+
+                  <View style={styles.tierHeader}>
+                    <View style={styles.tierNameContainer}>
+                      {renderTierIcon(display.icon, display.color)}
+                      <Text style={[styles.tierName, { color: display.color }]}>
+                        {display.name}
+                      </Text>
+                    </View>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.tierPrice}>
+                        {formatPrice(pkg)}{formatPeriod(pkg)}
+                      </Text>
+                      {monthlyPrice && (
+                        <Text style={styles.monthlyPrice}>{monthlyPrice}</Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.featuresList}>
+                    {PREMIUM_FEATURES.map((feature, index) => (
+                      <View key={index} style={styles.featureRow}>
+                        <CheckIcon size={16} color={colors.success} />
+                        <Text style={styles.featureText}>{feature}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.selectButton,
+                      { backgroundColor: display.color },
+                      isPremium && styles.currentButton,
+                    ]}
+                    onPress={() => !isPremium && handleSelectPackage(pkg)}
+                    disabled={isPremium || isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color={colors.text.primary} />
+                    ) : (
+                      <Text style={styles.selectButtonText}>
+                        {isPremium ? 'Current Plan' : 'Subscribe'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          )}
+
+          <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
+            <Text style={styles.restoreText}>Restore Purchases</Text>
+          </TouchableOpacity>
 
           <Text style={styles.disclaimer}>
-            Payment is processed securely via Stripe. Subscriptions automatically
-            renew unless canceled at least 24 hours before the end of the current
-            period. You can manage or cancel your subscription anytime.
+            Payment will be charged to your Apple ID or Google Play account at confirmation of purchase.
+            Subscription automatically renews unless auto-renew is turned off at least 24 hours before
+            the end of the current period. You can manage or cancel your subscription in your device's
+            account settings.
           </Text>
         </ScrollView>
       </SafeAreaView>
@@ -397,19 +402,17 @@ const styles = StyleSheet.create({
   currentPlanExpiry: {
     fontSize: typography.sizes.sm,
     color: colors.text.tertiary,
-    marginBottom: spacing.md,
   },
-  manageButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+  noPackages: {
+    backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.primary.DEFAULT,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
   },
-  manageButtonText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
-    color: colors.primary.DEFAULT,
+  noPackagesText: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
   tierCard: {
     backgroundColor: colors.bg.secondary,
@@ -496,6 +499,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.bold as any,
     color: colors.text.primary,
+  },
+  restoreButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  restoreText: {
+    fontSize: typography.sizes.sm,
+    color: colors.primary.DEFAULT,
+    fontWeight: typography.weights.semibold as any,
   },
   disclaimer: {
     fontSize: typography.sizes.xs,

@@ -200,6 +200,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	referralHandler := handlers.NewReferralHandler(referralService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, paymentService)
 	adminHandler := handlers.NewAdminHandler(adminRepo, userRepo)
+	revenueCatHandler := handlers.NewRevenueCatHandler(paymentRepo)
 
 	r := &Router{
 		mux:    chi.NewRouter(),
@@ -211,7 +212,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	}
 
 	r.setupMiddleware()
-	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler, authRateLimiter, magicLinkRateLimiter)
+	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler, revenueCatHandler, authRateLimiter, magicLinkRateLimiter)
 
 	return r
 }
@@ -248,6 +249,7 @@ func (r *Router) setupRoutes(
 	adminHandler *handlers.AdminHandler,
 	adminMw *middleware.AdminMiddleware,
 	referralHandler *handlers.ReferralHandler,
+	revenueCatHandler *handlers.RevenueCatHandler,
 	authRateLimiter *middleware.RateLimitMiddleware,
 	magicLinkRateLimiter *middleware.RateLimitMiddleware,
 ) {
@@ -277,6 +279,9 @@ func (r *Router) setupRoutes(
 
 		// Payment webhook (public - called by Stripe)
 		router.Post("/payments/webhook", paymentHandler.Webhook)
+
+		// RevenueCat webhook (public - called by RevenueCat)
+		router.Post("/revenuecat/webhook", revenueCatHandler.HandleWebhook)
 
 		// Public payment routes (plans list)
 		router.Get("/payments/plans", paymentHandler.GetPlans)

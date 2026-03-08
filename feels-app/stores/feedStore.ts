@@ -108,10 +108,13 @@ interface FeedState {
   currentIndex: number;
   isLoading: boolean;
   error: string | null;
+  lastPassed: Profile | null; // Store last passed profile for rewind
 
   loadProfiles: (forceRefresh?: boolean) => Promise<void>;
   nextProfile: () => void;
-  swipe: (action: 'like' | 'pass' | 'superlike') => Promise<{ matched: boolean; match_id?: string } | null>;
+  swipe: (action: 'like' | 'pass' | 'superlike' | 'premiumlike') => Promise<{ matched: boolean; match_id?: string } | null>;
+  rewind: () => Promise<boolean>;
+  canRewind: () => boolean;
   reset: () => void;
 }
 
@@ -120,6 +123,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   currentIndex: 0,
   isLoading: false,
   error: null,
+  lastPassed: null,
 
   loadProfiles: async (forceRefresh = false) => {
     const { profiles: existingProfiles, currentIndex } = get();
@@ -167,7 +171,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }
   },
 
-  swipe: async (action: 'like' | 'pass' | 'superlike') => {
+  swipe: async (action: 'like' | 'pass' | 'superlike' | 'premiumlike') => {
     const { profiles, currentIndex } = get();
     const profile = profiles[currentIndex];
 
@@ -175,6 +179,14 @@ export const useFeedStore = create<FeedState>((set, get) => ({
 
     try {
       const response = await feedApi.swipe(profile.id, action);
+
+      // Track last passed profile for rewind
+      if (action === 'pass') {
+        set({ lastPassed: profile });
+      } else {
+        set({ lastPassed: null }); // Clear on like (can't rewind likes)
+      }
+
       get().nextProfile();
 
       // Return match result (backend returns { matched: bool, match_id?: string })
@@ -193,7 +205,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       } else if (status === 409) {
         errorMsg = 'Already liked this person';
         get().nextProfile(); // Skip to next since already liked
-        return false;
+        return null;
       } else if (serverError) {
         errorMsg = serverError;
       }
@@ -203,7 +215,35 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }
   },
 
+  rewind: async () => {
+    const { lastPassed, profiles, currentIndex } = get();
+    if (!lastPassed) return false;
+
+    try {
+      // Call backend to undo the pass
+      await feedApi.rewind();
+
+      // Insert the profile back at current position
+      const newProfiles = [...profiles];
+      newProfiles.splice(currentIndex, 0, lastPassed);
+
+      set({
+        profiles: newProfiles,
+        lastPassed: null,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Rewind failed:', error);
+      return false;
+    }
+  },
+
+  canRewind: () => {
+    return get().lastPassed !== null;
+  },
+
   reset: () => {
-    set({ profiles: [], currentIndex: 0, isLoading: false, error: null });
+    set({ profiles: [], currentIndex: 0, isLoading: false, error: null, lastPassed: null });
   },
 }));

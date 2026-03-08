@@ -65,7 +65,8 @@ export const colors = {
   // Action colors (for swipe feedback)
   like: '#4ADE80',         // Fresh green (not gendered)
   pass: '#6B7280',         // Neutral gray
-  superlike: '#F5A623',    // Gold/amber
+  premiumLike: '#F5A623',  // Gold/amber (for premium likes)
+  superlike: '#F5A623',    // Alias for premiumLike (backwards compat)
   match: '#E85D75',        // Primary brand
 
   // Overlay

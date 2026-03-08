@@ -27,13 +27,17 @@ func NewCreditRepository(db *pgxpool.Pool) *CreditRepository {
 // GetCredit gets a user's credit balance
 func (r *CreditRepository) GetCredit(ctx context.Context, userID uuid.UUID) (*credit.Credit, error) {
 	query := `
-		SELECT user_id, balance, bonus_likes, last_reset
+		SELECT user_id, balance, bonus_likes,
+			COALESCE(premium_likes_used, 0), COALESCE(boosts_used, 0),
+			last_reset, last_boost_reset
 		FROM credits
 		WHERE user_id = $1
 	`
 	var c credit.Credit
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&c.UserID, &c.Balance, &c.BonusLikes, &c.LastReset,
+		&c.UserID, &c.Balance, &c.BonusLikes,
+		&c.PremiumLikesUsed, &c.BoostsUsed,
+		&c.LastReset, &c.LastBoostReset,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -46,6 +50,25 @@ func (r *CreditRepository) GetCredit(ctx context.Context, userID uuid.UUID) (*cr
 		}
 		return nil, err
 	}
+
+	// Reset premium likes if it's a new day
+	if c.LastReset != nil {
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		lastReset := c.LastReset.UTC().Truncate(24 * time.Hour)
+		if today.After(lastReset) {
+			c.PremiumLikesUsed = 0
+		}
+	}
+
+	// Reset boosts if it's been 7+ days
+	if c.LastBoostReset != nil {
+		now := time.Now().UTC()
+		lastBoost := c.LastBoostReset.UTC()
+		if now.Sub(lastBoost) >= 7*24*time.Hour {
+			c.BoostsUsed = 0
+		}
+	}
+
 	return &c, nil
 }
 
@@ -320,6 +343,53 @@ func (r *CreditRepository) DeductCreditsAtomic(ctx context.Context, userID uuid.
 	}
 	if result.RowsAffected() == 0 {
 		return ErrInsufficientCredits
+	}
+	return nil
+}
+
+// Premium like methods
+
+var ErrPremiumLikeLimitReached = errors.New("premium like limit reached")
+
+// UsePremiumLike records usage of a premium like (resets daily)
+func (r *CreditRepository) UsePremiumLike(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE credits
+		SET premium_likes_used = CASE
+			WHEN last_reset IS NULL OR last_reset::date < CURRENT_DATE THEN 1
+			ELSE premium_likes_used + 1
+		END,
+		last_reset = CURRENT_DATE
+		WHERE user_id = $1
+	`
+	_, err := r.db.Exec(ctx, query, userID)
+	return err
+}
+
+// UsePremiumLikeAtomic atomically checks limit and uses a premium like
+func (r *CreditRepository) UsePremiumLikeAtomic(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE credits
+		SET premium_likes_used = CASE
+			WHEN last_reset IS NULL OR last_reset::date < CURRENT_DATE THEN 1
+			ELSE premium_likes_used + 1
+		END,
+		last_reset = CURRENT_DATE
+		WHERE user_id = $1
+		AND (
+			last_reset IS NULL
+			OR last_reset::date < CURRENT_DATE
+			OR premium_likes_used < $2
+		)
+		RETURNING premium_likes_used
+	`
+	var used int
+	err := r.db.QueryRow(ctx, query, userID, credit.PremiumLikesPerDay).Scan(&used)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrPremiumLikeLimitReached
+		}
+		return err
 	}
 	return nil
 }

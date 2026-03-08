@@ -85,6 +85,7 @@ export default function ChatScreen() {
   const [message, setMessage] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState<string | null>(null);
   const [reportDetails, setReportDetails] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -558,7 +559,10 @@ export default function ChatScreen() {
           <ArrowLeftIcon size={24} color={colors.text.primary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.profileInfo}>
+        <TouchableOpacity
+          style={styles.profileInfo}
+          onPress={() => setProfileModalVisible(true)}
+        >
           {match?.other_user.photos?.[0]?.url && (
             <Image
               source={{ uri: match.other_user.photos?.[0]?.url }}
@@ -599,8 +603,8 @@ export default function ChatScreen() {
       {/* Messages */}
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -675,6 +679,49 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Profile Modal */}
+      <Modal
+        visible={profileModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <View style={styles.profileModalOverlay}>
+          <View style={styles.profileModalContent}>
+            <TouchableOpacity
+              style={styles.profileModalClose}
+              onPress={() => setProfileModalVisible(false)}
+            >
+              <XIcon size={24} color={colors.text.secondary} />
+            </TouchableOpacity>
+
+            {match?.other_user.photos?.[0]?.url && (
+              <Image
+                source={{ uri: match.other_user.photos[0].url }}
+                style={styles.profileModalPhoto}
+                contentFit="cover"
+              />
+            )}
+
+            <Text style={styles.profileModalName}>{match?.other_user.name}</Text>
+
+            {/* Show more photos if available */}
+            {match?.other_user.photos && match.other_user.photos.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileModalPhotos}>
+                {match.other_user.photos.slice(1).map((photo, index) => (
+                  <Image
+                    key={index}
+                    source={{ uri: photo.url }}
+                    style={styles.profileModalThumb}
+                    contentFit="cover"
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
       </Modal>
 
       {/* Report Modal */}
@@ -1007,5 +1054,49 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.bold as any,
     color: colors.text.primary,
+  },
+  // Profile modal styles
+  profileModalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  profileModalContent: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+  },
+  profileModalClose: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 1,
+    padding: spacing.sm,
+  },
+  profileModalPhoto: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    marginBottom: spacing.lg,
+  },
+  profileModalName: {
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  profileModalPhotos: {
+    marginTop: spacing.md,
+  },
+  profileModalThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.md,
+    marginRight: spacing.sm,
   },
 });

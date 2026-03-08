@@ -9,40 +9,22 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/stores/authStore';
-import { EyeIcon, EyeOffIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
-type LoginMode = 'password' | 'magic' | 'magic_sent';
+type LoginStep = 'email' | 'token';
 
 export default function LoginScreen() {
+  const [step, setStep] = useState<LoginStep>('email');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [magicToken, setMagicToken] = useState('');
+  const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [loginMode, setLoginMode] = useState<LoginMode>('password');
-  const { login, sendMagicLink, verifyMagicLink, isLoading } = useAuthStore();
+  const { sendMagicLink, verifyMagicLink, isLoading } = useAuthStore();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
-
-    setError('');
-    try {
-      await login(email, password);
-      router.replace('/(tabs)');
-    } catch (e: any) {
-      setError(e.message || 'Login failed');
-    }
-  };
-
-  const handleSendMagicLink = async () => {
+  const handleSendLink = async () => {
     if (!email) {
       setError('Please enter your email');
       return;
@@ -52,37 +34,37 @@ export default function LoginScreen() {
     setSuccess('');
     try {
       await sendMagicLink(email);
-      setLoginMode('magic_sent');
+      setStep('token');
       setSuccess('Check your email for the login link');
     } catch (e: any) {
       setError(e.message || 'Failed to send magic link');
     }
   };
 
-  const handleVerifyMagicLink = async () => {
-    if (!magicToken) {
+  const handleVerify = async () => {
+    if (!token) {
       setError('Please enter the token from your email');
       return;
     }
 
     setError('');
     try {
-      await verifyMagicLink(magicToken);
+      await verifyMagicLink(token);
       router.replace('/(tabs)');
     } catch (e: any) {
       setError(e.message || 'Invalid or expired link');
     }
   };
 
-  const toggleLoginMode = () => {
+  const handleBack = () => {
+    setStep('email');
+    setToken('');
     setError('');
     setSuccess('');
-    if (loginMode === 'password') {
-      setLoginMode('magic');
-    } else {
-      setLoginMode('password');
-      setMagicToken('');
-    }
+  };
+
+  const goToPhone = () => {
+    router.replace('/(auth)/phone' as any);
   };
 
   return (
@@ -93,7 +75,9 @@ export default function LoginScreen() {
       >
         <View style={styles.content}>
           <Text style={styles.title}>feels</Text>
-          <Text style={styles.subtitle}>Find your connection</Text>
+          <Text style={styles.subtitle}>
+            {step === 'email' ? 'Sign in with email' : 'Enter your code'}
+          </Text>
 
           {error ? (
             <View style={styles.errorBox}>
@@ -107,7 +91,7 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {loginMode === 'password' && (
+          {step === 'email' && (
             <>
               <View style={styles.inputContainer}>
                 <TextInput
@@ -119,98 +103,37 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoFocus
                 />
               </View>
 
-              <View style={styles.inputContainer}>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Password"
-                    placeholderTextColor={colors.text.tertiary}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon size={20} color={colors.text.tertiary} />
-                    ) : (
-                      <EyeIcon size={20} color={colors.text.tertiary} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
               <TouchableOpacity
-                style={styles.button}
-                onPress={handleLogin}
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleSendLink}
                 disabled={isLoading}
                 activeOpacity={0.8}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.text.primary} />
                 ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
+                  <Text style={styles.buttonText}>Send Login Link</Text>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.magicLinkButton}
-                onPress={toggleLoginMode}
+                style={styles.linkButton}
+                onPress={goToPhone}
                 activeOpacity={0.8}
               >
-                <Text style={styles.magicLinkButtonText}>Sign in with email link</Text>
+                <Text style={styles.linkText}>Sign in with phone instead</Text>
               </TouchableOpacity>
             </>
           )}
 
-          {loginMode === 'magic' && (
+          {step === 'token' && (
             <>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor={colors.text.tertiary}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleSendMagicLink}
-                disabled={isLoading}
-                activeOpacity={0.8}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={colors.text.primary} />
-                ) : (
-                  <Text style={styles.buttonText}>Send Magic Link</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.magicLinkButton}
-                onPress={toggleLoginMode}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.magicLinkButtonText}>Sign in with password</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {loginMode === 'magic_sent' && (
-            <>
-              <Text style={styles.magicInstructions}>
-                Enter the token from your email to sign in
+              <Text style={styles.instructions}>
+                We sent a code to {email}. Paste it below.
               </Text>
 
               <View style={styles.inputContainer}>
@@ -218,16 +141,17 @@ export default function LoginScreen() {
                   style={styles.input}
                   placeholder="Paste token here"
                   placeholderTextColor={colors.text.tertiary}
-                  value={magicToken}
-                  onChangeText={setMagicToken}
+                  value={token}
+                  onChangeText={setToken}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoFocus
                 />
               </View>
 
               <TouchableOpacity
-                style={styles.button}
-                onPress={handleVerifyMagicLink}
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleVerify}
                 disabled={isLoading}
                 activeOpacity={0.8}
               >
@@ -239,31 +163,23 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.magicLinkButton}
-                onPress={() => setLoginMode('magic')}
+                style={styles.linkButton}
+                onPress={handleSendLink}
+                disabled={isLoading}
                 activeOpacity={0.8}
               >
-                <Text style={styles.magicLinkButtonText}>Resend magic link</Text>
+                <Text style={styles.linkText}>Resend code</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.magicLinkButton}
-                onPress={toggleLoginMode}
+                style={styles.linkButton}
+                onPress={handleBack}
                 activeOpacity={0.8}
               >
-                <Text style={styles.magicLinkButtonText}>Sign in with password</Text>
+                <Text style={styles.linkText}>Use a different email</Text>
               </TouchableOpacity>
             </>
           )}
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <Link href="/register" asChild>
-              <TouchableOpacity>
-                <Text style={styles.linkText}>Sign Up</Text>
-              </TouchableOpacity>
-            </Link>
-          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -327,29 +243,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     fontSize: typography.sizes.base,
   },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg.secondary,
-    borderRadius: borderRadius.md,
-  },
-  passwordInput: {
-    flex: 1,
-    color: colors.text.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    fontSize: typography.sizes.base,
-  },
-  eyeButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-  },
   button: {
     backgroundColor: colors.primary.DEFAULT,
     paddingVertical: spacing.lg,
     borderRadius: borderRadius.md,
-    marginTop: spacing.sm,
     marginBottom: spacing.lg,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: colors.text.primary,
@@ -357,32 +258,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold as any,
   },
-  magicLinkButton: {
+  linkButton: {
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
   },
-  magicLinkButtonText: {
+  linkText: {
     color: colors.primary.DEFAULT,
     textAlign: 'center',
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold as any,
   },
-  magicInstructions: {
+  instructions: {
     color: colors.text.secondary,
     textAlign: 'center',
     fontSize: typography.sizes.sm,
     marginBottom: spacing.xl,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  footerText: {
-    color: colors.text.secondary,
-  },
-  linkText: {
-    color: colors.primary.DEFAULT,
-    fontWeight: typography.weights.semibold as any,
   },
 });

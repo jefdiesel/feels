@@ -98,7 +98,7 @@ func (h *FeedHandler) Like(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, resp, http.StatusOK)
 }
 
-func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
+func (h *FeedHandler) PremiumLike(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
@@ -112,6 +112,15 @@ func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user has premium subscription
+	if h.subscriptionChecker != nil {
+		hasSubscription, err := h.subscriptionChecker.HasActiveSubscription(r.Context(), userID)
+		if err != nil || !hasSubscription {
+			jsonError(w, "premium like requires subscription", http.StatusPaymentRequired)
+			return
+		}
+	}
+
 	resp, err := h.feedService.Like(r.Context(), userID, targetID, true)
 	if err != nil {
 		switch {
@@ -122,15 +131,20 @@ func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, feed.ErrInsufficientLikes),
 			errors.Is(err, credit.ErrInsufficientCredits),
 			errors.Is(err, credit.ErrDailyLimitReached):
-			jsonError(w, "insufficient credits for superlike", http.StatusPaymentRequired)
+			jsonError(w, "daily premium like limit reached", http.StatusPaymentRequired)
 		default:
-			log.Printf("[ERROR] Superlike failed for user %s -> %s: %v", userID, targetID, err)
-			jsonError(w, "failed to superlike", http.StatusInternalServerError)
+			log.Printf("[ERROR] PremiumLike failed for user %s -> %s: %v", userID, targetID, err)
+			jsonError(w, "failed to premium like", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	jsonResponse(w, resp, http.StatusOK)
+}
+
+// Superlike is kept for backwards compatibility, redirects to PremiumLike
+func (h *FeedHandler) Superlike(w http.ResponseWriter, r *http.Request) {
+	h.PremiumLike(w, r)
 }
 
 func (h *FeedHandler) Pass(w http.ResponseWriter, r *http.Request) {
@@ -222,8 +236,8 @@ func (h *FeedHandler) Rewind(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, profile, http.StatusOK)
 }
 
-// SuperlikeWithMessage handles superlike with an attached message
-func (h *FeedHandler) SuperlikeWithMessage(w http.ResponseWriter, r *http.Request) {
+// PremiumLikeWithMessage handles premium like with an attached message
+func (h *FeedHandler) PremiumLikeWithMessage(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
@@ -241,7 +255,7 @@ func (h *FeedHandler) SuperlikeWithMessage(w http.ResponseWriter, r *http.Reques
 	if h.subscriptionChecker != nil {
 		hasSubscription, err := h.subscriptionChecker.HasActiveSubscription(r.Context(), userID)
 		if err != nil || !hasSubscription {
-			jsonError(w, "superlike with message requires premium subscription", http.StatusPaymentRequired)
+			jsonError(w, "premium like with message requires subscription", http.StatusPaymentRequired)
 			return
 		}
 	}
@@ -270,14 +284,19 @@ func (h *FeedHandler) SuperlikeWithMessage(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, feed.ErrInsufficientLikes),
 			errors.Is(err, credit.ErrInsufficientCredits),
 			errors.Is(err, credit.ErrDailyLimitReached):
-			jsonError(w, "insufficient credits for superlike", http.StatusPaymentRequired)
+			jsonError(w, "daily premium like limit reached", http.StatusPaymentRequired)
 		default:
-			jsonError(w, "failed to superlike", http.StatusInternalServerError)
+			jsonError(w, "failed to premium like", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	jsonResponse(w, resp, http.StatusOK)
+}
+
+// SuperlikeWithMessage is kept for backwards compatibility
+func (h *FeedHandler) SuperlikeWithMessage(w http.ResponseWriter, r *http.Request) {
+	h.PremiumLikeWithMessage(w, r)
 }
 
 // DebugFeed returns diagnostic info about why feed might be empty

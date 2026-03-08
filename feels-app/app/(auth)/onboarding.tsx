@@ -73,26 +73,28 @@ export default function OnboardingScreen() {
 
   // Form data
   const [name, setName] = useState(user?.name || '');
-  const [dob, setDob] = useState('');
+  const [dobYear, setDobYear] = useState('');
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobDay, setDobDay] = useState('');
   const [gender, setGender] = useState('');
   const [vibeLevel, setVibeLevel] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [bio, setBio] = useState('');
   const [seekingGenders, setSeekingGenders] = useState<string[]>([]);
   const [lookingFor, setLookingFor] = useState('');
+  const [ageMin, setAgeMin] = useState('21');
+  const [ageMax, setAgeMax] = useState('60');
 
   // Prompts state
   const [selectedPrompts, setSelectedPrompts] = useState<PromptAnswer[]>([]);
   const [editingPromptIndex, setEditingPromptIndex] = useState<number | null>(null);
   const [promptAnswer, setPromptAnswer] = useState('');
 
-  const formatDob = (text: string) => {
-    // Remove non-digits
-    const digits = text.replace(/\D/g, '');
-    // Format as YYYY-MM-DD
-    if (digits.length <= 4) return digits;
-    if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  const getDob = () => {
+    if (dobYear.length === 4 && dobMonth.length === 2 && dobDay.length === 2) {
+      return `${dobYear}-${dobMonth}-${dobDay}`;
+    }
+    return '';
   };
 
   const toggleSeekingGender = (g: string) => {
@@ -106,8 +108,9 @@ export default function OnboardingScreen() {
       Alert.alert('Error', 'Please enter your name');
       return false;
     }
-    if (dob.length !== 10) {
-      Alert.alert('Error', 'Please enter your birth date (YYYY-MM-DD)');
+    const dob = getDob();
+    if (!dob) {
+      Alert.alert('Error', 'Please enter your complete birth date');
       return false;
     }
     // Check age is 18+
@@ -157,9 +160,9 @@ export default function OnboardingScreen() {
     return true;
   };
 
-  const validateStep4 = () => {
+  const validateStep4 = (promptsToCheck: PromptAnswer[]) => {
     // Prompts are optional but if selected, they must have answers
-    const incompletePrompts = selectedPrompts.filter(p => !p.answer.trim());
+    const incompletePrompts = promptsToCheck.filter(p => !p.answer.trim());
     if (incompletePrompts.length > 0) {
       Alert.alert('Error', 'Please answer all selected prompts or remove them');
       return false;
@@ -171,7 +174,21 @@ export default function OnboardingScreen() {
     if (step === 1 && validateStep1()) setStep(2);
     else if (step === 2 && validateStep2()) setStep(3);
     else if (step === 3 && validateStep3()) setStep(4);
-    else if (step === 4 && validateStep4()) handleSubmit();
+    else if (step === 4) {
+      // Save any pending prompt answer first
+      let finalPrompts = selectedPrompts;
+      if (editingPromptIndex !== null && promptAnswer.trim()) {
+        finalPrompts = [...selectedPrompts];
+        finalPrompts[editingPromptIndex] = {
+          ...finalPrompts[editingPromptIndex],
+          answer: promptAnswer.trim()
+        };
+        setSelectedPrompts(finalPrompts);
+        setEditingPromptIndex(null);
+        setPromptAnswer('');
+      }
+      if (validateStep4(finalPrompts)) handleSubmit(finalPrompts);
+    }
   };
 
   const selectPrompt = (question: string) => {
@@ -215,26 +232,27 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (finalPrompts?: PromptAnswer[]) => {
+    const promptsToSubmit = finalPrompts || selectedPrompts;
     setIsLoading(true);
     try {
       // Create profile with prompts
       await profileApi.create({
         name: name.trim(),
-        dob,
+        dob: getDob(),
         gender,
         zip_code: zipCode.trim(),
         bio: bio.trim(),
         kink_level: vibeLevel,
-        looking_for: lookingFor,
-        prompts: selectedPrompts.filter(p => p.answer.trim()),
+        looking_for: [lookingFor], // Backend expects array
+        prompts: promptsToSubmit.filter(p => p.answer.trim()),
       });
 
       // Set preferences
       await profileApi.updatePreferences({
         genders_seeking: seekingGenders,
-        age_min: 18,
-        age_max: 50,
+        age_min: parseInt(ageMin) || 18,
+        age_max: parseInt(ageMax) || 50,
         distance_miles: 25,
         visible_to_genders: seekingGenders,
       });
@@ -310,20 +328,44 @@ export default function OnboardingScreen() {
 
               <Text style={styles.label}>Birthday</Text>
               <View style={styles.dobContainer}>
-                <TextInput
-                  style={styles.input}
-                  value={dob}
-                  onChangeText={(t) => setDob(formatDob(t))}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#666"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                />
-                {dob.length > 0 && dob.length < 10 && (
-                  <Text style={styles.dobFormat}>
-                    {dob.length <= 4 ? 'Year' : dob.length <= 7 ? 'Month' : 'Day'}
-                  </Text>
-                )}
+                <View style={styles.dobField}>
+                  <TextInput
+                    style={styles.dobInput}
+                    value={dobYear}
+                    onChangeText={(t) => setDobYear(t.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="YYYY"
+                    placeholderTextColor="#666"
+                    keyboardType="number-pad"
+                    maxLength={4}
+                  />
+                  <Text style={styles.dobLabel}>Year</Text>
+                </View>
+                <Text style={styles.dobSeparator}>-</Text>
+                <View style={styles.dobField}>
+                  <TextInput
+                    style={styles.dobInput}
+                    value={dobMonth}
+                    onChangeText={(t) => setDobMonth(t.replace(/\D/g, '').slice(0, 2))}
+                    placeholder="MM"
+                    placeholderTextColor="#666"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={styles.dobLabel}>Month</Text>
+                </View>
+                <Text style={styles.dobSeparator}>-</Text>
+                <View style={styles.dobField}>
+                  <TextInput
+                    style={styles.dobInput}
+                    value={dobDay}
+                    onChangeText={(t) => setDobDay(t.replace(/\D/g, '').slice(0, 2))}
+                    placeholder="DD"
+                    placeholderTextColor="#666"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={styles.dobLabel}>Day</Text>
+                </View>
               </View>
               <Text style={styles.hint}>You must be 18+ to use Feels</Text>
             </View>
@@ -402,6 +444,35 @@ export default function OnboardingScreen() {
                 ))}
               </View>
               <Text style={styles.hint}>Select all that apply</Text>
+
+              <Text style={[styles.label, { marginTop: 24 }]}>Age range</Text>
+              <View style={styles.ageRangeContainer}>
+                <View style={styles.ageField}>
+                  <TextInput
+                    style={styles.ageInput}
+                    value={ageMin}
+                    onChangeText={(t) => setAgeMin(t.replace(/\D/g, '').slice(0, 2))}
+                    placeholder="21"
+                    placeholderTextColor="#666"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={styles.ageLabel}>Min</Text>
+                </View>
+                <Text style={styles.ageSeparator}>to</Text>
+                <View style={styles.ageField}>
+                  <TextInput
+                    style={styles.ageInput}
+                    value={ageMax}
+                    onChangeText={(t) => setAgeMax(t.replace(/\D/g, '').slice(0, 2))}
+                    placeholder="45"
+                    placeholderTextColor="#666"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={styles.ageLabel}>Max</Text>
+                </View>
+              </View>
 
               <Text style={[styles.label, { marginTop: 24 }]}>I'm looking for...</Text>
               <View style={styles.optionsGrid}>
@@ -616,19 +687,71 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
+    letterSpacing: 0,
   },
   bioInput: {
     minHeight: 120,
     paddingTop: spacing.lg,
   },
   dobContainer: {
-    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  dobFormat: {
-    position: 'absolute',
-    right: spacing.lg,
-    top: 18,
-    fontSize: typography.sizes.sm,
+  dobField: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  dobInput: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes.lg,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    textAlign: 'center',
+    width: '100%',
+    letterSpacing: 0,
+  },
+  dobLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+  },
+  dobSeparator: {
+    fontSize: typography.sizes.xl,
+    color: colors.text.tertiary,
+    marginTop: -spacing.lg,
+  },
+  ageRangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  ageField: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  ageInput: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes.lg,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    textAlign: 'center',
+    width: '100%',
+    letterSpacing: 0,
+  },
+  ageLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+  },
+  ageSeparator: {
+    fontSize: typography.sizes.base,
     color: colors.text.tertiary,
   },
   hint: {

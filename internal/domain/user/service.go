@@ -27,6 +27,7 @@ var (
 	ErrCodeExpired        = errors.New("verification code expired")
 	ErrTooManyAttempts    = errors.New("too many verification attempts")
 	ErrDeviceRequired     = errors.New("device_id is required")
+	ErrDeviceRegistered   = errors.New("this device already has an account")
 	ErrTOTPRequired       = errors.New("2FA code required")
 	ErrInvalidTOTP        = errors.New("invalid 2FA code")
 	ErrMagicLinkExpired   = errors.New("magic link expired")
@@ -39,7 +40,9 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByPhone(ctx context.Context, phone string) (*User, error)
+	GetByDeviceID(ctx context.Context, deviceID string) (*User, error)
 	Update(ctx context.Context, u *User) error
+	ClearDeviceID(ctx context.Context, deviceID string) error
 	CreateRefreshToken(ctx context.Context, token *RefreshToken) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*RefreshToken, error)
 	DeleteRefreshToken(ctx context.Context, tokenHash string) error
@@ -123,6 +126,17 @@ func (s *Service) CreateWithPhone(ctx context.Context, phone, deviceID, platform
 		return nil, ErrPhoneExists
 	}
 
+	// Check if device already has an account (anti-multi-accounting)
+	if deviceID != "" {
+		existingDevice, err := s.repo.GetByDeviceID(ctx, deviceID)
+		if err != nil {
+			return nil, err
+		}
+		if existingDevice != nil {
+			return nil, ErrDeviceRegistered
+		}
+	}
+
 	now := time.Now()
 	user := &User{
 		ID:              uuid.New(),
@@ -169,6 +183,20 @@ func (s *Service) GenerateTokens(ctx context.Context, userID uuid.UUID, deviceID
 		CreatedAt:  now,
 	}
 	_ = s.repo.UpsertDeviceSession(ctx, session)
+
+	// Update user's device_id to the new device (for login from new phone)
+	// This clears the old device and associates the new one
+	if deviceID != "" {
+		// First, clear this device_id from any other user
+		_ = s.repo.ClearDeviceID(ctx, deviceID)
+
+		// Then update this user's device_id
+		user, err := s.repo.GetByID(ctx, userID)
+		if err == nil && user != nil {
+			user.DeviceID = &deviceID
+			_ = s.repo.Update(ctx, user)
+		}
+	}
 
 	return s.generateTokens(ctx, userID)
 }

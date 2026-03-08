@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api } from '@/api/client';
+import { api, profileApi } from '@/api/client';
 import { useCreditsStore } from '@/stores/creditsStore';
 import { ArrowLeftIcon, CrownIcon, LockIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
@@ -36,6 +36,7 @@ export default function PrivacySettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<PrivacySettings>(defaultSettings);
+  const [isPrivate, setIsPrivate] = useState(false);
   const { subscription } = useCreditsStore();
 
   const isPremium = subscription?.status === 'active';
@@ -46,8 +47,12 @@ export default function PrivacySettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const response = await api.get('/settings/privacy');
-      setSettings({ ...defaultSettings, ...response.data });
+      const [privacyRes, prefsRes] = await Promise.all([
+        api.get('/settings/privacy'),
+        profileApi.getPreferences(),
+      ]);
+      setSettings({ ...defaultSettings, ...privacyRes.data });
+      setIsPrivate(prefsRes.data?.is_private ?? false);
     } catch (error: any) {
       // If no settings exist yet, use defaults
     } finally {
@@ -69,7 +74,7 @@ export default function PrivacySettingsScreen() {
         'This feature requires a premium subscription.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Get Premium', onPress: () => router.push('/premium') },
+          { text: 'Get Premium', onPress: () => router.push('/(tabs)/profile') },
         ]
       );
       return;
@@ -84,6 +89,34 @@ export default function PrivacySettingsScreen() {
     } catch (error: any) {
       console.error('Failed to save setting:', error);
       setSettings(settings);
+      Alert.alert('Error', 'Failed to save setting. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updatePrivateMode = async (value: boolean) => {
+    if (!isPremium) {
+      Alert.alert(
+        'Premium Feature',
+        'Private mode requires a premium subscription. Go invisible and only appear to people you like.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Get Premium', onPress: () => router.push('/(tabs)/profile') },
+        ]
+      );
+      return;
+    }
+
+    const previousValue = isPrivate;
+    setIsPrivate(value);
+
+    setSaving(true);
+    try {
+      await profileApi.updatePreferences({ is_private: value });
+    } catch (error: any) {
+      console.error('Failed to save private mode:', error);
+      setIsPrivate(previousValue);
       Alert.alert('Error', 'Failed to save setting. Please try again.');
     } finally {
       setSaving(false);
@@ -199,6 +232,25 @@ export default function PrivacySettingsScreen() {
         {/* Advanced Privacy */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Advanced</Text>
+
+          <View style={[styles.settingRow, !isPremium && styles.settingLocked]}>
+            <View style={styles.settingInfo}>
+              <View style={styles.settingTitleRow}>
+                <Text style={styles.settingTitle}>Private Mode</Text>
+                {!isPremium && renderPremiumBadge()}
+              </View>
+              <Text style={styles.settingDescription}>
+                Go invisible — only appear to people you've already liked
+              </Text>
+            </View>
+            <Switch
+              value={isPrivate}
+              onValueChange={updatePrivateMode}
+              trackColor={{ false: colors.bg.tertiary, true: colors.primary.DEFAULT }}
+              thumbColor={colors.text.primary}
+              disabled={!isPremium}
+            />
+          </View>
 
           <View style={[styles.settingRow, !isPremium && styles.settingLocked]}>
             <View style={styles.settingInfo}>

@@ -34,23 +34,24 @@ var PlanCredits = map[PlanType]map[PeriodType]int{
 	},
 }
 
-// Credit costs
+// Daily limits
 const (
-	CostSuperlike = 10
-	CostLike      = 1
+	FreeDailyLikeLimit    = 20
+	PremiumDailyLikeLimit = 50
+	MaxBonusLikes         = 10
+	PremiumLikesPerDay    = 3
+	BoostsPerWeek         = 1
 )
 
-// Daily limits for free users
-const (
-	FreeDailyLikeLimit = 10
-)
-
-// Credit represents a user's credit balance
+// Credit represents a user's credit balance and daily usage
 type Credit struct {
-	UserID    uuid.UUID  `json:"user_id"`
-	Balance   int        `json:"balance"`
-	BonusLikes int       `json:"bonus_likes"`
-	LastReset *time.Time `json:"last_reset,omitempty"`
+	UserID            uuid.UUID  `json:"user_id"`
+	Balance           int        `json:"balance"`
+	BonusLikes        int        `json:"bonus_likes"`
+	PremiumLikesUsed  int        `json:"premium_likes_used"`  // Resets daily
+	BoostsUsed        int        `json:"boosts_used"`         // Resets weekly
+	LastReset         *time.Time `json:"last_reset,omitempty"`
+	LastBoostReset    *time.Time `json:"last_boost_reset,omitempty"` // Weekly reset
 }
 
 // Subscription represents a user's active subscription
@@ -74,11 +75,15 @@ type DailyLike struct {
 
 // BalanceResponse is the API response for credit balance
 type BalanceResponse struct {
-	Balance         int  `json:"balance"`
-	BonusLikes      int  `json:"bonus_likes"`
-	DailyLikesUsed  int  `json:"daily_likes_used"`
-	DailyLikesLimit int  `json:"daily_likes_limit"`
-	HasSubscription bool `json:"has_subscription"`
+	Balance            int  `json:"balance"`
+	BonusLikes         int  `json:"bonus_likes"`
+	DailyLikesUsed     int  `json:"daily_likes_used"`
+	DailyLikesLimit    int  `json:"daily_likes_limit"`
+	PremiumLikesUsed   int  `json:"premium_likes_used"`
+	PremiumLikesLimit  int  `json:"premium_likes_limit"`
+	BoostsUsed         int  `json:"boosts_used"`
+	BoostsLimit        int  `json:"boosts_limit"`
+	HasSubscription    bool `json:"has_subscription"`
 }
 
 // SubscriptionResponse is the API response for subscription status

@@ -43,7 +43,7 @@ function TabIcon({ focused, icon, badge }: TabIconProps) {
     <View style={[styles.tabIconContainer, focused && styles.tabIconFocused]}>
       {renderIcon()}
       {focused && <View style={styles.indicator} />}
-      {badge && badge > 0 && (
+      {badge !== undefined && badge > 0 && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
         </View>

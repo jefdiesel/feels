@@ -123,7 +123,7 @@ const getDefaultPrompts = (profile: Profile) => {
 
 interface SwipeCardProps {
   profile: Profile;
-  onSwipe: (action: 'like' | 'pass' | 'superlike') => void;
+  onSwipe: (action: 'like' | 'pass' | 'superlike' | 'premiumlike') => void;
   onExpandProfile: () => void;
   onLikePrompt?: (promptId: string) => void;
 }

@@ -13,6 +13,7 @@ import (
 var (
 	ErrUserNotFound      = errors.New("user not found")
 	ErrEmailExists       = errors.New("email already exists")
+	ErrDeviceExists      = errors.New("device already registered")
 	ErrTokenNotFound     = errors.New("refresh token not found")
 	ErrTokenExpired      = errors.New("refresh token expired")
 )
@@ -432,4 +433,34 @@ func (r *UserRepository) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, e
 		return false, err
 	}
 	return isAdmin, nil
+}
+
+// GetByDeviceID returns the user associated with a device ID (if any)
+func (r *UserRepository) GetByDeviceID(ctx context.Context, deviceID string) (*user.User, error) {
+	query := `
+		SELECT id, email, password_hash, email_verified, phone, phone_verified,
+		       phone_verified_at, device_id, totp_secret, totp_enabled, totp_backup_codes,
+		       created_at, updated_at
+		FROM users WHERE device_id = $1
+	`
+	var u user.User
+	err := r.db.QueryRow(ctx, query, deviceID).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &u.EmailVerified, &u.Phone, &u.PhoneVerified,
+		&u.PhoneVerifiedAt, &u.DeviceID, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPBackupCodes,
+		&u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil // No user with this device - that's fine
+		}
+		return nil, err
+	}
+	return &u, nil
+}
+
+// ClearDeviceID removes a device ID from a user (when they log into existing account from new device)
+func (r *UserRepository) ClearDeviceID(ctx context.Context, deviceID string) error {
+	query := `UPDATE users SET device_id = NULL WHERE device_id = $1`
+	_, err := r.db.Exec(ctx, query, deviceID)
+	return err
 }

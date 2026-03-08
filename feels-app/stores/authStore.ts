@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
+import * as Application from 'expo-application';
+import * as Device from 'expo-device';
 import { api } from '@/api/client';
 import { storage } from './storage';
 
@@ -61,11 +63,24 @@ interface AuthState {
   getPublicKey: (userId: string) => Promise<string | null>;
 }
 
-// Generate or retrieve a persistent device ID
-const getOrCreateDeviceId = async (): Promise<string> => {
+// Get the hardware device ID (cannot be spoofed by clearing storage)
+const getHardwareDeviceId = async (): Promise<string> => {
+  try {
+    if (Platform.OS === 'ios') {
+      const iosId = await Application.getIosIdForVendorAsync();
+      if (iosId) return iosId;
+    } else if (Platform.OS === 'android') {
+      const androidId = Application.getAndroidId();
+      if (androidId) return androidId;
+    }
+  } catch (e) {
+    // Fall through to fallback
+  }
+
+  // Fallback: use cached device ID from storage
   let deviceId = await storage.getItem('deviceId');
   if (!deviceId) {
-    // Generate a unique device ID
+    // Last resort: generate one and cache it
     deviceId = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
     await storage.setItem('deviceId', deviceId);
   }
@@ -83,7 +98,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   getDeviceId: async () => {
     let { deviceId } = get();
     if (!deviceId) {
-      deviceId = await getOrCreateDeviceId();
+      deviceId = await getHardwareDeviceId();
       set({ deviceId });
     }
     return deviceId;
@@ -213,7 +228,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const accessToken = await storage.getItem('accessToken');
       const refreshToken = await storage.getItem('refreshToken');
-      const deviceId = await getOrCreateDeviceId();
+      const deviceId = await getHardwareDeviceId();
 
       set({ deviceId });
 

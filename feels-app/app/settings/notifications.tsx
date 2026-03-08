@@ -20,7 +20,7 @@ interface NotificationSettings {
   new_matches: boolean;
   new_messages: boolean;
   likes_received: boolean;
-  super_likes: boolean;
+  premium_likes: boolean;
   promotions: boolean;
 }
 
@@ -29,7 +29,7 @@ const defaultSettings: NotificationSettings = {
   new_matches: true,
   new_messages: true,
   likes_received: true,
-  super_likes: true,
+  premium_likes: true,
   promotions: false,
 };
 
@@ -64,7 +64,7 @@ export default function NotificationsSettingsScreen() {
         new_matches: false,
         new_messages: false,
         likes_received: false,
-        super_likes: false,
+        premium_likes: false,
         promotions: false,
       });
     }
@@ -176,14 +176,14 @@ export default function NotificationsSettingsScreen() {
 
           <View style={[styles.settingRow, !settings.push_enabled && styles.settingDisabled]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Super Likes</Text>
+              <Text style={styles.settingTitle}>Premium Likes</Text>
               <Text style={styles.settingDescription}>
-                When someone super likes you
+                When someone sends you a premium like
               </Text>
             </View>
             <Switch
-              value={settings.super_likes}
-              onValueChange={(value) => updateSetting('super_likes', value)}
+              value={settings.premium_likes}
+              onValueChange={(value) => updateSetting('premium_likes', value)}
               trackColor={{ false: colors.bg.tertiary, true: colors.primary.DEFAULT }}
               thumbColor={colors.text.primary}
               disabled={!settings.push_enabled}

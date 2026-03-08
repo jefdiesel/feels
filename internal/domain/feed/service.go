@@ -22,9 +22,9 @@ var (
 	ErrUserShadowbanned  = errors.New("user is not available")
 )
 
-// Credit costs (must match credit package values)
+// Premium like limits (must match credit package values)
 const (
-	CostSuperlike = 10
+	PremiumLikesPerDay = 2
 )
 
 // LikeResult contains the result of an atomic like operation
@@ -94,12 +94,12 @@ type MatchRepository interface {
 type CreditService interface {
 	CanLike(ctx context.Context, userID uuid.UUID) (bool, error)
 	UseLike(ctx context.Context, userID uuid.UUID) error
-	CanSuperlike(ctx context.Context, userID uuid.UUID) (bool, error)
-	UseSuperlike(ctx context.Context, userID uuid.UUID) error
+	CanPremiumLike(ctx context.Context, userID uuid.UUID) (bool, error)
+	UsePremiumLike(ctx context.Context, userID uuid.UUID) error
 	AddBonusLikes(ctx context.Context, userID uuid.UUID, amount int) error
 	// Atomic versions that check and deduct in a single transaction
 	UseLikeAtomic(ctx context.Context, userID uuid.UUID) error
-	UseSuperlikeAtomic(ctx context.Context, userID uuid.UUID) error
+	UsePremiumLikeAtomic(ctx context.Context, userID uuid.UUID) error
 }
 
 // Hub interface for real-time notifications
@@ -284,7 +284,7 @@ func (s *Service) Like(ctx context.Context, userID, targetID uuid.UUID, isSuperl
 		like,
 		isSuperlike,
 		s.dailyLimit,
-		CostSuperlike,
+		PremiumLikesPerDay,
 		user1, user2,
 	)
 	if err != nil {
@@ -459,7 +459,7 @@ func (s *Service) LikeWithMessage(ctx context.Context, userID, targetID uuid.UUI
 
 	// Use atomic credit+like transaction to prevent credit loss
 	// This wraps credit deduction and like creation in a single database transaction
-	result, err := s.feedRepo.CreateLikeWithMessageAndCreditAtomic(ctx, like, message, CostSuperlike, user1, user2)
+	result, err := s.feedRepo.CreateLikeWithMessageAndCreditAtomic(ctx, like, message, PremiumLikesPerDay, user1, user2)
 	if err != nil {
 		return nil, err
 	}

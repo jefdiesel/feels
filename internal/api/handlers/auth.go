@@ -539,6 +539,10 @@ func (h *AuthHandler) PhoneLogin(w http.ResponseWriter, r *http.Request) {
 		newUser, err := h.userService.CreateWithPhone(r.Context(), phone, req.DeviceID, req.Platform)
 		if err != nil {
 			log.Printf("[AUTH] Failed to create user for phone %s: %v", phone, err)
+			if errors.Is(err, user.ErrDeviceRegistered) {
+				jsonError(w, "this device already has an account - please log in instead", http.StatusConflict)
+				return
+			}
 			jsonError(w, "failed to create account", http.StatusInternalServerError)
 			return
 		}

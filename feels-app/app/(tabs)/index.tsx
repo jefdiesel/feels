@@ -16,24 +16,27 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { Image } from 'expo-image';
 import SwipeCard from '@/components/SwipeCard';
 import ProfileOverlay from '@/components/ProfileOverlay';
-import { CoinIcon, AlertCircleIcon, SparkleIcon, PartyPopperIcon, ChevronRightIcon } from '@/components/Icons';
+import { CoinIcon, AlertCircleIcon, SparkleIcon, PartyPopperIcon, ChevronRightIcon, RewindIcon } from '@/components/Icons';
+import PremiumModal from '@/components/PremiumModal';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
-const SUPERLIKE_COST = 5;
+// Premium likes use daily allowance (2/day for premium users), not credits
 
 export default function FeedScreen() {
-  const { profiles, currentIndex, isLoading, error, loadProfiles, swipe } = useFeedStore();
+  const { profiles, currentIndex, isLoading, error, loadProfiles, swipe, rewind, canRewind } = useFeedStore();
   const {
-    balance,
+    dailyLikesRemaining,
     bonusLikes,
-    isLowCredits,
-    hasEnoughCredits,
+    isLowLikes,
+    canLike,
     useBonusLike,
-    useCredits,
+    useDailyLike,
     loadCredits,
+    hasSubscription,
   } = useCreditsStore();
   const [showProfile, setShowProfile] = useState(false);
   const [matchAnimation, setMatchAnimation] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
   const [matchedProfile, setMatchedProfile] = useState<{ name: string; photo: string } | null>(null);
   const [isPushMatch, setIsPushMatch] = useState(false);
@@ -86,34 +89,36 @@ export default function FeedScreen() {
   const currentProfile = profiles[currentIndex];
 
   const handleSwipe = useCallback(
-    async (action: 'like' | 'pass' | 'superlike') => {
-      // Check credits for superlike
-      if (action === 'superlike') {
-        // First try to use bonus likes
-        if (bonusLikes > 0) {
-          useBonusLike();
-        } else if (hasEnoughCredits(SUPERLIKE_COST)) {
-          useCredits(SUPERLIKE_COST);
-        } else {
-          // Not enough credits - show warning
-          Alert.alert(
-            'Not Enough Credits',
-            `Super Likes cost ${SUPERLIKE_COST} credits. Get more credits to send Super Likes!`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Get Credits',
-                onPress: () => router.push('/(tabs)/profile'),
-              },
-            ]
-          );
-          return;
-        }
+    async (action: 'like' | 'pass' | 'superlike' | 'premiumlike') => {
+      // Check if user can like
+      if (action === 'like' && !canLike()) {
+        Alert.alert(
+          'Out of Likes',
+          'You\'ve used all your daily likes. Come back tomorrow or get premium for more likes!',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Get Premium',
+              onPress: () => router.push('/(tabs)/profile'),
+            },
+          ]
+        );
+        return;
       }
 
-      // For regular likes, use bonus likes (backend also tracks daily likes)
-      if (action === 'like' && bonusLikes > 0) {
-        useBonusLike();
+      // Premium likes (formerly superlikes) use daily allowance, not credits
+      // Backend handles the premium like limit check
+      if (action === 'superlike' || action === 'premiumlike') {
+        // No frontend credit check needed - backend validates subscription and daily limit
+      }
+
+      // For regular likes, try bonus likes first, then daily likes
+      if (action === 'like') {
+        if (bonusLikes > 0) {
+          useBonusLike();
+        } else {
+          useDailyLike();
+        }
       }
 
       setShowProfile(false);
@@ -124,13 +129,25 @@ export default function FeedScreen() {
         setIsPushMatch(false);
         setMatchedProfile({
           name: swipedProfile.name,
-          photo: swipedProfile.photos?.[0]?.url || '',
+          photo: swipedProfile.photos?.[0] || '',
         });
         setMatchAnimation(true);
       }
     },
-    [swipe, bonusLikes, hasEnoughCredits, useBonusLike, useCredits]
+    [swipe, bonusLikes, canLike, useBonusLike, useDailyLike]
   );
+
+  const handleRewind = useCallback(async () => {
+    if (!hasSubscription) {
+      setShowPremiumModal(true);
+      return;
+    }
+    if (!canRewind()) {
+      Alert.alert('No Rewind Available', 'You can only rewind your last pass.');
+      return;
+    }
+    await rewind();
+  }, [hasSubscription, canRewind, rewind]);
 
   if (isLoading && profiles.length === 0) {
     return (
@@ -182,8 +199,8 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Low credits warning banner */}
-      {isLowCredits() && balance > 0 && (
+      {/* Low likes warning banner */}
+      {isLowLikes() && (
         <TouchableOpacity
           style={styles.lowCreditsBanner}
           onPress={() => router.push('/(tabs)/profile')}
@@ -191,7 +208,7 @@ export default function FeedScreen() {
         >
           <CoinIcon size={18} color={colors.warning} />
           <Text style={styles.lowCreditsText}>
-            Credits running low ({balance} left)
+            {dailyLikesRemaining() + bonusLikes} likes left today
           </Text>
           <ChevronRightIcon size={18} color={colors.warning} />
         </TouchableOpacity>
@@ -207,6 +224,15 @@ export default function FeedScreen() {
           />
         </View>
       )}
+
+      {/* Rewind button - top right */}
+      <TouchableOpacity
+        style={[styles.rewindButton, !canRewind() && styles.rewindButtonDisabled]}
+        onPress={handleRewind}
+        activeOpacity={0.7}
+      >
+        <RewindIcon size={22} color={canRewind() ? colors.text.primary : colors.text.tertiary} />
+      </TouchableOpacity>
 
       {/* Current card */}
       <SwipeCard
@@ -306,6 +332,13 @@ export default function FeedScreen() {
           </View>
         </TouchableOpacity>
       )}
+
+      {/* Premium modal */}
+      <PremiumModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        feature="Rewind"
+      />
     </View>
   );
 }
@@ -314,6 +347,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg.primary,
+  },
+  rewindButton: {
+    position: 'absolute',
+    top: 60,
+    right: spacing.lg,
+    zIndex: 100,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rewindButtonDisabled: {
+    opacity: 0.5,
   },
   lowCreditsBanner: {
     position: 'absolute',

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/feels/feels/internal/domain/payment"
 	"github.com/google/uuid"
@@ -190,3 +191,74 @@ func (r *PaymentRepository) GetBonusDays(ctx context.Context, userID uuid.UUID) 
 	err := r.db.QueryRow(ctx, query, userID).Scan(&total)
 	return total, err
 }
+
+// ---- RevenueCat Subscription Methods ----
+
+// UpsertRevenueCatSubscription creates or updates a subscription from RevenueCat
+func (r *PaymentRepository) UpsertRevenueCatSubscription(
+	ctx context.Context,
+	userID string,
+	planType string,
+	status string,
+	productID string,
+	store string,
+	purchasedAt time.Time,
+	expiresAt time.Time,
+) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+
+	query := `INSERT INTO subscriptions (
+		id, user_id, stripe_subscription_id, stripe_customer_id, plan_type,
+		status, current_period_start, current_period_end, created_at, updated_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+	ON CONFLICT (user_id) WHERE stripe_subscription_id LIKE 'rc_%' DO UPDATE SET
+		plan_type = EXCLUDED.plan_type,
+		status = EXCLUDED.status,
+		current_period_start = EXCLUDED.current_period_start,
+		current_period_end = EXCLUDED.current_period_end,
+		updated_at = NOW()`
+
+	// Use 'rc_' prefix to identify RevenueCat subscriptions
+	rcSubID := "rc_" + productID + "_" + store
+	rcCustomerID := "rc_" + userID
+
+	_, err = r.db.Exec(ctx, query,
+		uuid.New(), userUUID, rcSubID, rcCustomerID,
+		planType, status, purchasedAt, expiresAt,
+	)
+	return err
+}
+
+// UpdateRevenueCatSubscriptionStatus updates the status of a RevenueCat subscription
+func (r *PaymentRepository) UpdateRevenueCatSubscriptionStatus(ctx context.Context, userID string, status string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+
+	query := `UPDATE subscriptions SET status = $1, updated_at = NOW()
+		WHERE user_id = $2 AND stripe_subscription_id LIKE 'rc_%'`
+
+	_, err = r.db.Exec(ctx, query, status, userUUID)
+	return err
+}
+
+// UpdateRevenueCatSubscriptionPlan updates the plan type of a RevenueCat subscription
+func (r *PaymentRepository) UpdateRevenueCatSubscriptionPlan(ctx context.Context, userID string, planType string, productID string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+
+	query := `UPDATE subscriptions SET plan_type = $1, updated_at = NOW()
+		WHERE user_id = $2 AND stripe_subscription_id LIKE 'rc_%'`
+
+	_, err = r.db.Exec(ctx, query, planType, userUUID)
+	return err
+}
+
+// SubscriptionRepository is an alias for PaymentRepository for use with RevenueCat handler
+type SubscriptionRepository = PaymentRepository
