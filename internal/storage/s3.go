@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -93,7 +94,11 @@ func (s *S3Client) DeletePhoto(ctx context.Context, url string) error {
 func (s *S3Client) GetPublicURL(objectName string) string {
 	// Use custom public URL if configured (e.g., photos.feelsfun.app)
 	if s.publicURL != "" {
-		return fmt.Sprintf("https://%s/%s", s.publicURL, objectName)
+		// Strip protocol if accidentally included in env var
+		url := s.publicURL
+		url = strings.TrimPrefix(url, "https://")
+		url = strings.TrimPrefix(url, "http://")
+		return fmt.Sprintf("https://%s/%s", url, objectName)
 	}
 	scheme := "http"
 	if s.useSSL {

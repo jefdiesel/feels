@@ -8,10 +8,15 @@ import {
   Platform,
   ActivityIndicator,
   StyleSheet,
+  Alert,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '@/stores/authStore';
+import { authApi } from '@/api/client';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 type LoginStep = 'email' | 'token';
@@ -22,7 +27,8 @@ export default function LoginScreen() {
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { sendMagicLink, verifyMagicLink, isLoading } = useAuthStore();
+  const { sendMagicLink, verifyMagicLink, isLoading, getDeviceId, setTokens } = useAuthStore();
+  const [appleLoading, setAppleLoading] = useState(false);
 
   const handleSendLink = async () => {
     if (!email) {
@@ -60,6 +66,51 @@ export default function LoginScreen() {
     }
   };
 
+  const handleAppleSignIn = async () => {
+    try {
+      setAppleLoading(true);
+      setError('');
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      const deviceId = await getDeviceId();
+      const fullName = credential.fullName
+        ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
+        : null;
+
+      const response = await authApi.appleAuth(
+        credential.identityToken || '',
+        credential.user,
+        credential.email,
+        fullName,
+        deviceId,
+        Platform.OS
+      );
+
+      await setTokens(response.data.access_token, response.data.refresh_token);
+
+      if (response.data.is_new_user) {
+        router.replace('/(auth)/onboarding');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (e: any) {
+      if (e.code === 'ERR_REQUEST_CANCELED') {
+        // User cancelled, don't show error
+        return;
+      }
+      console.error('Apple sign in error:', e);
+      setError(e.response?.data?.error || e.message || 'Apple sign in failed');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const handleBack = () => {
     setStep('email');
     setToken('');
@@ -93,6 +144,25 @@ export default function LoginScreen() {
 
           {step === 'email' && (
             <>
+              {/* Apple Sign In - iOS only */}
+              {Platform.OS === 'ios' && (
+                <>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                    cornerRadius={8}
+                    style={styles.appleButton}
+                    onPress={handleAppleSignIn}
+                  />
+
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>or</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                </>
+              )}
+
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -103,7 +173,6 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  autoFocus
                 />
               </View>
 
@@ -179,7 +248,29 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create<{
+  container: ViewStyle;
+  keyboardView: ViewStyle;
+  content: ViewStyle;
+  title: TextStyle;
+  subtitle: TextStyle;
+  errorBox: ViewStyle;
+  errorText: TextStyle;
+  successBox: ViewStyle;
+  successText: TextStyle;
+  appleButton: ViewStyle;
+  divider: ViewStyle;
+  dividerLine: ViewStyle;
+  dividerText: TextStyle;
+  inputContainer: ViewStyle;
+  input: TextStyle;
+  button: ViewStyle;
+  buttonDisabled: ViewStyle;
+  buttonText: TextStyle;
+  linkButton: ViewStyle;
+  linkText: TextStyle;
+  instructions: TextStyle;
+}>({
   container: {
     flex: 1,
     backgroundColor: colors.bg.primary,
@@ -190,26 +281,26 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
+    paddingHorizontal: spacing[6],
   },
   title: {
     fontSize: 48,
-    fontWeight: typography.weights.extrabold as any,
+    fontWeight: typography.weights.heading as TextStyle['fontWeight'],
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   subtitle: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing['3xl'],
+    marginBottom: spacing[7],
   },
   errorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    padding: spacing[4],
+    marginBottom: spacing[5],
   },
   errorText: {
     color: colors.error,
@@ -218,29 +309,48 @@ const styles = StyleSheet.create({
   successBox: {
     backgroundColor: 'rgba(74, 222, 128, 0.2)',
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    padding: spacing[4],
+    marginBottom: spacing[5],
   },
   successText: {
     color: colors.success,
     textAlign: 'center',
   },
+  appleButton: {
+    height: 50,
+    marginBottom: spacing[4],
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.DEFAULT,
+  },
+  dividerText: {
+    color: colors.text.tertiary,
+    paddingHorizontal: spacing[4],
+    fontSize: typography.sizes.base,
+  },
   inputContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   input: {
     backgroundColor: colors.bg.secondary,
     color: colors.text.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
     borderRadius: borderRadius.md,
     fontSize: typography.sizes.base,
   },
   button: {
     backgroundColor: colors.primary.DEFAULT,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing[4],
     borderRadius: borderRadius.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -248,23 +358,23 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.text.primary,
     textAlign: 'center',
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as TextStyle['fontWeight'],
   },
   linkButton: {
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
+    paddingVertical: spacing[3],
+    marginBottom: spacing[2],
   },
   linkText: {
     color: colors.primary.DEFAULT,
     textAlign: 'center',
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as TextStyle['fontWeight'],
   },
   instructions: {
     color: colors.text.secondary,
     textAlign: 'center',
-    fontSize: typography.sizes.sm,
-    marginBottom: spacing.xl,
+    fontSize: typography.sizes.base,
+    marginBottom: spacing[5],
   },
 });

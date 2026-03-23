@@ -310,16 +310,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing[3],
   },
   reorderButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing[1],
   },
   reorderText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   reorderHint: {
@@ -328,13 +328,13 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   slot: {
     width: '31%',
@@ -365,8 +365,8 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
+    top: spacing[1],
+    right: spacing[1],
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -382,16 +382,16 @@ const styles = StyleSheet.create({
   },
   mainBadge: {
     position: 'absolute',
-    bottom: spacing.xs,
-    left: spacing.xs,
+    bottom: spacing[1],
+    left: spacing[1],
     backgroundColor: colors.primary.DEFAULT,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
   },
   mainBadgeText: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   selectedOverlay: {
@@ -402,11 +402,11 @@ const styles = StyleSheet.create({
   },
   selectedText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
     backgroundColor: colors.primary.DEFAULT,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
     borderRadius: borderRadius.sm,
   },
 });

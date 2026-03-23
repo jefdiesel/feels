@@ -27,6 +27,7 @@ export default function PhoneAuthScreen() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const { setTokens } = useAuthStore();
 
   const codeInputRef = useRef<TextInput>(null);
@@ -79,6 +80,11 @@ export default function PhoneAuthScreen() {
     const digits = phone.replace(/\D/g, '');
     if (digits.length !== 10) {
       setError('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    if (!smsOptIn) {
+      setError('Please agree to receive SMS verification codes');
       return;
     }
 
@@ -191,10 +197,24 @@ export default function PhoneAuthScreen() {
                 />
               </View>
 
+              {/* SMS Opt-in Checkbox */}
               <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
+                style={styles.checkboxRow}
+                onPress={() => setSmsOptIn(!smsOptIn)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.checkbox, smsOptIn && styles.checkboxChecked]}>
+                  {smsOptIn && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxText}>
+                  I agree to receive SMS verification codes from Feels. Message frequency varies. Standard message and data rates may apply. Reply STOP to opt out. Text HELP for support.
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, (isLoading || !smsOptIn) && styles.buttonDisabled]}
                 onPress={handleSendCode}
-                disabled={isLoading}
+                disabled={isLoading || !smsOptIn}
                 activeOpacity={0.8}
               >
                 {isLoading ? (
@@ -205,8 +225,8 @@ export default function PhoneAuthScreen() {
               </TouchableOpacity>
 
               <Text style={styles.termsText}>
-                By continuing, you agree to our Terms of Service and Privacy Policy.
-                We'll send you a verification code via SMS.
+                By continuing, you also agree to our Terms of Service and Privacy Policy.
+                Your phone number will not be shared with third parties for marketing purposes.
               </Text>
             </>
           )}
@@ -278,26 +298,26 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
+    paddingHorizontal: spacing[6],
   },
   title: {
     fontSize: 48,
-    fontWeight: typography.weights.extrabold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   subtitle: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing['3xl'],
+    marginBottom: spacing[7],
   },
   errorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    padding: spacing[4],
+    marginBottom: spacing[5],
   },
   errorText: {
     color: colors.error,
@@ -308,41 +328,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   countryCode: {
     color: colors.text.primary,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semibold as any,
-    paddingLeft: spacing.xl,
-    paddingRight: spacing.md,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
+    paddingLeft: spacing[5],
+    paddingRight: spacing[3],
   },
   phoneInput: {
     flex: 1,
     color: colors.text.primary,
-    paddingVertical: spacing.lg,
-    paddingRight: spacing.xl,
-    fontSize: typography.sizes.lg,
+    paddingVertical: spacing[4],
+    paddingRight: spacing[5],
+    fontSize: typography.sizes.title,
   },
   codeContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   codeInput: {
     backgroundColor: colors.bg.secondary,
     color: colors.text.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[5],
     borderRadius: borderRadius.md,
     fontSize: 32,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     textAlign: 'center',
     letterSpacing: 8,
   },
   button: {
     backgroundColor: colors.primary.DEFAULT,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing[4],
     borderRadius: borderRadius.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -350,18 +370,18 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.text.primary,
     textAlign: 'center',
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
   },
   linkButton: {
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
+    paddingVertical: spacing[3],
+    marginBottom: spacing[2],
   },
   linkText: {
     color: colors.primary.DEFAULT,
     textAlign: 'center',
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
   },
   linkTextDisabled: {
     color: colors.text.tertiary,
@@ -371,6 +391,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: typography.sizes.xs,
     lineHeight: 18,
-    marginTop: spacing.lg,
+    marginTop: spacing[4],
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing[5],
+    paddingHorizontal: spacing[2],
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.text.tertiary,
+    marginRight: spacing[3],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary.DEFAULT,
+    borderColor: colors.primary.DEFAULT,
+  },
+  checkmark: {
+    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: typography.weights.heading as any,
+  },
+  checkboxText: {
+    flex: 1,
+    color: colors.text.secondary,
+    fontSize: typography.sizes.base,
+    lineHeight: 20,
   },
 });

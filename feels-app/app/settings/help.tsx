@@ -107,7 +107,7 @@ export default function HelpScreen() {
         {/* Quick Actions */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionCard} onPress={handleContactSupport}>
-            <View style={[styles.actionIcon, { backgroundColor: colors.primary.muted }]}>
+            <View style={[styles.actionIcon, { backgroundColor: colors.bg.tertiary }]}>
               <MessageIcon size={24} color={colors.primary.DEFAULT} />
             </View>
             <View style={styles.actionInfo}>
@@ -202,8 +202,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
   },
   backButton: {
     width: 44,
@@ -212,21 +212,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   section: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing['2xl'],
+    paddingHorizontal: spacing[5],
+    marginTop: spacing[6],
   },
   sectionTitle: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   // Quick Actions
   actionCard: {
@@ -234,8 +234,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   actionIcon: {
     width: 48,
@@ -243,16 +243,16 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.lg,
+    marginRight: spacing[4],
   },
   actionInfo: {
     flex: 1,
   },
   actionTitle: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   actionDescription: {
     fontSize: typography.sizes.sm,
@@ -262,8 +262,8 @@ const styles = StyleSheet.create({
   faqItem: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   faqHeader: {
     flexDirection: 'row',
@@ -273,16 +273,16 @@ const styles = StyleSheet.create({
   faqQuestion: {
     flex: 1,
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginRight: spacing.md,
+    marginRight: spacing[3],
   },
   faqAnswer: {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
     lineHeight: 22,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
+    marginTop: spacing[3],
+    paddingTop: spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
@@ -293,8 +293,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   linkText: {
     fontSize: typography.sizes.base,
@@ -303,12 +303,12 @@ const styles = StyleSheet.create({
   // Version
   versionContainer: {
     alignItems: 'center',
-    paddingVertical: spacing['3xl'],
+    paddingVertical: spacing[7],
   },
   versionText: {
     fontSize: typography.sizes.sm,
     color: colors.text.tertiary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   copyrightText: {
     fontSize: typography.sizes.xs,

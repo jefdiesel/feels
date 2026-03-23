@@ -95,7 +95,7 @@ export default function ChatScreen() {
     they_enabled: false,
     both_enabled: false,
   });
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const queryClient = useQueryClient();
   const { user, getPublicKey, uploadPublicKey } = useAuthStore();
@@ -503,7 +503,7 @@ export default function ChatScreen() {
     if (imageStatus.you_enabled) {
       return <CameraIcon size={22} color={colors.secondary.DEFAULT} />;
     }
-    return <LockIcon size={22} color={colors.text.tertiary} />;
+    return <CameraIcon size={22} color={colors.text.disabled} />;
   };
 
   // Show loading state
@@ -800,8 +800,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
     backgroundColor: colors.bg.secondary,
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing[3],
   },
   headerAvatar: {
     width: 40,
@@ -824,8 +824,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   headerName: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   typingIndicator: {
@@ -836,21 +836,21 @@ const styles = StyleSheet.create({
   statusIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing[1],
   },
   encryptionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.success,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
     borderRadius: borderRadius.sm,
-    gap: spacing.xs,
+    gap: spacing[1],
   },
   encryptionBadgeText: {
     color: colors.text.primary,
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
   },
   imageToggle: {
     width: 40,
@@ -868,25 +868,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messageList: {
-    padding: spacing.lg,
-    paddingTop: spacing.md,
+    padding: spacing[4],
+    paddingTop: spacing[3],
     flexGrow: 1,
   },
   messageBubble: {
     maxWidth: '75%',
-    padding: spacing.md,
+    padding: spacing[3],
     borderRadius: borderRadius.xl,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   myMessage: {
     alignSelf: 'flex-end',
     backgroundColor: colors.primary.DEFAULT,
-    borderBottomRightRadius: spacing.xs,
+    borderBottomRightRadius: spacing[1],
   },
   theirMessage: {
     alignSelf: 'flex-start',
     backgroundColor: colors.bg.tertiary,
-    borderBottomLeftRadius: spacing.xs,
+    borderBottomLeftRadius: spacing[1],
   },
   messageText: {
     fontSize: typography.sizes.base,
@@ -897,8 +897,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: spacing.xs,
-    gap: spacing.xs,
+    marginTop: spacing[1],
+    gap: spacing[1],
   },
   messageTime: {
     fontSize: typography.sizes.xs,
@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   imageBubble: {
-    padding: spacing.xs,
+    padding: spacing[1],
   },
   messageImage: {
     width: 200,
@@ -924,9 +924,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: spacing.md,
-    paddingBottom: spacing['3xl'],
-    gap: spacing.md,
+    padding: spacing[3],
+    paddingBottom: spacing[7],
+    gap: spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
     backgroundColor: colors.bg.secondary,
@@ -934,9 +934,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     backgroundColor: colors.bg.secondary,
-    borderRadius: borderRadius['2xl'],
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
     fontSize: typography.sizes.base,
     color: colors.text.primary,
     maxHeight: 120,
@@ -959,19 +959,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
     paddingTop: 100,
-    paddingRight: spacing.lg,
+    paddingRight: spacing[4],
   },
   menuContent: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.lg,
-    padding: spacing.sm,
+    padding: spacing[2],
     minWidth: 160,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: spacing[3],
+    padding: spacing[3],
     borderRadius: borderRadius.md,
   },
   menuText: {
@@ -988,7 +988,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.secondary,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
+    padding: spacing[5],
     paddingBottom: 40,
     maxHeight: '80%',
   },
@@ -996,27 +996,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   reportTitle: {
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   reportSubtitle: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   reportReasons: {
     maxHeight: 250,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   reasonItem: {
-    padding: spacing.lg,
+    padding: spacing[4],
     borderRadius: borderRadius.md,
     backgroundColor: colors.bg.tertiary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   reasonItemSelected: {
     backgroundColor: colors.primary.muted,
@@ -1029,21 +1029,21 @@ const styles = StyleSheet.create({
   },
   reasonTextSelected: {
     color: colors.primary.DEFAULT,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
   },
   reportInput: {
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
     fontSize: typography.sizes.base,
     color: colors.text.primary,
     minHeight: 80,
     textAlignVertical: 'top',
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   reportButton: {
     backgroundColor: colors.error,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing[4],
     borderRadius: borderRadius.md,
     alignItems: 'center',
   },
@@ -1052,7 +1052,7 @@ const styles = StyleSheet.create({
   },
   reportButtonText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   // Profile modal styles
@@ -1061,42 +1061,42 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: spacing[5],
   },
   profileModalContent: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    padding: spacing[5],
     width: '100%',
     maxWidth: 340,
     alignItems: 'center',
   },
   profileModalClose: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
+    top: spacing[3],
+    right: spacing[3],
     zIndex: 1,
-    padding: spacing.sm,
+    padding: spacing[2],
   },
   profileModalPhoto: {
     width: 200,
     height: 200,
     borderRadius: 100,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   profileModalName: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.h2,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginBottom: spacing.md,
+    marginBottom: spacing[3],
   },
   profileModalPhotos: {
-    marginTop: spacing.md,
+    marginTop: spacing[3],
   },
   profileModalThumb: {
     width: 60,
     height: 60,
     borderRadius: borderRadius.md,
-    marginRight: spacing.sm,
+    marginRight: spacing[2],
   },
 });

@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, profileApi } from '@/api/client';
+import { api, profileApi, authApi } from '@/api/client';
+import { useAuthStore } from '@/stores/authStore';
 import { useCreditsStore } from '@/stores/creditsStore';
 import { ArrowLeftIcon, CrownIcon, LockIcon } from '@/components/Icons';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
@@ -288,13 +289,21 @@ export default function PrivacySettingsScreen() {
             onPress={() => {
               Alert.alert(
                 'Delete Account',
-                'Are you sure you want to delete your account? This action cannot be undone.',
+                'Are you sure you want to delete your account? This will permanently delete all your data including matches, messages, and photos. This action cannot be undone.',
                 [
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => Alert.alert('Coming Soon', 'Account deletion coming soon.'),
+                    onPress: async () => {
+                      try {
+                        await authApi.deleteAccount();
+                        await useAuthStore.getState().logout();
+                        router.replace('/(auth)/login');
+                      } catch (e: any) {
+                        Alert.alert('Error', e.response?.data?.error || 'Failed to delete account');
+                      }
+                    },
                   },
                 ]
               );
@@ -331,8 +340,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
   },
   backButton: {
     width: 44,
@@ -341,21 +350,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   section: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing['2xl'],
+    paddingHorizontal: spacing[5],
+    marginTop: spacing[6],
   },
   sectionTitle: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   settingRow: {
     flexDirection: 'row',
@@ -363,26 +372,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   settingLocked: {
     opacity: 0.7,
   },
   settingInfo: {
     flex: 1,
-    marginRight: spacing.lg,
+    marginRight: spacing[4],
   },
   settingTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   settingTitle: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   settingDescription: {
     fontSize: typography.sizes.sm,
@@ -390,19 +399,19 @@ const styles = StyleSheet.create({
   },
   premiumBadge: {
     backgroundColor: colors.secondary.muted,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
   },
   actionRow: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   actionText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   dangerRow: {
@@ -410,15 +419,15 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.error,
   },
   savingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
+    gap: spacing[2],
+    marginTop: spacing[4],
   },
   savingText: {
     fontSize: typography.sizes.sm,

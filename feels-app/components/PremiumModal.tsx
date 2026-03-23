@@ -344,8 +344,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -353,8 +353,8 @@ const styles = StyleSheet.create({
     width: 50,
   },
   headerTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   closeButton: {
@@ -363,27 +363,27 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.xl,
-    paddingBottom: spacing['3xl'],
+    padding: spacing[5],
+    paddingBottom: spacing[7],
   },
   subtitle: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing[5],
   },
   currentPlan: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    padding: spacing[4],
+    marginBottom: spacing[5],
     alignItems: 'center',
   },
   currentPlanLabel: {
@@ -391,13 +391,13 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   currentPlanName: {
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   currentPlanExpiry: {
     fontSize: typography.sizes.sm,
@@ -406,8 +406,8 @@ const styles = StyleSheet.create({
   noPackages: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
+    padding: spacing[5],
+    marginBottom: spacing[5],
   },
   noPackagesText: {
     fontSize: typography.sizes.base,
@@ -417,8 +417,8 @@ const styles = StyleSheet.create({
   tierCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.lg,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
+    padding: spacing[5],
+    marginBottom: spacing[4],
     borderWidth: 2,
     borderColor: colors.border.DEFAULT,
   },
@@ -434,13 +434,13 @@ const styles = StyleSheet.create({
     left: '50%',
     transform: [{ translateX: -50 }],
     backgroundColor: colors.primary.DEFAULT,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
     borderRadius: borderRadius.full,
   },
   popularBadgeText: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
     letterSpacing: 1,
   },
@@ -448,24 +448,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-    marginTop: spacing.sm,
+    marginBottom: spacing[4],
+    marginTop: spacing[2],
   },
   tierNameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   tierName: {
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.extrabold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
   },
   priceContainer: {
     alignItems: 'flex-end',
   },
   tierPrice: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   monthlyPrice: {
@@ -474,13 +474,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   featuresList: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.md,
+    marginBottom: spacing[2],
+    gap: spacing[3],
   },
   featureText: {
     fontSize: typography.sizes.sm,
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectButton: {
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing[4],
     borderRadius: borderRadius.md,
     alignItems: 'center',
   },
@@ -497,23 +497,23 @@ const styles = StyleSheet.create({
   },
   selectButtonText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   restoreButton: {
     alignItems: 'center',
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing[4],
   },
   restoreText: {
     fontSize: typography.sizes.sm,
     color: colors.primary.DEFAULT,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
   },
   disclaimer: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing[4],
     lineHeight: 18,
   },
 });

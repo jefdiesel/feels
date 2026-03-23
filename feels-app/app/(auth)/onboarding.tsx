@@ -71,6 +71,9 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Debug: Log when component mounts/remounts
+  console.log('[Onboarding] Component rendered, step:', step);
+
   // Form data
   const [name, setName] = useState(user?.name || '');
   const [dobYear, setDobYear] = useState('');
@@ -236,8 +239,19 @@ export default function OnboardingScreen() {
     const promptsToSubmit = finalPrompts || selectedPrompts;
     setIsLoading(true);
     try {
+      console.log('[Onboarding] Creating profile...');
+      console.log('[Onboarding] Data:', JSON.stringify({
+        name: name.trim(),
+        dob: getDob(),
+        gender,
+        zip_code: zipCode.trim(),
+        bio: bio.trim().substring(0, 20) + '...',
+        kink_level: vibeLevel,
+        looking_for: [lookingFor],
+        prompts_count: promptsToSubmit.filter(p => p.answer.trim()).length,
+      }));
       // Create profile with prompts
-      await profileApi.create({
+      const createResult = await profileApi.create({
         name: name.trim(),
         dob: getDob(),
         gender,
@@ -247,15 +261,22 @@ export default function OnboardingScreen() {
         looking_for: [lookingFor], // Backend expects array
         prompts: promptsToSubmit.filter(p => p.answer.trim()),
       });
+      console.log('[Onboarding] Profile created successfully, response:', JSON.stringify(createResult.data));
 
       // Set preferences
-      await profileApi.updatePreferences({
+      console.log('[Onboarding] Setting preferences...', JSON.stringify({
+        genders_seeking: seekingGenders,
+        age_min: parseInt(ageMin) || 18,
+        age_max: parseInt(ageMax) || 50,
+      }));
+      const prefsResult = await profileApi.updatePreferences({
         genders_seeking: seekingGenders,
         age_min: parseInt(ageMin) || 18,
         age_max: parseInt(ageMax) || 50,
         distance_miles: 25,
         visible_to_genders: seekingGenders,
       });
+      console.log('[Onboarding] Preferences set successfully, response:', JSON.stringify(prefsResult.data));
 
       // Update user state
       setUser({
@@ -266,16 +287,22 @@ export default function OnboardingScreen() {
       });
 
       // Navigate to main app
+      console.log('[Onboarding] Navigating to tabs...');
       router.replace('/(tabs)');
     } catch (error: any) {
-      console.error('Onboarding error:', error);
+      console.error('[Onboarding] Error:', error);
+      console.error('[Onboarding] Error response:', error.response?.data);
+      console.error('[Onboarding] Error status:', error.response?.status);
+
       // If profile already exists (409), just navigate to main app
       if (error.response?.status === 409) {
+        console.log('[Onboarding] Profile exists, going to tabs');
         router.replace('/(tabs)');
         return;
       }
       // If unauthorized (401), redirect to login
       if (error.response?.status === 401) {
+        console.log('[Onboarding] Unauthorized, going to login');
         router.replace('/(auth)/login');
         return;
       }
@@ -641,13 +668,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: spacing.xl,
+    padding: spacing[5],
   },
   progress: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing['2xl'],
+    gap: spacing[2],
+    marginBottom: spacing[6],
   },
   progressDot: {
     width: 12,
@@ -662,27 +689,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.extrabold as any,
+    fontSize: typography.sizes.h2,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   subtitle: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing[6],
   },
   label: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
-    marginBottom: spacing.sm,
-    marginTop: spacing.lg,
+    marginBottom: spacing[2],
+    marginTop: spacing[4],
   },
   input: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
     fontSize: typography.sizes.base,
     color: colors.text.primary,
     borderWidth: 1,
@@ -691,12 +718,12 @@ const styles = StyleSheet.create({
   },
   bioInput: {
     minHeight: 120,
-    paddingTop: spacing.lg,
+    paddingTop: spacing[4],
   },
   dobContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   dobField: {
     flex: 1,
@@ -705,8 +732,8 @@ const styles = StyleSheet.create({
   dobInput: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    fontSize: typography.sizes.lg,
+    padding: spacing[4],
+    fontSize: typography.sizes.title,
     color: colors.text.primary,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
@@ -717,17 +744,17 @@ const styles = StyleSheet.create({
   dobLabel: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
-    marginTop: spacing.xs,
+    marginTop: spacing[1],
   },
   dobSeparator: {
-    fontSize: typography.sizes.xl,
+    fontSize: typography.sizes.title,
     color: colors.text.tertiary,
-    marginTop: -spacing.lg,
+    marginTop: -spacing[4],
   },
   ageRangeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing[3],
   },
   ageField: {
     flex: 1,
@@ -736,8 +763,8 @@ const styles = StyleSheet.create({
   ageInput: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    fontSize: typography.sizes.lg,
+    padding: spacing[4],
+    fontSize: typography.sizes.title,
     color: colors.text.primary,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
@@ -748,7 +775,7 @@ const styles = StyleSheet.create({
   ageLabel: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
-    marginTop: spacing.xs,
+    marginTop: spacing[1],
   },
   ageSeparator: {
     fontSize: typography.sizes.base,
@@ -757,22 +784,22 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   charCount: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
     textAlign: 'right',
-    marginTop: spacing.xs,
+    marginTop: spacing[1],
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   option: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[5],
     borderRadius: borderRadius.full,
     backgroundColor: colors.bg.secondary,
     borderWidth: 2,
@@ -784,7 +811,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
   },
   optionTextSelected: {
@@ -793,30 +820,30 @@ const styles = StyleSheet.create({
   vibeOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing[1],
   },
   navigation: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing['2xl'],
+    gap: spacing[3],
+    marginTop: spacing[6],
   },
   backButton: {
     flex: 1,
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
     alignItems: 'center',
   },
   backButtonText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
   },
   nextButton: {
     flex: 2,
     backgroundColor: colors.primary.DEFAULT,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
     alignItems: 'center',
   },
   nextButtonDisabled: {
@@ -824,15 +851,15 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   // Prompts styles
   selectedPrompt: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    padding: spacing[4],
+    marginBottom: spacing[3],
     borderWidth: 1,
     borderColor: colors.primary.DEFAULT,
   },
@@ -840,16 +867,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   promptQuestion: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
     flex: 1,
   },
   removePrompt: {
-    paddingLeft: spacing.md,
+    paddingLeft: spacing[3],
   },
   promptInput: {
     minHeight: 80,
@@ -859,18 +886,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   savePromptButton: {
     backgroundColor: colors.primary.DEFAULT,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[4],
     borderRadius: borderRadius.sm,
   },
   savePromptText: {
     color: colors.text.primary,
-    fontWeight: typography.weights.semibold as any,
-    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.heading as any,
+    fontSize: typography.sizes.base,
   },
   promptAnswer: {
     fontSize: typography.sizes.base,
@@ -883,13 +910,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   availablePrompts: {
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   promptOption: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -902,6 +929,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   promptAdd: {
-    marginLeft: spacing.md,
+    marginLeft: spacing[3],
   },
 });

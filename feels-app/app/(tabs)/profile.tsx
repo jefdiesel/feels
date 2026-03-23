@@ -1304,7 +1304,7 @@ export default function ProfileScreen() {
               </Text>
 
               {loadingReferral ? (
-                <ActivityIndicator color={colors.primary.DEFAULT} style={{ marginTop: spacing.md }} />
+                <ActivityIndicator color={colors.primary.DEFAULT} style={{ marginTop: spacing[3] }} />
               ) : (
                 <>
                   <View style={styles.referralCodeRow}>
@@ -1550,7 +1550,7 @@ export default function ProfileScreen() {
 
                 {zipData.neighborhoods.length > 1 && (
                   <>
-                    <Text style={[styles.locationLabel, { marginTop: spacing.lg }]}>
+                    <Text style={[styles.locationLabel, { marginTop: spacing[4] }]}>
                       Neighborhood (optional)
                     </Text>
                     <View style={styles.neighborhoodOptions}>
@@ -1729,18 +1729,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
   },
   title: {
-    fontSize: typography.sizes['3xl'],
-    fontWeight: typography.weights.extrabold as any,
+    fontSize: typography.sizes.h1,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   headerButton: {
     width: 44,
@@ -1760,11 +1760,11 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     alignItems: 'center',
-    paddingVertical: spacing['2xl'],
+    paddingVertical: spacing[6],
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   avatar: {
     width: 120,
@@ -1797,11 +1797,11 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   name: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.h2,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   verifiedBadge: {
@@ -1815,8 +1815,8 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
+    gap: spacing[1],
+    marginTop: spacing[1],
   },
   location: {
     fontSize: typography.sizes.base,
@@ -1824,11 +1824,11 @@ const styles = StyleSheet.create({
   },
   // Credits Card styles
   creditsCard: {
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.lg,
+    marginHorizontal: spacing[5],
+    marginTop: spacing[4],
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing[4],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
@@ -1845,16 +1845,16 @@ const styles = StyleSheet.create({
   creditsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   creditsValue: {
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.extrabold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   creditsValuePremium: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.heading as any,
     color: colors.secondary.light,
   },
   creditsLabel: {
@@ -1865,31 +1865,31 @@ const styles = StyleSheet.create({
     width: 1,
     height: 32,
     backgroundColor: colors.border.light,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing[4],
   },
   lowCreditsIndicator: {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: 10,
-    marginLeft: spacing.sm,
+    marginLeft: spacing[2],
   },
   lowCreditsText: {
     fontSize: 10,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.error,
     textTransform: 'uppercase',
   },
   creditsBreakdown: {
-    marginTop: spacing.lg,
-    paddingTop: spacing.lg,
+    marginTop: spacing[4],
+    paddingTop: spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing[3],
   },
   breakdownLabel: {
     fontSize: typography.sizes.sm,
@@ -1898,40 +1898,40 @@ const styles = StyleSheet.create({
   breakdownValue: {
     fontSize: typography.sizes.sm,
     color: colors.text.primary,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
   },
   getMoreButton: {
     backgroundColor: colors.primary.DEFAULT,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing[3],
     borderRadius: borderRadius.md,
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   getMoreText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   section: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing['2xl'],
+    paddingHorizontal: spacing[5],
+    marginTop: spacing[6],
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing[3],
   },
   sectionTitle: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   editText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   photoHint: {
@@ -1941,12 +1941,12 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing[1],
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   photoSlot: {
     width: '31%',
@@ -1971,7 +1971,7 @@ const styles = StyleSheet.create({
   bioCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
     minHeight: 80,
   },
   bioText: {
@@ -1988,16 +1988,16 @@ const styles = StyleSheet.create({
   workCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   workLabel: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   workText: {
     fontSize: typography.sizes.base,
@@ -2011,19 +2011,19 @@ const styles = StyleSheet.create({
   workModalHint: {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
     lineHeight: 20,
   },
   // Details section styles
   detailsGrid: {
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
   },
   detailItemLabel: {
     flex: 1,
@@ -2032,20 +2032,20 @@ const styles = StyleSheet.create({
   },
   detailItemValue: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
     color: colors.text.primary,
-    marginRight: spacing.sm,
+    marginRight: spacing[2],
   },
   detailItemPlaceholder: {
     fontSize: typography.sizes.base,
     color: colors.primary.DEFAULT,
-    marginRight: spacing.sm,
+    marginRight: spacing[2],
   },
   detailsModalContent: {
     backgroundColor: colors.bg.secondary,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
+    padding: spacing[5],
     paddingBottom: 40,
     maxHeight: '70%',
     marginTop: 'auto',
@@ -2059,8 +2059,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
   },
   detailOptionSelected: {
     backgroundColor: colors.primary.muted,
@@ -2072,12 +2072,12 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   detailOptionTextSelected: {
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   clearDetailButton: {
-    marginTop: spacing.lg,
-    paddingVertical: spacing.md,
+    marginTop: spacing[4],
+    paddingVertical: spacing[3],
     alignItems: 'center',
   },
   clearDetailText: {
@@ -2090,8 +2090,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: spacing[4],
+    gap: spacing[3],
   },
   locationText: {
     flex: 1,
@@ -2106,16 +2106,16 @@ const styles = StyleSheet.create({
   },
   locationLabel: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   zipInput: {
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold as any,
+    padding: spacing[4],
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
     textAlign: 'center',
     letterSpacing: 4,
@@ -2124,25 +2124,25 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.error,
     textAlign: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   zipResult: {
-    marginTop: spacing.lg,
+    marginTop: spacing[4],
   },
   zipBorough: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
     textAlign: 'center',
   },
   neighborhoodOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   neighborhoodOption: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.full,
     borderWidth: 1,
@@ -2154,48 +2154,48 @@ const styles = StyleSheet.create({
   },
   neighborhoodOptionText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
     color: colors.text.secondary,
   },
   neighborhoodOptionTextSelected: {
     color: colors.primary.DEFAULT,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
   },
   locationPreview: {
     fontSize: typography.sizes.sm,
     color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing[4],
     fontStyle: 'italic',
   },
   currentLocationBox: {
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    padding: spacing[4],
+    marginBottom: spacing[4],
     alignItems: 'center',
   },
   currentLocationLabel: {
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
     textTransform: 'uppercase',
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   currentLocationValue: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   // Prompts styles
   loadingOverlay: {
-    padding: spacing.xl,
+    padding: spacing[5],
     alignItems: 'center',
   },
   promptCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    padding: spacing[4],
+    marginBottom: spacing[3],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
@@ -2203,11 +2203,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   promptQuestion: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
     flex: 1,
   },
@@ -2219,7 +2219,7 @@ const styles = StyleSheet.create({
   emptyPrompts: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    padding: spacing['2xl'],
+    padding: spacing[6],
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.border.light,
@@ -2228,17 +2228,17 @@ const styles = StyleSheet.create({
   emptyPromptsText: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing[1],
   },
   emptyPromptsHint: {
     fontSize: typography.sizes.sm,
     color: colors.text.tertiary,
   },
   promptEditQuestion: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   promptList: {
     maxHeight: 400,
@@ -2246,8 +2246,8 @@ const styles = StyleSheet.create({
   promptSelectOption: {
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: spacing[4],
+    marginBottom: spacing[2],
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -2261,7 +2261,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.secondary,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
+    padding: spacing[5],
     paddingBottom: 40,
     maxHeight: '70%',
     marginTop: 'auto',
@@ -2270,11 +2270,11 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: spacing.xl,
+    marginTop: spacing[5],
   },
   searchFiltersContainer: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.lg,
+    paddingHorizontal: spacing[5],
+    marginTop: spacing[4],
   },
   searchFiltersButton: {
     flexDirection: 'row',
@@ -2283,14 +2283,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.muted,
     borderWidth: 1,
     borderColor: colors.primary.DEFAULT,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[4],
     borderRadius: borderRadius.lg,
   },
   searchFiltersContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing[3],
   },
   searchFiltersIcon: {
     width: 44,
@@ -2301,8 +2301,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchFiltersTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   searchFiltersSubtitle: {
@@ -2314,16 +2314,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bg.secondary,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[4],
     borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
+    marginBottom: spacing[2],
+    gap: spacing[3],
   },
   actionText: {
     flex: 1,
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   logoutButton: {
@@ -2332,7 +2332,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.error,
   },
   // Modal styles
@@ -2345,38 +2345,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.secondary,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
+    padding: spacing[5],
     paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing[5],
   },
   modalCancel: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
   },
   modalTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   modalSave: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   modalSaveSuccess: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.success,
   },
   modalInput: {
     backgroundColor: colors.bg.tertiary,
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: spacing[4],
     fontSize: typography.sizes.base,
     color: colors.text.primary,
   },
@@ -2388,16 +2388,16 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.text.tertiary,
     textAlign: 'right',
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   // Referral styles
   referralCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing[4],
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
+    gap: spacing[3],
     borderWidth: 1,
     borderColor: colors.secondary.muted,
   },
@@ -2413,25 +2413,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   referralTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   referralSubtitle: {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
-    marginTop: spacing.xs,
+    marginTop: spacing[1],
     lineHeight: 20,
   },
   referralCodeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
-    gap: spacing.md,
+    marginTop: spacing[3],
+    gap: spacing[3],
   },
   referralCode: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.extrabold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.secondary.DEFAULT,
     letterSpacing: 2,
   },
@@ -2439,46 +2439,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary.DEFAULT,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
     borderRadius: borderRadius.md,
-    gap: spacing.xs,
+    gap: spacing[1],
   },
   shareCodeText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
   },
   referralStatsRow: {
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   referralStatsText: {
     fontSize: typography.sizes.sm,
     color: colors.success,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
   },
   // Profile Tips styles
   tipsContainer: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.md,
-    gap: spacing.sm,
+    paddingHorizontal: spacing[5],
+    marginTop: spacing[3],
+    gap: spacing[2],
   },
   editProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   editProfileIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.bg.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2486,18 +2486,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.sizes.base,
     color: colors.text.primary,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
   },
   tipCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(232, 176, 73, 0.1)',
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
     borderWidth: 1,
     borderColor: 'rgba(232, 176, 73, 0.3)',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   tipIcon: {
     width: 28,
@@ -2511,6 +2511,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.sizes.sm,
     color: colors.text.primary,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
   },
 });

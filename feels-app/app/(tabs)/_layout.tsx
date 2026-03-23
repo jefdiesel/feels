@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeartIcon, HeartFilledIcon, MessageIcon, MessageFilledIcon, UserIcon, UserFilledIcon } from '@/components/Icons';
 import { matchesApi } from '@/api/client';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -80,12 +81,17 @@ function useUnreadCount() {
 
 export default function TabLayout() {
   const unreadCount = useUnreadCount();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          ...styles.tabBar,
+          height: Math.max(layout.tabBar.height, layout.tabBar.height + insets.bottom),
+          paddingBottom: Math.max(layout.tabBar.paddingBottom, insets.bottom),
+        },
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary.DEFAULT,
         tabBarInactiveTintColor: colors.text.tertiary,
@@ -155,6 +161,6 @@ const styles = StyleSheet.create({
   badgeText: {
     color: colors.text.primary,
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
   },
 });

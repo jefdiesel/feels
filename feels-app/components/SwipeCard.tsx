@@ -49,7 +49,7 @@ const formatDetail = (key: string, value: any): string | null => {
   if (value === null || value === undefined || value === '') return null;
 
   const formatters: Record<string, Record<string, string>> = {
-    hasKids: { 'true': 'Has kids', true: 'Has kids' },
+    hasKids: { 'true': 'Has kids', 'false': 'No kids' },
     wantsKids: {
       yes: 'Wants kids',
       no: 'Doesn\'t want kids',
@@ -224,7 +224,7 @@ export default function SwipeCard({ profile, onSwipe, onExpandProfile, onLikePro
 
           {/* Gradient overlay */}
           <LinearGradient
-            colors={gradients.dark as string[]}
+            colors={gradients.photoOverlay as [string, string, ...string[]]}
             locations={[0.4, 0.7, 1]}
             style={styles.gradient}
           />
@@ -405,9 +405,9 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     position: 'absolute',
-    bottom: spacing.lg,
-    left: spacing.xl,
-    right: spacing.xl,
+    bottom: spacing[4],
+    left: spacing[5],
+    right: spacing[5],
   },
   nameRow: {
     flexDirection: 'row',
@@ -417,13 +417,13 @@ const styles = StyleSheet.create({
   nameContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: spacing.sm,
+    gap: spacing[2],
     flex: 1,
   },
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing[3],
   },
   passButton: {
     width: 36,
@@ -436,50 +436,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   name: {
-    fontSize: typography.sizes['4xl'],
-    fontWeight: typography.weights.semibold as any,
+    fontSize: typography.sizes.h1,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
     letterSpacing: -0.5,
   },
   age: {
-    fontSize: typography.sizes['3xl'],
+    fontSize: typography.sizes.h2,
     fontWeight: typography.weights.normal as any,
     color: 'rgba(255,255,255,0.85)',
   },
   distance: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.medium as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.normal as any,
     color: 'rgba(255,255,255,0.6)',
-    marginLeft: spacing.sm,
+    marginLeft: spacing[2],
   },
   location: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
     color: 'rgba(255,255,255,0.7)',
-    marginTop: spacing.xs,
+    marginTop: spacing[1],
     letterSpacing: 0.2,
   },
   // Info section on black background
   infoSection: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[2],
     backgroundColor: colors.bg.primary,
   },
   infoBarText: {
     fontSize: typography.sizes.base,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
     color: colors.text.primary,
   },
   detailsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.md,
-    marginLeft: -spacing.md, // offset bubble padding so text aligns
+    gap: spacing[1],
+    marginTop: spacing[3],
+    marginLeft: -spacing[3], // offset bubble padding so text aligns
   },
   detailTag: {
     backgroundColor: colors.bg.tertiary,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing[3],
     paddingVertical: 6,
     borderRadius: borderRadius.full,
   },
@@ -488,22 +488,22 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   bioText: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.title,
     fontWeight: typography.weights.normal as any,
     color: colors.text.primary,
     lineHeight: 28,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.sm,
+    marginTop: spacing[3],
+    paddingTop: spacing[3],
+    paddingHorizontal: spacing[2],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
   alignmentBadge: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing[3],
     paddingVertical: 6,
     borderRadius: borderRadius.full,
     alignSelf: 'flex-start',
-    marginTop: spacing.sm,
+    marginTop: spacing[2],
   },
   alignmentPerfect: {
     backgroundColor: 'rgba(34, 197, 94, 0.15)',
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   },
   alignmentText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
   },
   alignmentTextPerfect: {
     color: 'rgb(34, 197, 94)',
@@ -525,66 +525,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
+    gap: spacing[1],
+    paddingVertical: spacing[3],
+    marginTop: spacing[2],
   },
   viewMoreText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
     color: colors.text.tertiary,
   },
   promptsSection: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing[5],
   },
   promptCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.lg,
-    padding: spacing.xl,
-    marginBottom: spacing.md,
+    padding: spacing[5],
+    marginBottom: spacing[3],
     position: 'relative',
   },
   promptQuestion: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   promptAnswer: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.medium as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.normal as any,
     color: colors.text.primary,
     lineHeight: 26,
   },
   interestsContainer: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: spacing[2],
+    marginBottom: spacing[4],
   },
   interestsLabel: {
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
+    marginBottom: spacing[3],
+    paddingHorizontal: spacing[1],
   },
   interestsTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   interestTag: {
     backgroundColor: colors.bg.tertiary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
     borderRadius: borderRadius.full,
   },
   interestText: {
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
+    fontWeight: typography.weights.normal as any,
     color: 'rgba(255, 255, 255, 0.85)',
   },
 });

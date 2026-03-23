@@ -4,6 +4,7 @@ import Animated, {
   useSharedValue,
   withSpring,
   withSequence,
+  SharedValue,
 } from 'react-native-reanimated';
 import { XIcon } from '@/components/Icons';
 import { colors, shadows, animations } from '@/constants/theme';
@@ -17,7 +18,7 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 export default function ActionBar({ onPass }: ActionBarProps) {
   const passScale = useSharedValue(1);
 
-  const animatePress = (scale: Animated.SharedValue<number>, callback: () => void) => {
+  const animatePress = (scale: SharedValue<number>, callback: () => void) => {
     scale.value = withSequence(
       withSpring(0.85, animations.spring),
       withSpring(1, animations.spring)

@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: spacing[5],
   },
   iconContainer: {
     width: 100,
@@ -48,13 +48,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing[5],
   },
   title: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.h2,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginBottom: spacing.md,
+    marginBottom: spacing[3],
     textAlign: 'center',
   },
   subtitle: {

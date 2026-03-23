@@ -82,6 +82,7 @@ export default function FeedScreen() {
   // Handle profile required error - redirect to onboarding
   useEffect(() => {
     if (error === 'PROFILE_REQUIRED') {
+      console.log('[Feed] PROFILE_REQUIRED error - redirecting to onboarding');
       router.replace('/(auth)/onboarding');
     }
   }, [error]);
@@ -170,19 +171,6 @@ export default function FeedScreen() {
   }
 
   if (!currentProfile) {
-    const showDebug = async () => {
-      try {
-        const res = await feedApi.debug();
-        const d = res.data;
-        Alert.alert(
-          'Feed Debug',
-          `Total profiles: ${d.total_profiles}\nAlready seen: ${d.already_seen}\nGender match: ${d.gender_match}\nAge match: ${d.age_match}\n\nPrefs: ages ${d.pref_age_min}-${d.pref_age_max}, ${d.pref_distance}mi, ${d.pref_genders_count} genders\n\nYour lat: ${d.user_lat || 'null'}, lng: ${d.user_lng || 'null'}`
-        );
-      } catch (e: any) {
-        Alert.alert('Debug Error', e.message);
-      }
-    };
-
     return (
       <View style={styles.centered}>
         <View style={styles.emptyIconContainer}>
@@ -190,9 +178,6 @@ export default function FeedScreen() {
         </View>
         <Text style={styles.emptyTitle}>No more profiles</Text>
         <Text style={styles.emptyText}>Check back later for new people</Text>
-        <TouchableOpacity onPress={showDebug} style={{ marginTop: 20, padding: 10 }}>
-          <Text style={{ color: colors.text.tertiary }}>Debug Info</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -351,7 +336,7 @@ const styles = StyleSheet.create({
   rewindButton: {
     position: 'absolute',
     top: 60,
-    right: spacing.lg,
+    right: spacing[4],
     zIndex: 100,
     width: 44,
     height: 44,
@@ -368,23 +353,23 @@ const styles = StyleSheet.create({
   lowCreditsBanner: {
     position: 'absolute',
     top: 56,
-    left: spacing.lg,
-    right: spacing.lg,
+    left: spacing[4],
+    right: spacing[4],
     zIndex: 100,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(251, 191, 36, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.25)',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
     borderRadius: borderRadius.md,
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   lowCreditsText: {
     flex: 1,
     fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold as any,
+    fontWeight: typography.weights.heading as any,
     color: colors.warning,
   },
   centered: {
@@ -392,10 +377,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing['4xl'],
+    padding: spacing[8],
   },
   loadingText: {
-    marginTop: spacing.lg,
+    marginTop: spacing[4],
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
   },
@@ -406,7 +391,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   errorText: {
     fontSize: typography.sizes.base,
@@ -420,13 +405,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary.muted,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing[4],
   },
   emptyTitle: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.h2,
+    fontWeight: typography.weights.heading as any,
     color: colors.text.primary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   emptyText: {
     fontSize: typography.sizes.base,
@@ -456,25 +441,25 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.bg.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing[6],
   },
   matchText: {
-    fontSize: typography.sizes['4xl'],
-    fontWeight: typography.weights.extrabold as any,
+    fontSize: typography.sizes.h1,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
-    marginBottom: spacing.sm,
+    marginBottom: spacing[2],
   },
   matchSubtext: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
   },
   matchDismiss: {
-    marginTop: spacing.xl,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
+    marginTop: spacing[5],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[5],
   },
   matchDismissText: {
     fontSize: typography.sizes.sm,
@@ -484,26 +469,26 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing[6],
     borderWidth: 3,
     borderColor: colors.primary.DEFAULT,
   },
   matchName: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.title,
     color: colors.text.primary,
-    marginBottom: spacing.md,
+    marginBottom: spacing[3],
   },
   pushMatchToast: {
     position: 'absolute',
     top: 60,
-    left: spacing.lg,
-    right: spacing.lg,
+    left: spacing[4],
+    right: spacing[4],
     backgroundColor: colors.bg.secondary,
     borderRadius: borderRadius.xl,
-    padding: spacing.md,
+    padding: spacing[3],
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing[3],
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -523,7 +508,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.bg.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -531,8 +516,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pushMatchTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.heading as any,
     color: colors.primary.DEFAULT,
   },
   pushMatchName: {
