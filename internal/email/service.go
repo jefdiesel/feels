@@ -200,6 +200,47 @@ Start swiping and find your match!
 	})
 }
 
+// SendWebMagicLink sends a magic link email for web dashboard login
+func (s *Service) SendWebMagicLink(ctx context.Context, toEmail, token, appName, webDomain string) error {
+	webLink := fmt.Sprintf("%s/auth/verify?token=%s", webDomain, token)
+
+	html := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0a; color: #ffffff; padding: 40px 20px;">
+  <div style="max-width: 400px; margin: 0 auto; text-align: center;">
+    <h1 style="color: #e85d75; margin-bottom: 30px;">%s</h1>
+    <p style="font-size: 18px; margin-bottom: 30px;">Tap the button below to sign in to your web dashboard.</p>
+    <a href="%s" style="display: inline-block; background-color: #e85d75; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Sign In to Dashboard</a>
+    <p style="margin-top: 30px; color: #888; font-size: 14px;">This link expires in 15 minutes.</p>
+    <p style="color: #666; font-size: 12px; margin-top: 20px;">If you didn't request this email, you can safely ignore it.</p>
+  </div>
+</body>
+</html>
+`, appName, webLink)
+
+	text := fmt.Sprintf(`Sign in to %s Web Dashboard
+
+Click this link to sign in:
+%s
+
+This link expires in 15 minutes.
+
+If you didn't request this email, you can safely ignore it.
+`, appName, webLink)
+
+	return s.Send(ctx, &Email{
+		To:      []string{toEmail},
+		Subject: fmt.Sprintf("Sign in to %s Dashboard", appName),
+		HTML:    html,
+		Text:    text,
+	})
+}
+
 // SendMatchNotification sends a match notification email
 func (s *Service) SendMatchNotification(ctx context.Context, toEmail, matchName, appName string) error {
 	html := fmt.Sprintf(`

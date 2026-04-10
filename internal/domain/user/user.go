@@ -127,6 +127,16 @@ type MagicLinkAuthResponse struct {
 	IsNewUser    bool   `json:"is_new_user"`
 }
 
+// AppleAuthRequest is the request for Sign in with Apple
+type AppleAuthRequest struct {
+	IdentityToken string `json:"identity_token"`
+	UserID        string `json:"user_id"`       // Apple's user identifier
+	Email         string `json:"email"`         // May be nil after first auth
+	FullName      string `json:"full_name"`     // May be nil after first auth
+	DeviceID      string `json:"device_id"`
+	Platform      string `json:"platform,omitempty"`
+}
+
 // UserPublicKey represents a user's public key for E2E encryption
 type UserPublicKey struct {
 	ID        uuid.UUID `json:"id"`

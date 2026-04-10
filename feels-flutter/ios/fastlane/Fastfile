@@ -1,0 +1,57 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and push to TestFlight"
+  lane :beta do
+    setup_ci if ENV["CI"]
+
+    # Increment build number based on latest TestFlight build
+    increment_build_number(
+      build_number: latest_testflight_build_number + 1,
+      xcodeproj: "Runner.xcodeproj"
+    )
+
+    # Build Flutter app first
+    sh("cd ../.. && flutter build ios --release --no-codesign")
+
+    # Build and sign with Xcode
+    build_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      export_method: "app-store",
+      output_directory: "../build/ios",
+      output_name: "Feels.ipa"
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      apple_id: ENV["APP_STORE_APP_ID"] || ""
+    )
+  end
+
+  desc "Build for simulator"
+  lane :simulator do
+    sh("cd ../.. && flutter build ios --simulator")
+  end
+
+  desc "Build release IPA without uploading"
+  lane :build_release do
+    setup_ci if ENV["CI"]
+
+    increment_build_number(
+      build_number: latest_testflight_build_number + 1,
+      xcodeproj: "Runner.xcodeproj"
+    )
+
+    sh("cd ../.. && flutter build ios --release --no-codesign")
+
+    build_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      export_method: "app-store",
+      output_directory: "../build/ios",
+      output_name: "Feels.ipa"
+    )
+  end
+end

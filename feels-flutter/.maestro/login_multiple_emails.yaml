@@ -1,0 +1,23 @@
+appId: app.feelsfun.feels
+---
+# Test sending magic link, going back, sending to different email
+
+- launchApp
+
+# First email
+- tapOn: "Email address"
+- inputText: "first@feelsfun.app"
+- tapOn: "Send Magic Link"
+- assertVisible: "first@feelsfun.app"
+
+# Go back
+- tapOn: "Use different email"
+- assertVisible: "Send Magic Link"
+
+# Second email - tap the input area directly since hint text may be gone
+- tapOn:
+    point: 50%, 40%
+- eraseText: 30
+- inputText: "second@feelsfun.app"
+- tapOn: "Send Magic Link"
+- assertVisible: "second@feelsfun.app"

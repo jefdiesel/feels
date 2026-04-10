@@ -1,0 +1,102 @@
+default_platform(:android)
+
+JSON_KEY_PATH = ENV["GOOGLE_PLAY_JSON_KEY"] || "/Users/jef/Downloads/showup-e9bf5-firebase-adminsdk-fbsvc-aec6d15887.json"
+PACKAGE_NAME = "com.feelsfun.app"
+AAB_PATH = "../build/app/outputs/bundle/release/app-release.aab"
+
+platform :android do
+  desc "Build release AAB only (no upload)"
+  lane :build_bundle do
+    sh("cd ../.. && flutter build appbundle --release")
+    UI.success("AAB built")
+  end
+
+  desc "Upload existing AAB to Play Store internal testing"
+  lane :upload_internal do
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      track: "internal",
+      aab: AAB_PATH,
+      json_key: JSON_KEY_PATH,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true,
+      release_status: "draft"
+    )
+  end
+
+  desc "Upload metadata, images, and screenshots only (no AAB)"
+  lane :upload_listing do
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      json_key: JSON_KEY_PATH,
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+      skip_upload_changelogs: true,
+      track: "internal",
+      release_status: "draft"
+    )
+  end
+
+  desc "Full release: build AAB + upload everything (metadata, images, screenshots, changelog)"
+  lane :ship do
+    sh("cd ../.. && flutter build appbundle --release")
+
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      track: "internal",
+      aab: AAB_PATH,
+      json_key: JSON_KEY_PATH,
+      skip_upload_aab: false,
+      skip_upload_apk: true,
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+      skip_upload_changelogs: false,
+      release_status: "draft"
+    )
+  end
+
+  desc "Build and push to Play Store internal testing"
+  lane :beta do
+    sh("cd ../.. && flutter build appbundle --release")
+
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      track: "internal",
+      aab: AAB_PATH,
+      json_key: JSON_KEY_PATH,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true,
+      release_status: "draft"
+    )
+  end
+
+  desc "Promote internal track to closed testing (alpha)"
+  lane :promote_to_alpha do
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      track: "internal",
+      track_promote_to: "alpha",
+      json_key: JSON_KEY_PATH,
+      skip_upload_changelogs: true
+    )
+  end
+
+  desc "Promote alpha to production"
+  lane :promote_to_production do
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      track: "alpha",
+      track_promote_to: "production",
+      json_key: JSON_KEY_PATH,
+      skip_upload_changelogs: true
+    )
+  end
+end

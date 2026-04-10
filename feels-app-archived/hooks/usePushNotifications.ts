@@ -1,0 +1,199 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Platform, Alert } from 'react-native';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { api } from '@/api/client';
+
+// Configure how notifications are handled when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+interface PushNotificationState {
+  expoPushToken: string | null;
+  notification: Notifications.Notification | null;
+}
+
+export function usePushNotifications() {
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [notification, setNotification] = useState<Notifications.Notification | null>(null);
+  const notificationListener = useRef<Notifications.Subscription>(null);
+  const responseListener = useRef<Notifications.Subscription>(null);
+  const queryClient = useQueryClient();
+
+  // Register for push notifications
+  const registerForPushNotifications = useCallback(async (): Promise<string | null> => {
+    if (Platform.OS === 'web') {
+      return null;
+    }
+
+    if (!Device.isDevice) {
+      return null;
+    }
+
+    try {
+      // Check existing permission
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      // Request permission if not granted
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        return null;
+      }
+
+      // Get push token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+      });
+      const token = tokenData.data;
+
+      setExpoPushToken(token);
+
+      // Configure Android channel
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#E85D75',
+        });
+
+        await Notifications.setNotificationChannelAsync('matches', {
+          name: 'Matches',
+          description: 'Notifications for new matches',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#E85D75',
+        });
+
+        await Notifications.setNotificationChannelAsync('messages', {
+          name: 'Messages',
+          description: 'Notifications for new messages',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#E85D75',
+        });
+      }
+
+      return token;
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  // Send push token to backend
+  const savePushToken = useCallback(async (token: string) => {
+    try {
+      await api.post('/push/register', {
+        token,
+        platform: Platform.OS,
+      });
+    } catch (error) {
+      // Failed to save push token
+    }
+  }, []);
+
+  // Unregister push token (for logout)
+  const unregisterPushToken = useCallback(async () => {
+    if (!expoPushToken) return;
+
+    try {
+      await api.delete('/push/register', {
+        data: { token: expoPushToken },
+      });
+      setExpoPushToken(null);
+    } catch (error) {
+      // Failed to remove push token
+    }
+  }, [expoPushToken]);
+
+  // Handle notification response (when user taps notification)
+  const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse) => {
+    const data = response.notification.request.content.data;
+
+    if (data?.type === 'new_match' && data.matchId) {
+      router.push(`/chat/${data.matchId}`);
+    } else if (data?.type === 'new_message' && data.matchId) {
+      router.push(`/chat/${data.matchId}`);
+    } else if (data?.type === 'like_received') {
+      // Navigate to matches tab
+      router.push('/(tabs)/matches');
+    }
+  }, []);
+
+  // Set up notification listeners
+  useEffect(() => {
+    // Listener for notifications received while app is foregrounded
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      setNotification(notification);
+
+      // Invalidate relevant queries based on notification type
+      const data = notification.request.content.data;
+      if (data?.type === 'new_message' && data.matchId) {
+        queryClient.invalidateQueries({ queryKey: ['messages', data.matchId] });
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      } else if (data?.type === 'new_match' || data?.type === 'match_created') {
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      }
+    });
+
+    // Listener for when user interacts with notification
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+
+    return () => {
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+    };
+  }, [handleNotificationResponse]);
+
+  // Initialize push notifications
+  const initPushNotifications = useCallback(async () => {
+    const token = await registerForPushNotifications();
+    if (token) {
+      await savePushToken(token);
+    }
+  }, [registerForPushNotifications, savePushToken]);
+
+  // Get badge count
+  const getBadgeCount = useCallback(async (): Promise<number> => {
+    return Notifications.getBadgeCountAsync();
+  }, []);
+
+  // Set badge count
+  const setBadgeCount = useCallback(async (count: number) => {
+    await Notifications.setBadgeCountAsync(count);
+  }, []);
+
+  // Clear all notifications
+  const clearAllNotifications = useCallback(async () => {
+    await Notifications.dismissAllNotificationsAsync();
+    await Notifications.setBadgeCountAsync(0);
+  }, []);
+
+  return {
+    expoPushToken,
+    notification,
+    initPushNotifications,
+    unregisterPushToken,
+    getBadgeCount,
+    setBadgeCount,
+    clearAllNotifications,
+  };
+}

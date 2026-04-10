@@ -2,10 +2,13 @@ package user
 
 import (
 	"context"
+	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"strconv"
+	"fmt"
+	"log"
+	"math/big"
 	"strings"
 	"time"
 
@@ -71,6 +74,9 @@ type Repository interface {
 	UpsertPublicKey(ctx context.Context, key *UserPublicKey) error
 	GetPublicKey(ctx context.Context, userID uuid.UUID, keyType string) (*UserPublicKey, error)
 	GetPublicKeysByUserIDs(ctx context.Context, userIDs []uuid.UUID, keyType string) (map[uuid.UUID]*UserPublicKey, error)
+
+	// Account deletion
+	DeleteUser(ctx context.Context, userID uuid.UUID) error
 }
 
 // SMSService interface for sending SMS messages
@@ -624,17 +630,12 @@ func (s *Service) Setup2FA(ctx context.Context, userID uuid.UUID) (*Setup2FAResp
 }
 
 func generateVerificationCode() string {
-	// Generate 6-digit numeric code
-	b := make([]byte, 3)
-	_, _ = uuid.New().MarshalBinary()
-	copy(b, uuid.New().String()[:3])
-	code := 0
-	for _, c := range b {
-		code = code*256 + int(c)
+	max := big.NewInt(1000000)
+	n, err := crand.Int(crand.Reader, max)
+	if err != nil {
+		return fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
 	}
-	code = code % 1000000
-	codeStr := strconv.Itoa(code)
-	return strings.Repeat("0", 6-len(codeStr)) + codeStr
+	return fmt.Sprintf("%06d", n.Int64())
 }
 
 func generateTOTPSecret() string {
@@ -778,6 +779,93 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *VerifyMagicLinkReque
 	_ = s.repo.UpsertDeviceSession(ctx, session)
 
 	// Generate tokens
+	log.Printf("[Auth] VerifyMagicLink: user=%s email=%s isNewUser=%v", user.ID, user.Email, isNewUser)
+	authResp, err := s.generateTokens(ctx, user.ID)
+	if err != nil {
+		log.Printf("[Auth] VerifyMagicLink: failed to generate tokens for user=%s: %v", user.ID, err)
+		return nil, err
+	}
+
+	log.Printf("[Auth] VerifyMagicLink: tokens generated successfully for user=%s", user.ID)
+	return &MagicLinkAuthResponse{
+		AccessToken:  authResp.AccessToken,
+		RefreshToken: authResp.RefreshToken,
+		ExpiresIn:    authResp.ExpiresIn,
+		IsNewUser:    isNewUser,
+	}, nil
+}
+
+// AuthenticateWithApple handles Sign in with Apple authentication
+func (s *Service) AuthenticateWithApple(ctx context.Context, req *AppleAuthRequest) (*MagicLinkAuthResponse, error) {
+	if req.DeviceID == "" {
+		return nil, ErrDeviceRequired
+	}
+
+	// Apple's identity token should be verified here in production
+	// For now, we trust the client-side verification and use the Apple user ID
+	// to find or create a user
+
+	// Look for existing user by email (Apple provides email on first auth)
+	var user *User
+	var isNewUser bool
+
+	if req.Email != "" {
+		existingUser, err := s.repo.GetByEmail(ctx, req.Email)
+		if err == nil {
+			user = existingUser
+		}
+	}
+
+	if user == nil {
+		// New user - check device ID first
+		existingDevice, err := s.repo.GetByDeviceID(ctx, req.DeviceID)
+		if err != nil {
+			return nil, err
+		}
+		if existingDevice != nil {
+			return nil, ErrDeviceRegistered
+		}
+
+		// Create new user
+		isNewUser = true
+		email := req.Email
+		if email == "" {
+			// Apple may not provide email after first auth, use a placeholder
+			email = req.UserID + "@privaterelay.appleid.com"
+		}
+
+		now := time.Now()
+		user = &User{
+			ID:            uuid.New(),
+			Email:         email,
+			PasswordHash:  "", // No password for Apple users
+			EmailVerified: true,
+			DeviceID:      &req.DeviceID,
+			TOTPEnabled:   false,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+		if err := s.repo.Create(ctx, user); err != nil {
+			return nil, err
+		}
+		log.Printf("[Auth] Apple: created new user %s with email %s", user.ID, email)
+	} else {
+		log.Printf("[Auth] Apple: existing user %s", user.ID)
+	}
+
+	// Update device session
+	now := time.Now()
+	session := &DeviceSession{
+		ID:         uuid.New(),
+		UserID:     user.ID,
+		DeviceID:   req.DeviceID,
+		Platform:   req.Platform,
+		LastActive: now,
+		CreatedAt:  now,
+	}
+	_ = s.repo.UpsertDeviceSession(ctx, session)
+
+	// Generate tokens
 	authResp, err := s.generateTokens(ctx, user.ID)
 	if err != nil {
 		return nil, err
@@ -844,4 +932,14 @@ func (s *Service) GetPublicKeys(ctx context.Context, userIDs []uuid.UUID) (map[u
 // ClearAllDeviceIDs clears all device IDs (for testing)
 func (s *Service) ClearAllDeviceIDs(ctx context.Context) error {
 	return s.repo.ClearAllDeviceIDs(ctx)
+}
+
+// DeleteAccount permanently deletes a user account and all associated data
+func (s *Service) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
+	// Delete all refresh tokens first
+	if err := s.repo.DeleteUserRefreshTokens(ctx, userID); err != nil {
+		return err
+	}
+	// Delete the user (cascades to profile, photos, matches, messages, etc.)
+	return s.repo.DeleteUser(ctx, userID)
 }

@@ -1,0 +1,19 @@
+appId: app.feelsfun.feels
+---
+- launchApp
+- assertVisible: "feels"
+
+# Should land on login screen
+- assertVisible: "Send Magic Link"
+
+# Enter email
+- tapOn: "Email address"
+- inputText: "test@feelsfun.app"
+
+# Tap send
+- tapOn: "Send Magic Link"
+
+# Should navigate to magic link screen
+- assertVisible: "Check your email"
+- assertVisible: "test@feelsfun.app"
+- assertVisible: "Resend in.*"

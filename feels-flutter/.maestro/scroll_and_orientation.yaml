@@ -1,0 +1,10 @@
+appId: app.feelsfun.feels
+---
+# Test login screen elements are all present
+
+- launchApp
+- assertVisible: "feels"
+- assertVisible: "Send Magic Link"
+- assertVisible: "Sign in with Apple"
+- assertVisible: "Login with Token"
+- assertVisible: "By continuing, you agree to our Terms of Service.*"

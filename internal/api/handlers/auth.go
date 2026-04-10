@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -205,7 +207,10 @@ func (h *AuthHandler) Setup2FA(w http.ResponseWriter, r *http.Request) {
 
 // SendMagicLink sends a magic link to the user's email
 func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
-	var req user.SendMagicLinkRequest
+	var req struct {
+		Email    string `json:"email"`
+		Platform string `json:"platform"` // "web" for web dashboard, empty for mobile app
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -223,9 +228,16 @@ func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 
 	// Send the magic link email
 	if h.emailService != nil {
-		if err := h.emailService.SendMagicLink(r.Context(), req.Email, token, "Feels"); err != nil {
-			// Log error but don't fail - user can retry
-			// In dev mode, email service logs to console anyway
+		if req.Platform == "web" {
+			// Send web-specific magic link that redirects to web dashboard
+			if err := h.emailService.SendWebMagicLink(r.Context(), req.Email, token, "Feels", "https://feelsfun.app"); err != nil {
+				log.Printf("[Auth] Failed to send web magic link: %v", err)
+			}
+		} else {
+			// Send mobile app magic link
+			if err := h.emailService.SendMagicLink(r.Context(), req.Email, token, "Feels"); err != nil {
+				log.Printf("[Auth] Failed to send magic link: %v", err)
+			}
 		}
 	}
 
@@ -283,6 +295,49 @@ func (h *AuthHandler) ClearAllDevices(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]string{"status": "cleared"}, http.StatusOK)
 }
 
+// AppleAuth handles Sign in with Apple
+func (h *AuthHandler) AppleAuth(w http.ResponseWriter, r *http.Request) {
+	var req user.AppleAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.userService.AuthenticateWithApple(r.Context(), &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, user.ErrDeviceRequired):
+			jsonError(w, "device_id is required", http.StatusBadRequest)
+		case errors.Is(err, user.ErrDeviceRegistered):
+			jsonError(w, "this device already has an account - please log in instead", http.StatusConflict)
+		default:
+			log.Printf("[Auth] Apple auth error: %v", err)
+			jsonError(w, "authentication failed", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonResponse(w, resp, http.StatusOK)
+}
+
+// DeleteAccount permanently deletes the authenticated user's account
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.userService.DeleteAccount(r.Context(), userID); err != nil {
+		log.Printf("[Auth] DeleteAccount error for user %s: %v", userID, err)
+		jsonError(w, "failed to delete account", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[Auth] Account deleted: %s", userID)
+	jsonResponse(w, map[string]string{"status": "deleted"}, http.StatusOK)
+}
+
 // MagicLinkRedirect handles the web redirect to the app deep link
 // This is called when the user clicks the link in their email
 func (h *AuthHandler) MagicLinkRedirect(w http.ResponseWriter, r *http.Request) {
@@ -293,10 +348,13 @@ func (h *AuthHandler) MagicLinkRedirect(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Redirect to the app using the custom URL scheme
-	appLink := fmt.Sprintf("feelsfun://magic?token=%s", token)
+	safeToken := url.QueryEscape(token)
+	appLink := fmt.Sprintf("feelsfun://magic?token=%s", safeToken)
+	displayToken := html.EscapeString(token)
+	safeAppLink := html.EscapeString(appLink)
 
 	// Return an HTML page that attempts the redirect and shows a fallback
-	html := fmt.Sprintf(`<!DOCTYPE html>
+	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -360,11 +418,11 @@ func (h *AuthHandler) MagicLinkRedirect(w http.ResponseWriter, r *http.Request) 
     </p>
   </div>
 </body>
-</html>`, appLink, token, appLink)
+</html>`, safeAppLink, displayToken, safeAppLink)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(html))
+	w.Write([]byte(htmlContent))
 }
 
 // SetPublicKey stores the user's public key for E2E encryption

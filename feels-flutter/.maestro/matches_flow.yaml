@@ -1,0 +1,7 @@
+appId: app.feelsfun.feels
+---
+- launchApp
+- assertVisible: "feels"
+- tapOn:
+    text: "Matches"
+    optional: true

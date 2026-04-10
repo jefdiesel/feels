@@ -1,0 +1,40 @@
+appId: app.feelsfun.feels
+---
+# Deep login flow - validation, navigation, UI completeness
+
+- launchApp
+- assertVisible: "feels"
+- assertVisible: "the dating app that puts.*real connections first"
+- assertVisible: "Send Magic Link"
+- assertVisible: "Sign in with Apple"
+- assertVisible: "or"
+- assertVisible: "By continuing, you agree to our Terms of Service.*"
+
+# Empty email validation
+- tapOn: "Send Magic Link"
+- assertVisible: "Enter your email"
+
+# Invalid email validation
+- tapOn:
+    point: 50%, 40%
+- inputText: "notanemail"
+- tapOn: "Send Magic Link"
+- assertVisible: "Enter a valid email"
+
+# Clear and enter valid email
+- tapOn:
+    point: 50%, 40%
+- eraseText: 20
+- inputText: "test@feelsfun.app"
+- tapOn: "Send Magic Link"
+
+# Magic link screen - full element check
+- assertVisible: "Check your email"
+- assertVisible: "We sent a magic link to"
+- assertVisible: "test@feelsfun.app"
+- assertVisible: "Tap the link in the email to sign in."
+- assertVisible: "Didn.*get it.*Check your spam folder."
+
+# Back navigation
+- tapOn: "Use different email"
+- assertVisible: "Send Magic Link"

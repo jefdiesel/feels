@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -140,9 +141,12 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, req *Crea
 		Photos:         []Photo{},
 	}
 
+	log.Printf("[Profile] Creating profile for user %s", userID)
 	if err := s.repo.Create(ctx, profile); err != nil {
+		log.Printf("[Profile] ERROR creating profile for user %s: %v", userID, err)
 		return nil, err
 	}
+	log.Printf("[Profile] Profile created successfully for user %s", userID)
 
 	// Create default preferences
 	prefs := &Preferences{
@@ -155,9 +159,12 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, req *Crea
 		VisibleToGenders: []string{"woman", "man"},
 		HardBlockGenders: []string{},
 	}
+	log.Printf("[Profile] Creating preferences for user %s", userID)
 	if err := s.repo.CreatePreferences(ctx, prefs); err != nil {
+		log.Printf("[Profile] ERROR creating preferences for user %s: %v", userID, err)
 		return nil, err
 	}
+	log.Printf("[Profile] Preferences created successfully for user %s", userID)
 
 	return profile, nil
 }

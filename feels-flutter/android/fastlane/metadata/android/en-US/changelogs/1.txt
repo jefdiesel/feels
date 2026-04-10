@@ -1,0 +1,12 @@
+Welcome to Feels — the dating app built for real connections.
+
+This is our first release. Pour a coffee, build a profile, and meet people who are actually here to connect.
+
+What's inside:
+• Beautiful, distraction-free design
+• Photo profiles and conversation prompts
+• End-to-end encrypted messaging
+• Smart matching by location, age, and lifestyle
+• Privacy controls you actually understand
+
+Got feedback? hello@feelsfun.app

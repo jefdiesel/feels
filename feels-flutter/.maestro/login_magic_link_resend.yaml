@@ -1,0 +1,12 @@
+appId: app.feelsfun.feels
+---
+# Test magic link resend cooldown timer
+
+- launchApp
+- tapOn: "Email address"
+- inputText: "resend@feelsfun.app"
+- tapOn: "Send Magic Link"
+- assertVisible: "Check your email"
+
+# Resend button should show countdown text
+- assertVisible: "Resend in.*s"

@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "Feels",
+    "slug": "feels-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "feelsfun",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#000000",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.feelsfun",
+      "backgroundColor": "#000000",
+      "buildNumber": "1",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "app.feelsfun",
+      "backgroundColor": "#000000",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "feelsfun"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      [
+        "expo-system-ui",
+        {
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "FeelsFun uses your location to show you people nearby and calculate distances.",
+          "locationWhenInUsePermission": "FeelsFun uses your location to show you people nearby and calculate distances."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cdc6ede8-be05-4e77-94ff-1ee55e4dde35"
+      }
+    },
+    "owner": "jefdiesel",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cdc6ede8-be05-4e77-94ff-1ee55e4dde35"
+    }
+  }
+}

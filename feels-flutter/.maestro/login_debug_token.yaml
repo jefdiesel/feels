@@ -1,0 +1,14 @@
+appId: app.feelsfun.feels
+---
+# Test debug token input (visible in debug builds)
+
+- launchApp
+- assertVisible: "feels"
+
+# Debug token field should be visible in debug builds
+- assertVisible: "Paste magic link token.*"
+- assertVisible: "Login with Token"
+
+# Tap token login with empty token (should no-op gracefully)
+- tapOn: "Login with Token"
+- assertVisible: "feels"

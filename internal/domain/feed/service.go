@@ -3,6 +3,7 @@ package feed
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/feels/feels/internal/domain/match"
@@ -173,6 +174,7 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 	// Get user's preferences
 	prefs, err := s.profileRepo.GetPreferences(ctx, userID)
 	if err != nil {
+		log.Printf("[ERROR] GetFeed: GetPreferences failed for user %s: %v", userID, err)
 		return nil, ErrProfileRequired
 	}
 

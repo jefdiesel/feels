@@ -90,7 +90,7 @@ type S3Config struct {
 }
 
 func Load() *Config {
-	return &Config{
+	cfg := &Config{
 		Server: ServerConfig{
 			Port: getEnv("PORT", "8080"),
 			Env:  getEnv("ENV", "development"),
@@ -148,6 +148,15 @@ func Load() *Config {
 			ReviewThreshold: getEnvFloat("MODERATION_REVIEW_THRESHOLD", 0.7),
 		},
 	}
+
+	// Security: refuse to start in production with weak JWT secret
+	if cfg.Server.Env == "production" {
+		if cfg.JWT.Secret == "dev-secret-change-me" || len(cfg.JWT.Secret) < 32 {
+			panic("FATAL: JWT_SECRET must be a strong value (32+ chars) in production. Set the JWT_SECRET environment variable.")
+		}
+	}
+
+	return cfg
 }
 
 func (c *Config) IsDevelopment() bool {

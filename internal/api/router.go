@@ -225,7 +225,7 @@ func (r *Router) setupMiddleware() {
 	r.mux.Use(chimiddleware.Timeout(30 * time.Second))
 
 	r.mux.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*", "https://*.feelsfun.app"},
+		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*", "https://*.feelsfun.app", "https://*.feels.fun", "https://feels.fun"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
 		ExposedHeaders:   []string{"Link"},
@@ -261,9 +261,6 @@ func (r *Router) setupRoutes(
 	// Magic link redirect (root level - handles email link clicks)
 	r.mux.Get("/auth/magic", authHandler.MagicLinkRedirect)
 
-	// Temp admin endpoint to clear device IDs for testing
-	r.mux.Post("/admin/clear-devices", authHandler.ClearAllDevices)
-
 	// API v1 routes
 	r.mux.Route("/api/v1", func(router chi.Router) {
 		// Auth routes (public) with rate limiting
@@ -280,7 +277,13 @@ func (r *Router) setupRoutes(
 
 			// Magic link with stricter rate limit (3 req/min)
 			auth.With(magicLinkRateLimiter.Limit).Post("/magic/send", authHandler.SendMagicLink)
-			auth.Post("/magic/verify", authHandler.VerifyMagicLink)
+			auth.With(authRateLimiter.Limit).Post("/magic/verify", authHandler.VerifyMagicLink)
+
+			// Sign in with Apple
+			auth.Post("/apple", authHandler.AppleAuth)
+
+			// Account deletion (requires auth)
+			auth.With(r.authMw.Authenticate).Delete("/account", authHandler.DeleteAccount)
 		})
 
 

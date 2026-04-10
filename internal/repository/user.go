@@ -471,3 +471,17 @@ func (r *UserRepository) ClearAllDeviceIDs(ctx context.Context) error {
 	_, err := r.db.Exec(ctx, query)
 	return err
 }
+
+// DeleteUser permanently deletes a user and all associated data
+// Most related data is deleted via ON DELETE CASCADE
+func (r *UserRepository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	query := `DELETE FROM users WHERE id = $1`
+	result, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
