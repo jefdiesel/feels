@@ -1,0 +1,98 @@
+# ------------------------------------------------------------------------------
+# Flutter PR Checks
+# ------------------------------------------------------------------------------
+# Runs on pull requests that touch the Flutter app. Performs static analysis,
+# unit tests, and a debug build as a fast sanity check. Uploads the debug APK
+# so reviewers can install it directly from the PR.
+# ------------------------------------------------------------------------------
+
+name: Flutter PR
+
+on:
+  pull_request:
+    paths:
+      - "feels-flutter/**"
+      - ".github/workflows/flutter-pr.yml"
+
+# Cancel in-progress runs for the same PR when new commits are pushed.
+concurrency:
+  group: flutter-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: feels-flutter
+
+jobs:
+  checks:
+    name: Analyze, test, build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # Check out the repo at the PR's head commit.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # JDK 17 is required by current Android Gradle Plugin versions.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Install Flutter on the stable channel (3.x).
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.x"
+          cache: true
+
+      # Cache the pub package cache keyed on pubspec.lock for fast reinstalls.
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            feels-flutter/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('feels-flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      # Cache Gradle's wrapper + module cache so Android builds are fast.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            feels-flutter/android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('feels-flutter/android/**/*.gradle*', 'feels-flutter/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Resolve Dart/Flutter dependencies.
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Fail on analyzer errors and warnings, but tolerate info-level lints.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      # Run unit and widget tests.
+      - name: Test
+        run: flutter test
+
+      # Build a debug APK as a smoke test that the app still compiles.
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      # Publish the APK as a workflow artifact so reviewers can install it.
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: feels-debug-apk-${{ github.event.pull_request.number }}
+          path: feels-flutter/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error

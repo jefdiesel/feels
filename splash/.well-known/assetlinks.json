@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.feelsfun.app",
+      "sha256_cert_fingerprints": [
+        "A1:4F:30:D1:E4:71:DB:26:5C:DD:20:C9:E6:7F:86:2A:1C:8E:03:EA:C2:92:FB:E4:C6:C0:C8:FB:A7:25:27:F2"
+      ]
+    }
+  }
+]

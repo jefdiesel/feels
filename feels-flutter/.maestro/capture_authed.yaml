@@ -1,0 +1,23 @@
+appId: app.feelsfun.feels
+---
+- launchApp
+
+# Wait for feed to load
+- assertVisible: "feels"
+- takeScreenshot: feed
+
+# Tap Matches tab
+- tapOn: "Matches"
+- waitForAnimationToEnd
+- takeScreenshot: matches
+
+# Tap Profile tab
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- takeScreenshot: profile
+
+# Tap settings icon (top right)
+- tapOn:
+    point: "92%, 8%"
+- waitForAnimationToEnd
+- takeScreenshot: settings

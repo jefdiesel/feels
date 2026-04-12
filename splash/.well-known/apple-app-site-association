@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "G849HTGU43.app.feelsfun.feels",
+        "paths": ["/m/*", "/auth/*"]
+      }
+    ]
+  }
+}

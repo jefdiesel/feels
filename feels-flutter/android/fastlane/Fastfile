@@ -37,8 +37,8 @@ platform :android do
       skip_upload_images: false,
       skip_upload_screenshots: false,
       skip_upload_changelogs: true,
-      track: "internal",
-      release_status: "draft"
+      changes_not_sent_for_review: true,
+      validate_only: false
     )
   end
 

@@ -1,0 +1,22 @@
+appId: app.feelsfun.feels
+---
+- launchApp
+
+# Wait for feed
+- assertVisible: "feels"
+
+# Go to settings
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- tapOn:
+    point: "92%, 8%"
+- waitForAnimationToEnd
+
+# Scroll down to find Get Premium button
+- scroll
+- scroll
+
+# Tap Get Premium
+- tapOn: "Get Premium"
+- waitForAnimationToEnd
+- takeScreenshot: premium

@@ -1,0 +1,33 @@
+appId: app.feelsfun.feels
+---
+- launchApp:
+    clearState: true
+
+- assertVisible: "Send Magic Link"
+- takeScreenshot: 01_login
+
+# Reveal "Other login options"
+- scroll
+- tapOn: "Other login options"
+- assertVisible: "Log in"
+
+# Tap email field, type, then dismiss keyboard by tapping logo area
+- tapOn:
+    point: "50%, 71%"
+- inputText: "playreviewer@degenjef.com"
+- tapOn:
+    point: "50%, 8%"
+
+# Now password field should be visible without keyboard
+- tapOn:
+    point: "50%, 78%"
+- inputText: "FeelsReviewer2026!"
+- tapOn:
+    point: "50%, 8%"
+
+- tapOn: "Log in"
+
+- waitForAnimationToEnd:
+    timeout: 8000
+
+- takeScreenshot: 02_after_login

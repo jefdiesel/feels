@@ -1,0 +1,198 @@
+# ------------------------------------------------------------------------------
+# Flutter Release (Internal Testing)
+# ------------------------------------------------------------------------------
+# On every push to main that touches the Flutter app, this workflow:
+#   1. Runs analyze + tests
+#   2. Decodes signing secrets
+#   3. Builds a release AAB
+#   4. Uploads the AAB to Google Play Internal Testing via fastlane
+#   5. Archives the AAB as a downloadable workflow artifact
+#
+# Supports manual runs via workflow_dispatch so you can re-ship without a code
+# change (e.g. after rotating the keystore or service account).
+#
+# ------------------------------------------------------------------------------
+# Required GitHub Secrets
+# ------------------------------------------------------------------------------
+#   KEYSTORE_BASE64
+#       Base64 of feels-flutter/android/app/feels-release.jks
+#       Generate:  base64 -i feels-release.jks -o keystore.b64
+#
+#   KEY_PROPERTIES_BASE64
+#       Base64 of feels-flutter/android/key.properties
+#       (contains storePassword, keyPassword, keyAlias, storeFile)
+#       Generate:  base64 -i key.properties -o key-properties.b64
+#
+#   GOOGLE_PLAY_JSON_BASE64
+#       Base64 of the Google Play service-account JSON with
+#       "Release manager" permissions on the app.
+#       Generate:  base64 -i google-play-service-account.json -o gp.b64
+#
+# Add them at: GitHub repo -> Settings -> Secrets and variables -> Actions.
+# ------------------------------------------------------------------------------
+
+name: Flutter Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "feels-flutter/**"
+      - ".github/workflows/flutter-release.yml"
+  # Allow re-running the workflow manually without a code change.
+  workflow_dispatch:
+
+# Only one release run at a time; do NOT cancel in-progress uploads because
+# aborting halfway through a Play Store upload can leave an orphaned draft.
+concurrency:
+  group: flutter-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: feels-flutter
+
+jobs:
+  release:
+    name: Build and ship to Play Internal
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # Check out the commit that triggered the workflow.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # JDK 17 for Android Gradle Plugin.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Install Flutter on stable 3.x.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.x"
+          cache: true
+
+      # Cache pub-cache + .dart_tool for fast re-runs.
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            feels-flutter/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('feels-flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      # Cache Gradle to avoid re-downloading Android toolchains.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            feels-flutter/android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('feels-flutter/android/**/*.gradle*', 'feels-flutter/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Resolve Dart/Flutter dependencies.
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Safety net: block release on analyzer errors.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      # Unit and widget tests.
+      - name: Test
+        run: flutter test
+
+      # Decode the upload keystore. The Fastfile/Gradle read it via
+      # storeFile in key.properties, which we write in the next step.
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not set"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/feels-release.jks
+          echo "Keystore written: $(wc -c < android/app/feels-release.jks) bytes"
+
+      # Decode key.properties (storePassword, keyPassword, keyAlias, storeFile).
+      - name: Decode key.properties
+        env:
+          KEY_PROPERTIES_BASE64: ${{ secrets.KEY_PROPERTIES_BASE64 }}
+        run: |
+          if [ -z "$KEY_PROPERTIES_BASE64" ]; then
+            echo "::error::KEY_PROPERTIES_BASE64 secret is not set"
+            exit 1
+          fi
+          echo "$KEY_PROPERTIES_BASE64" | base64 --decode > android/key.properties
+
+      # Build the signed release bundle. Signing is configured in
+      # android/app/build.gradle to read from key.properties.
+      - name: Build release AAB
+        run: flutter build appbundle --release
+
+      # Decode the Play service-account JSON into a RUNNER_TEMP path so it
+      # never lands in the workspace and gets cleaned up automatically.
+      - name: Decode Google Play service account
+        id: play_key
+        env:
+          GOOGLE_PLAY_JSON_BASE64: ${{ secrets.GOOGLE_PLAY_JSON_BASE64 }}
+        run: |
+          if [ -z "$GOOGLE_PLAY_JSON_BASE64" ]; then
+            echo "::error::GOOGLE_PLAY_JSON_BASE64 secret is not set"
+            exit 1
+          fi
+          KEY_PATH="$RUNNER_TEMP/play-service-account.json"
+          echo "$GOOGLE_PLAY_JSON_BASE64" | base64 --decode > "$KEY_PATH"
+          echo "path=$KEY_PATH" >> "$GITHUB_OUTPUT"
+
+      # Install Ruby so we can run fastlane.
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: false
+
+      # Install fastlane. We install directly (no Gemfile) since the Android
+      # directory doesn't currently vendor a Gemfile.
+      - name: Install fastlane
+        run: gem install fastlane -NV
+
+      # Upload the freshly built AAB to the internal testing track. The
+      # Fastfile reads GOOGLE_PLAY_JSON_KEY as a fallback when the constant's
+      # default path doesn't exist on the runner.
+      - name: Fastlane upload_internal
+        working-directory: feels-flutter/android
+        env:
+          GOOGLE_PLAY_JSON_KEY: ${{ steps.play_key.outputs.path }}
+          LC_ALL: en_US.UTF-8
+          LANG: en_US.UTF-8
+        run: fastlane upload_internal
+
+      # Archive the AAB so you can download it from the Actions run page.
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: feels-release-aab-${{ github.sha }}
+          path: feels-flutter/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Always wipe decoded secrets from the workspace, even on failure.
+      - name: Clean up secrets
+        if: always()
+        run: |
+          rm -f android/app/feels-release.jks android/key.properties
+          rm -f "$RUNNER_TEMP/play-service-account.json" || true
