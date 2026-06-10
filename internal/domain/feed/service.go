@@ -115,6 +115,25 @@ type NotificationService interface {
 	SendNewMatchNotification(ctx context.Context, userID uuid.UUID, matchName string, matchID uuid.UUID) error
 }
 
+// OverlapRepository is the NYC anchor-overlap strategy hook. Implementations
+// return candidates whose anchors share an NTA with the viewer's, plus
+// affinity flags used for ranking.
+type OverlapRepository interface {
+	OverlappingCandidates(ctx context.Context, viewerID uuid.UUID) (map[uuid.UUID]AnchorAffinity, error)
+}
+
+// AnchorAffinity mirrors repository.AnchorAffinity to avoid importing
+// repository from the domain layer.
+type AnchorAffinity struct {
+	UserID         uuid.UUID
+	OverlapCount   int
+	SharedPlay     bool
+	SharedWork     bool
+	SharedLive     bool
+	DensityPenalty int
+	SharedNTAName  string
+}
+
 type Service struct {
 	feedRepo            FeedRepository
 	profileRepo         ProfileRepository
@@ -125,6 +144,15 @@ type Service struct {
 	notificationService NotificationService
 	hub                 Hub
 	dailyLimit          int
+
+	// NYC anchor-overlap strategy (optional). When set, the feed is filtered
+	// to candidates whose anchors share an NTA with the viewer's, and
+	// re-ranked by overlap signals within existing priority buckets.
+	overlap OverlapRepository
+}
+
+func (s *Service) SetOverlap(r OverlapRepository) {
+	s.overlap = r
 }
 
 func NewService(feedRepo FeedRepository, profileRepo ProfileRepository, matchRepo MatchRepository, dailyLimit int) *Service {
@@ -191,10 +219,44 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 		return nil, err
 	}
 
-	// Get feed profiles
-	profiles, err := s.feedRepo.GetFeedProfiles(ctx, userID, prefs, limit)
+	// Get feed profiles. When NYC overlap strategy is active, fetch a wider
+	// candidate set so the post-filter still yields ~limit results.
+	repoLimit := limit
+	if s.overlap != nil {
+		repoLimit = limit * 4
+		if repoLimit > MaxFeedLimit {
+			repoLimit = MaxFeedLimit
+		}
+	}
+	profiles, err := s.feedRepo.GetFeedProfiles(ctx, userID, prefs, repoLimit)
 	if err != nil {
 		return nil, err
+	}
+
+	// NYC anchor-overlap strategy: keep only candidates whose anchors share
+	// an NTA with the viewer's, then re-rank within priority buckets.
+	// If the viewer has no anchors yet, fall back to the radius ordering.
+	if s.overlap != nil {
+		aff, rerr := s.overlap.OverlappingCandidates(ctx, userID)
+		if rerr != nil {
+			log.Printf("[FEED] overlap lookup failed: %v (falling back to radius)", rerr)
+		} else if len(aff) > 0 {
+			filtered := profiles[:0]
+			for _, p := range profiles {
+				if a, ok := aff[p.UserID]; ok {
+					if a.SharedNTAName != "" {
+						name := a.SharedNTAName
+						p.SharedPlace = &name
+					}
+					filtered = append(filtered, p)
+				}
+			}
+			profiles = filtered
+			sortByOverlap(profiles, aff)
+			if len(profiles) > limit {
+				profiles = profiles[:limit]
+			}
+		}
 	}
 
 	// Compute looking_for alignment for each profile

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/theme.dart';
+import '../../../anchors/presentation/anchors_onboarding_screen.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../providers/onboarding_provider.dart';
 
@@ -1111,7 +1112,16 @@ class _PreferencesStep extends ConsumerWidget {
             HapticFeedback.mediumImpact();
             // Reload profile so the app has it cached
             ref.read(profileProvider.notifier).loadProfile(forceRefresh: true);
-            context.go('/home/feed');
+            // Hand off to NYC anchor onboarding (LIVE/WORK/PLAY). Anchors
+            // are required — the screen blocks back-out and only the
+            // onCompleted callback advances to the feed.
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => AnchorsOnboardingScreen(
+                  onCompleted: () => context.go('/home/feed'),
+                ),
+              ),
+            );
           } else if (context.mounted && ob.error != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(ob.error!)),

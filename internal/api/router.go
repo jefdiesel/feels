@@ -9,6 +9,7 @@ import (
 	"github.com/feels/feels/internal/api/handlers"
 	"github.com/feels/feels/internal/api/middleware"
 	"github.com/feels/feels/internal/config"
+	"github.com/feels/feels/internal/domain/anchor"
 	"github.com/feels/feels/internal/domain/credit"
 	"github.com/feels/feels/internal/domain/feed"
 	"github.com/feels/feels/internal/domain/match"
@@ -73,6 +74,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	moderationRepo := repository.NewModerationRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
 	referralRepo := repository.NewReferralRepository(db)
+	anchorRepo := repository.NewAnchorRepository(db)
 
 	// Ensure passes table exists
 	if err := feedRepo.EnsurePassesTable(context.Background()); err != nil {
@@ -201,6 +203,14 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, paymentService)
 	adminHandler := handlers.NewAdminHandler(adminRepo, userRepo)
 	revenueCatHandler := handlers.NewRevenueCatHandler(paymentRepo)
+	anchorService := anchor.NewService(anchorRepo)
+	anchorHandler := handlers.NewAnchorHandler(anchorService)
+
+	// NYC anchor-overlap matching strategy (opt-in via MATCHING_STRATEGY=nyc_overlap).
+	if cfg.Matching.Strategy == "nyc_overlap" {
+		feedService.SetOverlap(&overlapAdapter{r: repository.NewReachability(db)})
+		log.Printf("[MATCHING] NYC anchor-overlap strategy enabled")
+	}
 
 	r := &Router{
 		mux:    chi.NewRouter(),
@@ -212,7 +222,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	}
 
 	r.setupMiddleware()
-	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler, revenueCatHandler, authRateLimiter, magicLinkRateLimiter)
+	r.setupRoutes(healthHandler, authHandler, profileHandler, feedHandler, matchHandler, messageHandler, creditHandler, settingsHandler, notificationHandler, paymentHandler, analyticsHandler, adminHandler, adminMw, referralHandler, revenueCatHandler, anchorHandler, authRateLimiter, magicLinkRateLimiter)
 
 	return r
 }
@@ -250,6 +260,7 @@ func (r *Router) setupRoutes(
 	adminMw *middleware.AdminMiddleware,
 	referralHandler *handlers.ReferralHandler,
 	revenueCatHandler *handlers.RevenueCatHandler,
+	anchorHandler *handlers.AnchorHandler,
 	authRateLimiter *middleware.RateLimitMiddleware,
 	magicLinkRateLimiter *middleware.RateLimitMiddleware,
 ) {
@@ -327,6 +338,13 @@ func (r *Router) setupRoutes(
 				p.Post("/verify/submit", profileHandler.SubmitVerification)
 				p.Get("/analytics", analyticsHandler.GetProfileAnalytics)
 				p.Get("/share-link", profileHandler.GetShareLink)
+			})
+
+			// Anchor routes (NYC hyper-local matching)
+			protected.Route("/anchors", func(a chi.Router) {
+				a.Get("/", anchorHandler.List)
+				a.Put("/{kind}", anchorHandler.Set)
+				a.Delete("/{kind}", anchorHandler.Delete)
 			})
 
 			// Feed routes

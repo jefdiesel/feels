@@ -121,4 +121,11 @@ class Endpoints {
   // ---------------------------------------------------------------------------
 
   static const String ws = '$_base/ws';
+
+  // ---------------------------------------------------------------------------
+  // Anchors (NYC hyper-local matching)
+  // ---------------------------------------------------------------------------
+
+  static const String anchors = '$_base/anchors';
+  static String anchorByKind(String kind) => '$_base/anchors/$kind';
 }

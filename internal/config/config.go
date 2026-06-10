@@ -19,6 +19,13 @@ type Config struct {
 	Sentry     SentryConfig
 	OpenAI     OpenAIConfig
 	Moderation ModerationConfig
+	Matching   MatchingConfig
+}
+
+type MatchingConfig struct {
+	// Strategy: "radius" (default, great-circle distance) or "nyc_overlap"
+	// (filter + rank by NTA overlap between user anchors).
+	Strategy string
 }
 
 type SMSConfig struct {
@@ -147,6 +154,9 @@ func Load() *Config {
 			BlockThreshold:  getEnvFloat("MODERATION_BLOCK_THRESHOLD", 0.9),
 			ReviewThreshold: getEnvFloat("MODERATION_REVIEW_THRESHOLD", 0.7),
 		},
+		Matching: MatchingConfig{
+			Strategy: getEnv("MATCHING_STRATEGY", "nyc_overlap"),
+		},
 	}
 
 	// Security: refuse to start in production with weak JWT secret
@@ -170,6 +180,15 @@ func (c *Config) IsProduction() bool {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			return parsed
+		}
 	}
 	return defaultValue
 }

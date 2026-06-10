@@ -23,3 +23,10 @@ vendor/
 *.log
 feels-app-release.apk
 *.apk
+
+# Local binaries built at repo root
+/gtfs-precompute
+/nta-load
+
+# Bulky local data (NYC NTA GeoJSON ~4.5MB)
+/data/
