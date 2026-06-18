@@ -20,6 +20,15 @@ type Config struct {
 	OpenAI     OpenAIConfig
 	Moderation ModerationConfig
 	Matching   MatchingConfig
+	IMessage   IMessageConfig
+}
+
+type IMessageConfig struct {
+	// ServiceToken gates the handle-based auth endpoint used by the iMessage
+	// concierge/relay. The bot is the trusted attestor (it observed the message
+	// arrive from the handle), so only callers presenting this token may mint a
+	// session for a handle. Empty value disables the endpoint entirely.
+	ServiceToken string
 }
 
 type MatchingConfig struct {
@@ -156,6 +165,9 @@ func Load() *Config {
 		},
 		Matching: MatchingConfig{
 			Strategy: getEnv("MATCHING_STRATEGY", "nyc_overlap"),
+		},
+		IMessage: IMessageConfig{
+			ServiceToken: getEnv("IMESSAGE_SERVICE_TOKEN", ""),
 		},
 	}
 

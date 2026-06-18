@@ -79,17 +79,11 @@ type Repository interface {
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 }
 
-// SMSService interface for sending SMS messages
-type SMSService interface {
-	SendVerificationCode(ctx context.Context, to, code string) error
-}
-
 type Service struct {
 	repo          Repository
 	jwtSecret     []byte
 	accessExpiry  time.Duration
 	refreshExpiry time.Duration
-	smsService    SMSService
 }
 
 type Claims struct {
@@ -106,75 +100,54 @@ func NewService(repo Repository, jwtSecret string, accessExpiry, refreshExpiry t
 	}
 }
 
-// SetSMSService sets the SMS service for phone verification
-func (s *Service) SetSMSService(sms SMSService) {
-	s.smsService = sms
-}
-
 // GetByPhone returns a user by their phone number
 func (s *Service) GetByPhone(ctx context.Context, phone string) (*User, error) {
 	return s.repo.GetByPhone(ctx, phone)
 }
 
-// CreateWithPhone creates a new user with just a phone number (phone-first auth)
-func (s *Service) CreateWithPhone(ctx context.Context, phone, deviceID, platform string) (*User, error) {
-	// Check if phone is blocked
-	blocked, err := s.repo.IsPhoneBlocked(ctx, phone)
-	if err != nil {
-		return nil, err
-	}
-	if blocked {
-		return nil, ErrPhoneBlocked
-	}
-
-	// Check if phone already exists
-	existing, err := s.repo.GetByPhone(ctx, phone)
-	if err == nil && existing != nil {
-		return nil, ErrPhoneExists
+// GetOrCreateByIMessageHandle finds or creates a user keyed by their iMessage
+// handle (a phone number or email). The handle IS the identity: messaging the
+// feels bot from it proves ownership, so no OTP is needed. The caller (the bot)
+// is trusted to have observed the inbound message from this handle.
+//
+// Returns the user and whether it was newly created. Handles are stored against
+// the email key for a single stable lookup — email handles use themselves; phone
+// handles get a namespaced placeholder, mirroring the phone-only user pattern.
+func (s *Service) GetOrCreateByIMessageHandle(ctx context.Context, handle, platform string) (*User, bool, error) {
+	handle = strings.ToLower(strings.TrimSpace(handle))
+	if handle == "" {
+		return nil, false, errors.New("handle required")
 	}
 
-	// Check if device already has an account (anti-multi-accounting)
-	if deviceID != "" {
-		existingDevice, err := s.repo.GetByDeviceID(ctx, deviceID)
-		if err != nil {
-			return nil, err
-		}
-		if existingDevice != nil {
-			return nil, ErrDeviceRegistered
-		}
+	emailKey := handle
+	var phone *string
+	if !strings.Contains(handle, "@") {
+		p := handle
+		phone = &p
+		emailKey = handle + "@imessage.feels.local"
+	}
+
+	if existing, err := s.repo.GetByEmail(ctx, emailKey); err == nil && existing != nil {
+		return existing, false, nil
 	}
 
 	now := time.Now()
-	user := &User{
-		ID:              uuid.New(),
-		Email:           phone + "@phone.feels.local", // Placeholder email for phone-only users
-		PasswordHash:    "",                           // No password for phone auth
-		EmailVerified:   false,
-		Phone:           &phone,
-		PhoneVerified:   true, // Already verified via OTP
-		PhoneVerifiedAt: &now,
-		DeviceID:        &deviceID,
-		TOTPEnabled:     false,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+	u := &User{
+		ID:            uuid.New(),
+		Email:         emailKey,
+		EmailVerified: false,
+		Phone:         phone,
+		PhoneVerified: phone != nil, // arriving via iMessage from this handle attests it
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
-
-	if err := s.repo.Create(ctx, user); err != nil {
-		return nil, err
+	if phone != nil {
+		u.PhoneVerifiedAt = &now
 	}
-
-	// Create device session
-	session := &DeviceSession{
-		ID:         uuid.New(),
-		UserID:     user.ID,
-		DeviceID:   deviceID,
-		Platform:   platform,
-		LastActive: now,
-		CreatedAt:  now,
+	if err := s.repo.Create(ctx, u); err != nil {
+		return nil, false, err
 	}
-	_ = s.repo.UpsertDeviceSession(ctx, session)
-
-	return user, nil
+	return u, true, nil
 }
 
 // GenerateTokens creates access and refresh tokens for a user (public wrapper)
@@ -484,112 +457,6 @@ func normalizeUSPhone(phone string) (string, error) {
 	default:
 		return "", ErrInvalidPhone
 	}
-}
-
-// SendPhoneCode sends a verification code to the phone number
-func (s *Service) SendPhoneCode(ctx context.Context, userID *uuid.UUID, phone string) error {
-	normalized, err := normalizeUSPhone(phone)
-	if err != nil {
-		return err
-	}
-
-	// Check if phone is blocked
-	blocked, err := s.repo.IsPhoneBlocked(ctx, normalized)
-	if err != nil {
-		return err
-	}
-	if blocked {
-		return ErrPhoneBlocked
-	}
-
-	// Check if phone already registered to another user
-	existing, err := s.repo.GetByPhone(ctx, normalized)
-	if err == nil && existing != nil {
-		if userID == nil || existing.ID != *userID {
-			return ErrPhoneExists
-		}
-	}
-
-	// Delete any existing verification for this phone
-	_ = s.repo.DeletePhoneVerification(ctx, normalized)
-
-	// Generate 6-digit code
-	code := generateVerificationCode()
-	codeHash := hashToken(code)
-
-	verification := &PhoneVerification{
-		ID:        uuid.New(),
-		UserID:    userID,
-		Phone:     normalized,
-		CodeHash:  codeHash,
-		Attempts:  0,
-		ExpiresAt: time.Now().Add(10 * time.Minute),
-		CreatedAt: time.Now(),
-	}
-
-	if err := s.repo.CreatePhoneVerification(ctx, verification); err != nil {
-		return err
-	}
-
-	// Send SMS via Twilio
-	if s.smsService != nil {
-		if err := s.smsService.SendVerificationCode(ctx, normalized, code); err != nil {
-			// Log error but don't fail - user can retry
-			// The code is still stored and valid
-			_ = err
-		}
-	}
-
-	return nil
-}
-
-// VerifyPhone verifies the phone code and marks the phone as verified
-func (s *Service) VerifyPhone(ctx context.Context, userID uuid.UUID, phone, code string) error {
-	normalized, err := normalizeUSPhone(phone)
-	if err != nil {
-		return err
-	}
-
-	verification, err := s.repo.GetPhoneVerification(ctx, normalized)
-	if err != nil {
-		return ErrInvalidCode
-	}
-
-	if time.Now().After(verification.ExpiresAt) {
-		_ = s.repo.DeletePhoneVerification(ctx, normalized)
-		return ErrCodeExpired
-	}
-
-	if verification.Attempts >= 5 {
-		_ = s.repo.DeletePhoneVerification(ctx, normalized)
-		return ErrTooManyAttempts
-	}
-
-	codeHash := hashToken(code)
-	if codeHash != verification.CodeHash {
-		_ = s.repo.IncrementPhoneAttempts(ctx, verification.ID)
-		return ErrInvalidCode
-	}
-
-	// Code is valid, update user
-	user, err := s.repo.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	user.Phone = &normalized
-	user.PhoneVerified = true
-	user.PhoneVerifiedAt = &now
-
-	if err := s.repo.Update(ctx, user); err != nil {
-		return err
-	}
-
-	// Clean up verification
-	_ = s.repo.DeletePhoneVerification(ctx, normalized)
-
-	return nil
 }
 
 // Setup2FA generates a TOTP secret for the user (not enabled yet)

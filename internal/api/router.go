@@ -23,7 +23,6 @@ import (
 	"github.com/feels/feels/internal/domain/settings"
 	"github.com/feels/feels/internal/domain/user"
 	"github.com/feels/feels/internal/email"
-	"github.com/feels/feels/internal/otp"
 	"github.com/feels/feels/internal/repository"
 	"github.com/feels/feels/internal/storage"
 	"github.com/feels/feels/internal/websocket"
@@ -116,12 +115,6 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		}
 	}
 
-	// Initialize OTP service (Telnyx SMS)
-	otpService := otp.NewService(db, otp.Config{
-		TelnyxAPIKey:     cfg.Telnyx.APIKey,
-		TelnyxFromNumber: cfg.Telnyx.FromNumber,
-	})
-
 	// Initialize services
 	userService := user.NewService(
 		userRepo,
@@ -129,7 +122,6 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		cfg.JWT.AccessExpiry,
 		cfg.JWT.RefreshExpiry,
 	)
-	userService.SetSMSService(otpService)
 
 	profileService := profile.NewService(profileRepo, s3Client)
 	// Payment service is initialized later and will be set on profile service
@@ -189,7 +181,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
 	authHandler := handlers.NewAuthHandler(userService, profileService, emailService, cfg.IsDevelopment())
-	authHandler.SetOTPService(otpService)
+	authHandler.SetIMessageServiceToken(cfg.IMessage.ServiceToken)
 	profileHandler := handlers.NewProfileHandler(profileService)
 	feedHandler := handlers.NewFeedHandler(feedService)
 	feedHandler.SetSubscriptionChecker(paymentService)
@@ -274,12 +266,11 @@ func (r *Router) setupRoutes(
 
 	// API v1 routes
 	r.mux.Route("/api/v1", func(router chi.Router) {
-		// Auth routes (public) with rate limiting
+		// Auth routes (public) with rate limiting.
+		// iMessage handle auth (iPhone) + email magic link (Android) are the
+		// two front doors; phone SMS OTP was removed (10DLC/TCPA + carrier
+		// filtering of dating content made it untenable).
 		router.Route("/auth", func(auth chi.Router) {
-			// Phone-first auth (primary flow)
-			auth.With(magicLinkRateLimiter.Limit).Post("/phone/send", authHandler.SendPhoneOTP)
-			auth.With(authRateLimiter.Limit).Post("/phone/login", authHandler.PhoneLogin)
-
 			// Legacy email/password auth
 			auth.With(authRateLimiter.Limit).Post("/register", authHandler.Register)
 			auth.With(authRateLimiter.Limit).Post("/login", authHandler.Login)
@@ -292,6 +283,9 @@ func (r *Router) setupRoutes(
 
 			// Sign in with Apple
 			auth.Post("/apple", authHandler.AppleAuth)
+
+			// iMessage handle auth (service-token gated; called by the bot, not users)
+			auth.With(authRateLimiter.Limit).Post("/imessage", authHandler.IMessageAuth)
 
 			// Account deletion (requires auth)
 			auth.With(r.authMw.Authenticate).Delete("/account", authHandler.DeleteAccount)
@@ -314,9 +308,6 @@ func (r *Router) setupRoutes(
 		router.Group(func(protected chi.Router) {
 			protected.Use(r.authMw.Authenticate)
 
-			// Phone verification routes (for adding/verifying phone to existing account)
-			protected.Post("/auth/phone/add", authHandler.SendPhoneCode)
-			protected.Post("/auth/phone/confirm", authHandler.VerifyPhone)
 
 			// 2FA routes (disabled until needed)
 			// protected.Post("/auth/2fa/setup", authHandler.Setup2FA)
