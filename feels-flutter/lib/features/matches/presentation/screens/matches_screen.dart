@@ -356,6 +356,32 @@ class _MatchCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (match.sharedPlace != null &&
+                      match.sharedPlace!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_city,
+                          size: 12,
+                          color: FeelsColors.primary,
+                        ),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            match.sharedPlace!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: FeelsColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     match.lastMessage?.content ?? 'Say hi!',

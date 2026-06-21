@@ -74,7 +74,14 @@ func (r *MatchRepository) GetMatchWithProfile(ctx context.Context, matchID, user
 			p.user_id, p.name, p.dob, p.gender, p.zip_code, p.neighborhood, p.bio,
 			p.kink_level, p.looking_for, p.zodiac, p.religion, p.has_kids, p.wants_kids,
 			p.alcohol, p.weed, p.lat, p.lng, p.is_verified, p.last_active, p.created_at,
-			COALESCE(ip.enabled, false) AS image_enabled
+			COALESCE(ip.enabled, false) AS image_enabled,
+			(SELECT n.name
+				FROM user_anchors va
+				JOIN user_anchors ca ON ca.nta_id = va.nta_id AND ca.user_id = p.user_id
+				JOIN nyc_ntas n ON n.id = va.nta_id
+				WHERE va.user_id = $2 AND va.nta_id IS NOT NULL
+				ORDER BY CASE n.density_tier WHEN 'CORE' THEN 0 WHEN 'FRINGE' THEN 1 ELSE 2 END, n.name
+				LIMIT 1) AS shared_place
 		FROM matches m
 		JOIN profiles p ON p.user_id = CASE WHEN m.user1_id = $2 THEN m.user2_id ELSE m.user1_id END
 		LEFT JOIN image_permissions ip ON ip.match_id = m.id AND ip.user_id = $2
@@ -91,6 +98,7 @@ func (r *MatchRepository) GetMatchWithProfile(ctx context.Context, matchID, user
 		&mwp.OtherUser.Alcohol, &mwp.OtherUser.Weed, &mwp.OtherUser.Lat, &mwp.OtherUser.Lng,
 		&mwp.OtherUser.IsVerified, &mwp.OtherUser.LastActive, &mwp.OtherUser.CreatedAt,
 		&mwp.ImageEnabled,
+		&mwp.SharedPlace,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -122,7 +130,14 @@ func (r *MatchRepository) GetUserMatches(ctx context.Context, userID uuid.UUID) 
 			(SELECT sender_id FROM messages WHERE match_id = m.id ORDER BY created_at DESC LIMIT 1) AS last_sender,
 			(SELECT created_at FROM messages WHERE match_id = m.id ORDER BY created_at DESC LIMIT 1) AS last_msg_time,
 			COALESCE(ip.enabled, false) AS image_enabled,
-			(SELECT COUNT(*) FROM messages WHERE match_id = m.id AND sender_id != $1 AND read_at IS NULL) AS unread_count
+			(SELECT COUNT(*) FROM messages WHERE match_id = m.id AND sender_id != $1 AND read_at IS NULL) AS unread_count,
+			(SELECT n.name
+				FROM user_anchors va
+				JOIN user_anchors ca ON ca.nta_id = va.nta_id AND ca.user_id = p.user_id
+				JOIN nyc_ntas n ON n.id = va.nta_id
+				WHERE va.user_id = $1 AND va.nta_id IS NOT NULL
+				ORDER BY CASE n.density_tier WHEN 'CORE' THEN 0 WHEN 'FRINGE' THEN 1 ELSE 2 END, n.name
+				LIMIT 1) AS shared_place
 		FROM matches m
 		JOIN profiles p ON p.user_id = CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END
 		LEFT JOIN image_permissions ip ON ip.match_id = m.id AND ip.user_id = $1
@@ -157,6 +172,7 @@ func (r *MatchRepository) GetUserMatches(ctx context.Context, userID uuid.UUID) 
 			&lastMsgContent, &lastMsgSender, &lastMsgTime,
 			&mwp.ImageEnabled,
 			&mwp.UnreadCount,
+			&mwp.SharedPlace,
 		)
 		if err != nil {
 			return nil, err
@@ -277,4 +293,3 @@ func (r *MatchRepository) GetOtherUserID(ctx context.Context, matchID, userID uu
 	}
 	return otherID, nil
 }
-

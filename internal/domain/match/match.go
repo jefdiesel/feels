@@ -22,7 +22,8 @@ type MatchWithProfile struct {
 	CreatedAt    time.Time       `json:"created_at"`
 	LastMessage  *MessagePreview `json:"last_message,omitempty"`
 	UnreadCount  int             `json:"unread_count"`
-	ImageEnabled bool            `json:"image_enabled"` // whether you've enabled images
+	ImageEnabled bool            `json:"image_enabled"`          // whether you've enabled images
+	SharedPlace  *string         `json:"shared_place,omitempty"` // shared NYC neighborhood (NTA), if any
 }
 
 // MessagePreview is a preview of a message

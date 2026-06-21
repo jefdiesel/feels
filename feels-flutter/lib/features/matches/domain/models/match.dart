@@ -36,6 +36,9 @@ class MatchWithProfile {
   final int unreadCount;
   final bool imageEnabled;
 
+  /// Shared NYC neighborhood (NTA) with this match, if any.
+  final String? sharedPlace;
+
   const MatchWithProfile({
     required this.id,
     required this.otherUser,
@@ -43,6 +46,7 @@ class MatchWithProfile {
     this.lastMessage,
     required this.unreadCount,
     required this.imageEnabled,
+    this.sharedPlace,
   });
 
   factory MatchWithProfile.fromJson(Map<String, dynamic> json) {
@@ -55,6 +59,7 @@ class MatchWithProfile {
           : null,
       unreadCount: json['unread_count'] as int? ?? 0,
       imageEnabled: json['image_enabled'] as bool? ?? false,
+      sharedPlace: json['shared_place'] as String?,
     );
   }
 
@@ -66,6 +71,7 @@ class MatchWithProfile {
       if (lastMessage != null) 'last_message': lastMessage!.toJson(),
       'unread_count': unreadCount,
       'image_enabled': imageEnabled,
+      if (sharedPlace != null) 'shared_place': sharedPlace,
     };
   }
 
@@ -76,6 +82,7 @@ class MatchWithProfile {
     LastMessage? lastMessage,
     int? unreadCount,
     bool? imageEnabled,
+    String? sharedPlace,
   }) {
     return MatchWithProfile(
       id: id ?? this.id,
@@ -84,6 +91,7 @@ class MatchWithProfile {
       lastMessage: lastMessage ?? this.lastMessage,
       unreadCount: unreadCount ?? this.unreadCount,
       imageEnabled: imageEnabled ?? this.imageEnabled,
+      sharedPlace: sharedPlace ?? this.sharedPlace,
     );
   }
 

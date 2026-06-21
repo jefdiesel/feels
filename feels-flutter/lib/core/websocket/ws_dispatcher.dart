@@ -94,10 +94,8 @@ class WsDispatcher {
 
     final matched =
         _ref.read(matchesProvider).matches.where((m) => m.id == e.matchId);
-    _showMatchToast(
-      e.matchId,
-      matched.isNotEmpty ? matched.first.otherUser.name : null,
-    );
+    final match = matched.isNotEmpty ? matched.first : null;
+    _showMatchToast(e.matchId, match?.otherUser.name, match?.sharedPlace);
   }
 
   bool _isOnFeed() {
@@ -114,10 +112,13 @@ class WsDispatcher {
     }
   }
 
-  void _showMatchToast(String matchId, String? name) {
+  void _showMatchToast(String matchId, String? name, String? sharedPlace) {
     final messenger = feelsScaffoldMessengerKey.currentState;
     if (messenger == null) return;
     final who = (name != null && name.trim().isNotEmpty) ? name : 'someone new';
+    final nabe = (sharedPlace != null && sharedPlace.isNotEmpty)
+        ? " — you're both in $sharedPlace"
+        : '';
     messenger
       ..clearSnackBars()
       ..showSnackBar(
@@ -126,7 +127,7 @@ class WsDispatcher {
           backgroundColor: FeelsColors.primary,
           duration: const Duration(seconds: 5),
           content: Text(
-            "It's a match with $who \u{1F389}",
+            "It's a match with $who \u{1F389}$nabe",
             style: const TextStyle(
               color: FeelsColors.textPrimary,
               fontWeight: FeelsTypography.weightHeading,
