@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../anchors/data/anchor_repository.dart';
 import '../providers/auth_provider.dart';
 
 const _bgColor = Color(0xFF0A0A0A);
@@ -59,10 +60,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       if (state.isNewUser) {
         context.go('/onboarding');
       } else {
-        context.go('/home/feed');
+        // Returning user: force NYC anchor setup if they don't have anchors
+        // yet. Catches every existing user on their first launch after this
+        // build, since the published app never had the anchor flow.
+        final needsAnchors = await _missingAnchors();
+        if (!mounted) return;
+        if (needsAnchors) {
+          context.go('/anchors');
+        } else {
+          context.go('/home/feed');
+        }
       }
     } else {
       context.go('/auth');
+    }
+  }
+
+  Future<bool> _missingAnchors() async {
+    try {
+      final repo = ref.read(anchorRepositoryProvider);
+      final list = await repo.list();
+      return list.isEmpty;
+    } catch (_) {
+      // If the check fails, don't block the feed — server still falls back
+      // to radius for users with no anchors.
+      return false;
     }
   }
 

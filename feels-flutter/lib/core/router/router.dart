@@ -10,6 +10,7 @@ import '../../features/matches/presentation/screens/matches_screen.dart';
 import '../../features/chat/presentation/screens/conversation_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/preferences_screen.dart';
+import '../../features/anchors/presentation/anchors_onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/premium/presentation/screens/premium_screen.dart';
 import '../../shared/widgets/settings_screen.dart';
@@ -24,6 +25,7 @@ class RoutePaths {
   static const String splash = '/';
   static const String auth = '/auth';
   static const String onboarding = '/onboarding';
+  static const String anchors = '/anchors';
   static const String home = '/home';
   static const String feed = '/home/feed';
   static const String matches = '/home/matches';
@@ -72,6 +74,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.onboarding,
         name: 'onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+
+      // NYC anchor setup (forced for any user without anchors)
+      GoRoute(
+        path: RoutePaths.anchors,
+        name: 'anchors',
+        builder: (context, state) => AnchorsOnboardingScreen(
+          onCompleted: () => context.go('/home/feed'),
+        ),
       ),
 
       // Main app — shell route with bottom navigation
