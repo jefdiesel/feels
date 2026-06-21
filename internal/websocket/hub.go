@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -11,6 +12,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
+
+// presenceRefreshInterval is how often all currently-connected users have their
+// last_active bumped, so long foreground sessions keep floating up in the feed.
+const presenceRefreshInterval = 3 * time.Minute
+
+// PresenceRecorder persists user activity so the feed can float currently-online
+// users up. Satisfied by the profile repository's TouchLastActive.
+type PresenceRecorder interface {
+	TouchLastActive(ctx context.Context, userIDs []uuid.UUID) error
+}
 
 var (
 	upgrader = websocket.Upgrader{
@@ -37,6 +48,7 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan userMessage
+	presence   PresenceRecorder
 	mu         sync.RWMutex
 }
 
@@ -55,8 +67,18 @@ func NewHub() *Hub {
 	}
 }
 
+// SetPresenceRecorder wires presence tracking for the activity-weighted feed.
+// Must be called before Run() — the recorder is read from the hub goroutine
+// without a lock, so setting it beforehand avoids a data race.
+func (h *Hub) SetPresenceRecorder(p PresenceRecorder) {
+	h.presence = p
+}
+
 // Run starts the hub's main loop
 func (h *Hub) Run() {
+	ticker := time.NewTicker(presenceRefreshInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case client := <-h.register:
@@ -66,6 +88,7 @@ func (h *Hub) Run() {
 			}
 			h.clients[client.userID][client] = true
 			h.mu.Unlock()
+			h.touch(client.userID)
 			log.Printf("Client connected: user %s", client.userID)
 
 		case client := <-h.unregister:
@@ -80,7 +103,11 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock()
+			h.touch(client.userID)
 			log.Printf("Client disconnected: user %s", client.userID)
+
+		case <-ticker.C:
+			h.refreshPresence()
 
 		case msg := <-h.broadcast:
 			h.mu.RLock()
@@ -97,6 +124,41 @@ func (h *Hub) Run() {
 			h.mu.RUnlock()
 		}
 	}
+}
+
+// touch marks a single user active (on connect/disconnect). Fire-and-forget so
+// it never blocks the hub loop.
+func (h *Hub) touch(userID uuid.UUID) {
+	if h.presence == nil {
+		return
+	}
+	go func() {
+		if err := h.presence.TouchLastActive(context.Background(), []uuid.UUID{userID}); err != nil {
+			log.Printf("presence touch failed for %s: %v", userID, err)
+		}
+	}()
+}
+
+// refreshPresence bumps last_active for every currently-connected user in one
+// batch, so users with the app open keep counting as recently active.
+func (h *Hub) refreshPresence() {
+	if h.presence == nil {
+		return
+	}
+	h.mu.RLock()
+	ids := make([]uuid.UUID, 0, len(h.clients))
+	for id := range h.clients {
+		ids = append(ids, id)
+	}
+	h.mu.RUnlock()
+	if len(ids) == 0 {
+		return
+	}
+	go func() {
+		if err := h.presence.TouchLastActive(context.Background(), ids); err != nil {
+			log.Printf("presence refresh failed: %v", err)
+		}
+	}()
 }
 
 // SendToUser sends a message to all connections for a user

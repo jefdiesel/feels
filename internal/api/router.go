@@ -53,13 +53,17 @@ func (a *moderationAdapter) CheckContent(ctx context.Context, userID uuid.UUID, 
 }
 
 func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Router {
-	// Initialize WebSocket hub
-	hub := websocket.NewHub()
-	go hub.Run()
-
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	profileRepo := repository.NewProfileRepository(db)
+
+	// Initialize WebSocket hub. Wire presence (last_active) before Run() so the
+	// activity-weighted feed knows who's currently online — every authenticated
+	// client now holds a socket, so this tracks real presence.
+	hub := websocket.NewHub()
+	hub.SetPresenceRecorder(profileRepo)
+	go hub.Run()
+
 	feedRepo := repository.NewFeedRepository(db)
 	matchRepo := repository.NewMatchRepository(db)
 	blockRepo := repository.NewBlockRepository(db)

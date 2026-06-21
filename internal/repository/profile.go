@@ -126,6 +126,18 @@ func (r *ProfileRepository) UpdateLastActive(ctx context.Context, userID uuid.UU
 	return err
 }
 
+// TouchLastActive bumps last_active to NOW() for many users in one statement.
+// The WebSocket hub calls this to keep presence fresh for the
+// activity-weighted feed (connect, disconnect, and periodic while online).
+func (r *ProfileRepository) TouchLastActive(ctx context.Context, userIDs []uuid.UUID) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+	query := `UPDATE profiles SET last_active = NOW() WHERE user_id = ANY($1)`
+	_, err := r.db.Exec(ctx, query, userIDs)
+	return err
+}
+
 func (r *ProfileRepository) GetNameByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
 	query := `SELECT COALESCE(name, '') FROM profiles WHERE user_id = $1`
 	var name string
