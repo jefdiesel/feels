@@ -189,8 +189,20 @@ func (s *Service) SetUserRepository(ur UserRepository) {
 	s.userRepo = ur
 }
 
+// FeedScope controls how strongly NYC neighborhood overlap weighs on the order.
+type FeedScope string
+
+const (
+	// ScopeMyNabes (default) ranks people in your neighborhoods first, but
+	// still includes everyone else in the tail.
+	ScopeMyNabes FeedScope = "my_nabes"
+	// ScopeEverywhere drops the nabe boost so you can look beyond your
+	// neighborhoods (shared-nabe badges still show where they apply).
+	ScopeEverywhere FeedScope = "everywhere"
+)
+
 // GetFeed returns the next batch of profiles for the user
-func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*FeedResponse, error) {
+func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int, scope FeedScope) (*FeedResponse, error) {
 	// Validate limit
 	if limit <= 0 {
 		limit = DefaultFeedLimit
@@ -233,30 +245,32 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int) (*Fe
 		return nil, err
 	}
 
-	// NYC anchor-overlap strategy: keep only candidates whose anchors share
-	// an NTA with the viewer's, then re-rank within priority buckets.
-	// If the viewer has no anchors yet, fall back to the radius ordering.
+	// NYC anchor-overlap strategy (soft priority, not a hard filter): annotate
+	// the shared neighborhood on every overlapping candidate for the card
+	// badge, then — unless the viewer asked to look everywhere — rank their
+	// nabes first while keeping everyone else in the tail. A non-overlap
+	// candidate has no affinity entry, so sortByOverlap scores it worst and it
+	// naturally sinks below nabe matches within each priority bucket.
 	if s.overlap != nil {
 		aff, rerr := s.overlap.OverlappingCandidates(ctx, userID)
 		if rerr != nil {
 			log.Printf("[FEED] overlap lookup failed: %v (falling back to radius)", rerr)
 		} else if len(aff) > 0 {
-			filtered := profiles[:0]
-			for _, p := range profiles {
-				if a, ok := aff[p.UserID]; ok {
-					if a.SharedNTAName != "" {
-						name := a.SharedNTAName
-						p.SharedPlace = &name
-					}
-					filtered = append(filtered, p)
+			for i := range profiles {
+				if a, ok := aff[profiles[i].UserID]; ok && a.SharedNTAName != "" {
+					name := a.SharedNTAName
+					profiles[i].SharedPlace = &name
 				}
 			}
-			profiles = filtered
-			sortByOverlap(profiles, aff)
-			if len(profiles) > limit {
-				profiles = profiles[:limit]
+			if scope != ScopeEverywhere {
+				sortByOverlap(profiles, aff)
 			}
 		}
+	}
+
+	// Cap to the requested page after any re-ranking.
+	if len(profiles) > limit {
+		profiles = profiles[:limit]
 	}
 
 	// Compute looking_for alignment for each profile

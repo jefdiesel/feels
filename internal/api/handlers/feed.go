@@ -49,7 +49,14 @@ func (h *FeedHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp, err := h.feedService.GetFeed(r.Context(), userID, limit)
+	// Scope lets the user look beyond their neighborhoods. Default ranks nabes
+	// first; "everywhere" drops the boost.
+	scope := feed.ScopeMyNabes
+	if r.URL.Query().Get("scope") == string(feed.ScopeEverywhere) {
+		scope = feed.ScopeEverywhere
+	}
+
+	resp, err := h.feedService.GetFeed(r.Context(), userID, limit, scope)
 	if err != nil {
 		if errors.Is(err, feed.ErrProfileRequired) {
 			jsonError(w, "profile required to use feed", http.StatusPreconditionRequired)

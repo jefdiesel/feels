@@ -86,6 +86,29 @@ func TestSortByOverlap_StrongOverlapBeatsActivity(t *testing.T) {
 	}
 }
 
+// Soft priority: a non-overlap candidate (no affinity entry) sorts after an
+// overlapping one in the same bucket, but stays in the feed (it isn't dropped).
+func TestSortByOverlap_NonOverlapFallsToTail(t *testing.T) {
+	overlap, _ := browseProfile(10 * 24 * time.Hour)
+	nonOverlap, _ := browseProfile(10 * 24 * time.Hour)
+
+	aff := map[uuid.UUID]AnchorAffinity{
+		overlap.UserID: {OverlapCount: 1},
+		// nonOverlap intentionally absent — no shared neighborhood.
+	}
+
+	profiles := []FeedProfile{nonOverlap, overlap}
+	sortByOverlap(profiles, aff)
+
+	got := order(profiles)
+	if got[0] != overlap.UserID {
+		t.Fatalf("expected overlapping user first, got order %v", got)
+	}
+	if len(profiles) != 2 {
+		t.Fatalf("non-overlap candidate should remain in the list, got %d", len(profiles))
+	}
+}
+
 // Priority bucket dominates both overlap and activity.
 func TestSortByOverlap_PriorityDominates(t *testing.T) {
 	qualified, _ := browseProfile(10 * 24 * time.Hour)
