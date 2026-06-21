@@ -31,3 +31,9 @@ class AnchorRepository {
 final anchorRepositoryProvider = Provider<AnchorRepository>((ref) {
   return AnchorRepository(ref.read(apiClientProvider));
 });
+
+/// The current user's LIVE/WORK/PLAY anchors, for display on their profile.
+/// Invalidate after editing an anchor to refresh.
+final myAnchorsProvider = FutureProvider<List<Anchor>>((ref) {
+  return ref.read(anchorRepositoryProvider).list();
+});

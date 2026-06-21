@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/theme.dart';
+import '../../../anchors/data/anchor_models.dart';
+import '../../../anchors/data/anchor_repository.dart';
 import '../../domain/models/profile_models.dart';
 import '../../widgets/photo_grid.dart';
 import '../providers/profile_provider.dart';
@@ -128,6 +130,8 @@ class _ProfileBody extends ConsumerWidget {
     final mainPhotoUrl =
         sortedPhotos.isNotEmpty ? sortedPhotos.first.url : null;
     final completeness = _calculateCompleteness(profile);
+    final anchors =
+        ref.watch(myAnchorsProvider).valueOrNull ?? const <Anchor>[];
 
     return ListView(
       padding: const EdgeInsets.symmetric(
@@ -225,6 +229,15 @@ class _ProfileBody extends ConsumerWidget {
           ),
 
         const SizedBox(height: FeelsSpacing.s4),
+
+        // --- "Your neighborhoods" card (NYC anchors) ---
+        if (anchors.isNotEmpty) ...[
+          _GroupedCard(
+            title: 'Your neighborhoods',
+            children: _buildNabeRows(anchors),
+          ),
+          const SizedBox(height: FeelsSpacing.s4),
+        ],
 
         // --- "About You" card: looking for + lifestyle ---
         _GroupedCard(
@@ -829,6 +842,59 @@ class _PromptCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Tag chip
 // ---------------------------------------------------------------------------
+
+/// Rows for the "Your neighborhoods" card, ordered LIVE → WORK → PLAY.
+List<Widget> _buildNabeRows(List<Anchor> anchors) {
+  const order = {AnchorKind.live: 0, AnchorKind.work: 1, AnchorKind.play: 2};
+  final sorted = List<Anchor>.from(anchors)
+    ..sort((a, b) => (order[a.kind] ?? 3).compareTo(order[b.kind] ?? 3));
+  final rows = <Widget>[];
+  for (var i = 0; i < sorted.length; i++) {
+    if (i > 0) rows.add(const SizedBox(height: FeelsSpacing.s3));
+    rows.add(_NabeRow(anchor: sorted[i]));
+  }
+  return rows;
+}
+
+class _NabeRow extends StatelessWidget {
+  final Anchor anchor;
+
+  const _NabeRow({required this.anchor});
+
+  IconData get _icon => switch (anchor.kind) {
+        AnchorKind.live => Icons.home_outlined,
+        AnchorKind.work => Icons.work_outline,
+        AnchorKind.play => Icons.local_activity_outlined,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final place = anchor.ntaName ?? anchor.borough ?? 'Pinned';
+    return Row(
+      children: [
+        Icon(_icon, size: 18, color: FeelsColors.primary),
+        const SizedBox(width: FeelsSpacing.s2),
+        Text(
+          anchor.kind.label,
+          style: FeelsTypography.bodySmall.copyWith(
+            color: FeelsColors.textSecondary,
+          ),
+        ),
+        const SizedBox(width: FeelsSpacing.s2),
+        Expanded(
+          child: Text(
+            place,
+            style: FeelsTypography.body.copyWith(
+              fontWeight: FeelsTypography.weightHeading,
+            ),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _Tag extends StatelessWidget {
   final String label;

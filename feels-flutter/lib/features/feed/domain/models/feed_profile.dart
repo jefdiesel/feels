@@ -9,6 +9,11 @@ class FeedProfile {
   final String? genderIdentity;
   final String zipCode;
   final String? neighborhood;
+
+  /// NYC anchor overlap: the neighborhood (NTA) this profile shares with the
+  /// viewer's LIVE/WORK/PLAY anchors. Null when there's no overlap (or the
+  /// viewer has no anchors). Surfaced as the "shared nabe" badge on the card.
+  final String? sharedPlace;
   final String bio;
   final String? kinkLevel;
   final List<String> lookingFor;
@@ -40,6 +45,7 @@ class FeedProfile {
     this.genderIdentity,
     required this.zipCode,
     this.neighborhood,
+    this.sharedPlace,
     required this.bio,
     this.kinkLevel,
     required this.lookingFor,
@@ -73,6 +79,7 @@ class FeedProfile {
       genderIdentity: json['gender_identity'] as String?,
       zipCode: json['zip_code'] as String? ?? '',
       neighborhood: json['neighborhood'] as String?,
+      sharedPlace: json['shared_place'] as String?,
       bio: json['bio'] as String? ?? '',
       kinkLevel: json['kink_level'] as String?,
       lookingFor: (json['looking_for'] as List<dynamic>?)
@@ -119,6 +126,7 @@ class FeedProfile {
       if (genderIdentity != null) 'gender_identity': genderIdentity,
       'zip_code': zipCode,
       if (neighborhood != null) 'neighborhood': neighborhood,
+      if (sharedPlace != null) 'shared_place': sharedPlace,
       'bio': bio,
       if (kinkLevel != null) 'kink_level': kinkLevel,
       'looking_for': lookingFor,

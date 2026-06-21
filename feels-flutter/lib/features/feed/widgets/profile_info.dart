@@ -73,6 +73,17 @@ class ProfileInfo extends StatelessWidget {
           ),
 
           // ------------------------------------------------------------------
+          // Shared nabe — the NYC neighborhood-overlap differentiator. Leads
+          // the card because a shared neighborhood beats "X mi away" in a
+          // subway city.
+          // ------------------------------------------------------------------
+          if (profile.sharedPlace != null &&
+              profile.sharedPlace!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _SharedNabeBadge(place: profile.sharedPlace!),
+          ],
+
+          // ------------------------------------------------------------------
           // 2. Distance
           // ------------------------------------------------------------------
           if (profile.distance != null) ...[
@@ -192,6 +203,50 @@ class ProfileInfo extends StatelessWidget {
     }
 
     return tags;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared nabe badge
+// ---------------------------------------------------------------------------
+
+class _SharedNabeBadge extends StatelessWidget {
+  final String place;
+
+  const _SharedNabeBadge({required this.place});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: FeelsColors.primaryMuted,
+        borderRadius: FeelsRadius.fullAll,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.location_city,
+            size: 15,
+            color: FeelsColors.primary,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              "You're both in $place",
+              style: const TextStyle(
+                fontSize: FeelsTypography.sizeSm,
+                fontWeight: FeelsTypography.weightHeading,
+                color: FeelsColors.primary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
