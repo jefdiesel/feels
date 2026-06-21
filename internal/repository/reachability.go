@@ -81,3 +81,33 @@ func (r *Reachability) OverlappingCandidates(ctx context.Context, viewerID uuid.
 	}
 	return out, rows.Err()
 }
+
+// UsersInNTA returns the neighborhood's name and the set of users with any
+// anchor in it. Used to browse a specific neighborhood.
+func (r *Reachability) UsersInNTA(ctx context.Context, ntaID string) (string, map[uuid.UUID]bool, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT n.name, ua.user_id
+		FROM nyc_ntas n
+		LEFT JOIN user_anchors ua ON ua.nta_id = n.id
+		WHERE n.id = $1
+	`, ntaID)
+	if err != nil {
+		return "", nil, err
+	}
+	defer rows.Close()
+
+	var name string
+	users := map[uuid.UUID]bool{}
+	for rows.Next() {
+		var nm string
+		var uid *uuid.UUID
+		if err := rows.Scan(&nm, &uid); err != nil {
+			return "", nil, err
+		}
+		name = nm
+		if uid != nil {
+			users[*uid] = true
+		}
+	}
+	return name, users, rows.Err()
+}

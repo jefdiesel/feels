@@ -95,9 +95,13 @@ class FeedNotifier extends AsyncNotifier<FeedState> {
   }
 
   Future<FeedState> _loadInitial() async {
+    final nabe = ref.read(feedNabeProvider);
     final scope = ref.read(feedScopeProvider);
-    final result =
-        await _repo.getProfiles(limit: _batchSize, scope: scope.apiValue);
+    final result = await _repo.getProfiles(
+      limit: _batchSize,
+      scope: scope.apiValue,
+      ntaId: nabe?.id,
+    );
     if (result.isFailure) {
       return FeedState(error: result.error!.message);
     }
@@ -122,6 +126,19 @@ class FeedNotifier extends AsyncNotifier<FeedState> {
   Future<void> setScope(FeedScope scope) async {
     if (scope == ref.read(feedScopeProvider)) return;
     ref.read(feedScopeProvider.notifier).state = scope;
+    await loadProfiles();
+  }
+
+  /// Browse a specific neighborhood by NTA id, then reload.
+  Future<void> browseNabe(String ntaId, String name) async {
+    ref.read(feedNabeProvider.notifier).state = (id: ntaId, name: name);
+    await loadProfiles();
+  }
+
+  /// Stop browsing a neighborhood and return to the normal feed.
+  Future<void> clearNabe() async {
+    if (ref.read(feedNabeProvider) == null) return;
+    ref.read(feedNabeProvider.notifier).state = null;
     await loadProfiles();
   }
 
@@ -312,3 +329,8 @@ final feedProvider =
 /// FeedState so the header toggle reflects the selection instantly, even while
 /// the feed reloads the new scope.
 final feedScopeProvider = StateProvider<FeedScope>((ref) => FeedScope.myNabes);
+
+/// The neighborhood (NTA) currently being browsed in the feed, or null for the
+/// normal feed. Set from the profile's "browse this nabe" action.
+final feedNabeProvider =
+    StateProvider<({String id, String name})?>((ref) => null);

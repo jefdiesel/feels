@@ -20,8 +20,11 @@ class FeedRepository {
   Future<FeedResult<FeedApiResponse>> getProfiles({
     int limit = 10,
     String scope = 'my_nabes',
+    String? ntaId,
   }) async {
-    return _guard(() => _api.getProfiles(limit: limit, scope: scope));
+    return _guard(
+      () => _api.getProfiles(limit: limit, scope: scope, ntaId: ntaId),
+    );
   }
 
   Future<FeedResult<FeedApiResponse>> getDailyPicks() async {

@@ -120,6 +120,9 @@ type NotificationService interface {
 // affinity flags used for ranking.
 type OverlapRepository interface {
 	OverlappingCandidates(ctx context.Context, viewerID uuid.UUID) (map[uuid.UUID]AnchorAffinity, error)
+	// UsersInNTA returns the neighborhood's name and the set of users anchored
+	// in it, for browsing a specific neighborhood.
+	UsersInNTA(ctx context.Context, ntaID string) (string, map[uuid.UUID]bool, error)
 }
 
 // AnchorAffinity mirrors repository.AnchorAffinity to avoid importing
@@ -202,7 +205,7 @@ const (
 )
 
 // GetFeed returns the next batch of profiles for the user
-func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int, scope FeedScope) (*FeedResponse, error) {
+func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int, scope FeedScope, ntaID string) (*FeedResponse, error) {
 	// Validate limit
 	if limit <= 0 {
 		limit = DefaultFeedLimit
@@ -240,6 +243,10 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int, scop
 			repoLimit = MaxFeedLimit
 		}
 	}
+	// Browsing one neighborhood post-filters a prefs-filtered pool, so widen it.
+	if ntaID != "" {
+		repoLimit = MaxFeedLimit
+	}
 	profiles, err := s.feedRepo.GetFeedProfiles(ctx, userID, prefs, repoLimit)
 	if err != nil {
 		return nil, err
@@ -251,7 +258,26 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int, scop
 	// nabes first while keeping everyone else in the tail. A non-overlap
 	// candidate has no affinity entry, so sortByOverlap scores it worst and it
 	// naturally sinks below nabe matches within each priority bucket.
-	if s.overlap != nil {
+	if ntaID != "" && s.overlap != nil {
+		// Browse one neighborhood: keep only people anchored there, labelled
+		// with the nabe name. Order stays the SQL activity order.
+		name, users, rerr := s.overlap.UsersInNTA(ctx, ntaID)
+		if rerr != nil {
+			log.Printf("[FEED] nta browse lookup failed: %v", rerr)
+		} else {
+			filtered := profiles[:0]
+			for _, p := range profiles {
+				if users[p.UserID] {
+					if name != "" {
+						n := name
+						p.SharedPlace = &n
+					}
+					filtered = append(filtered, p)
+				}
+			}
+			profiles = filtered
+		}
+	} else if s.overlap != nil {
 		aff, rerr := s.overlap.OverlappingCandidates(ctx, userID)
 		if rerr != nil {
 			log.Printf("[FEED] overlap lookup failed: %v (falling back to radius)", rerr)

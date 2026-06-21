@@ -734,6 +734,7 @@ class _FeedHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scope = ref.watch(feedScopeProvider);
+    final nabe = ref.watch(feedNabeProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: FeelsLayout.screenPaddingHorizontal,
@@ -753,16 +754,66 @@ class _FeedHeader extends ConsumerWidget {
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: _ScopeToggle(
-              scope: scope,
-              onTap: () => ref.read(feedProvider.notifier).setScope(
-                    scope == FeedScope.myNabes
-                        ? FeedScope.everywhere
-                        : FeedScope.myNabes,
+            child: nabe != null
+                ? _BrowsingChip(
+                    name: nabe.name,
+                    onClear: () => ref.read(feedProvider.notifier).clearNabe(),
+                  )
+                : _ScopeToggle(
+                    scope: scope,
+                    onTap: () => ref.read(feedProvider.notifier).setScope(
+                          scope == FeedScope.myNabes
+                              ? FeedScope.everywhere
+                              : FeedScope.myNabes,
+                        ),
                   ),
-            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shows the neighborhood being browsed, with an ✕ to return to the normal feed.
+class _BrowsingChip extends StatelessWidget {
+  final String name;
+  final VoidCallback onClear;
+
+  const _BrowsingChip({required this.name, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onClear,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: FeelsColors.primary,
+          borderRadius: FeelsRadius.fullAll,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_city,
+                size: 13, color: FeelsColors.textPrimary),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 130),
+              child: Text(
+                name,
+                style: const TextStyle(
+                  fontSize: FeelsTypography.sizeSm,
+                  color: FeelsColors.textPrimary,
+                  fontWeight: FeelsTypography.weightHeading,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.close, size: 14, color: FeelsColors.textPrimary),
+          ],
+        ),
       ),
     );
   }
@@ -1111,7 +1162,19 @@ class _EmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inNabes = ref.watch(feedScopeProvider) == FeedScope.myNabes;
+    final nabe = ref.watch(feedNabeProvider);
+    final inNabes =
+        nabe == null && ref.watch(feedScopeProvider) == FeedScope.myNabes;
+    final title = nabe != null
+        ? "You've seen everyone in ${nabe.name}"
+        : inNabes
+            ? "You've seen everyone in your nabes"
+            : "You've seen everyone nearby";
+    final subtitle = nabe != null
+        ? 'Try another neighborhood, or head back to your feed.'
+        : inNabes
+            ? 'Want to look beyond your neighborhoods?'
+            : "We'll notify you when new people join";
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(FeelsSpacing.s6),
@@ -1154,9 +1217,7 @@ class _EmptyState extends ConsumerWidget {
             ),
             const SizedBox(height: FeelsSpacing.s5),
             Text(
-              inNabes
-                  ? "You've seen everyone in your nabes"
-                  : "You've seen everyone nearby",
+              title,
               style: const TextStyle(
                 fontSize: FeelsTypography.sizeTitle,
                 fontWeight: FeelsTypography.weightHeading,
@@ -1167,9 +1228,7 @@ class _EmptyState extends ConsumerWidget {
             ),
             const SizedBox(height: FeelsSpacing.s2),
             Text(
-              inNabes
-                  ? 'Want to look beyond your neighborhoods?'
-                  : "We'll notify you when new people join",
+              subtitle,
               style: const TextStyle(
                 fontSize: FeelsTypography.sizeBase,
                 color: FeelsColors.textSecondary,
@@ -1178,7 +1237,13 @@ class _EmptyState extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: FeelsSpacing.s5),
-            if (inNabes) ...[
+            if (nabe != null) ...[
+              FilledButton(
+                onPressed: () => ref.read(feedProvider.notifier).clearNabe(),
+                child: const Text('Back to your feed'),
+              ),
+              const SizedBox(height: FeelsSpacing.s3),
+            ] else if (inNabes) ...[
               FilledButton(
                 onPressed: () => ref
                     .read(feedProvider.notifier)

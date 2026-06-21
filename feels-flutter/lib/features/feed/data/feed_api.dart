@@ -18,10 +18,15 @@ class FeedApi {
   Future<FeedApiResponse> getProfiles({
     int limit = 10,
     String scope = 'my_nabes',
+    String? ntaId,
   }) async {
     final response = await _dio.get(
       '/feed',
-      queryParameters: {'limit': limit, 'scope': scope},
+      queryParameters: {
+        'limit': limit,
+        'scope': scope,
+        if (ntaId != null) 'nta_id': ntaId,
+      },
     );
     final data = response.data as Map<String, dynamic>;
     final rawProfiles = data['profiles'] as List<dynamic>? ?? [];

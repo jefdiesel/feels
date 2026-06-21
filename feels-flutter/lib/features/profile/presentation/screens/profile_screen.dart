@@ -9,6 +9,7 @@ import '../../../../core/theme/theme.dart';
 import '../../../anchors/data/anchor_models.dart';
 import '../../../anchors/data/anchor_repository.dart';
 import '../../../anchors/presentation/anchors_onboarding_screen.dart';
+import '../../../feed/presentation/providers/feed_provider.dart';
 import '../../domain/models/profile_models.dart';
 import '../../widgets/photo_grid.dart';
 import '../providers/profile_provider.dart';
@@ -237,7 +238,14 @@ class _ProfileBody extends ConsumerWidget {
           actionLabel: anchors.isNotEmpty ? 'Edit' : 'Add',
           onAction: () => _editAnchors(context, ref),
           children: anchors.isNotEmpty
-              ? _buildNabeRows(anchors)
+              ? _buildNabeRows(anchors, (a) {
+                  if (a.ntaId != null && a.ntaName != null) {
+                    ref
+                        .read(feedProvider.notifier)
+                        .browseNabe(a.ntaId!, a.ntaName!);
+                    context.go('/home/feed');
+                  }
+                })
               : [
                   Text(
                     'Add where you live, work, and play to match with people '
@@ -867,22 +875,24 @@ Future<void> _editAnchors(BuildContext context, WidgetRef ref) async {
 }
 
 /// Rows for the "Your neighborhoods" card, ordered LIVE → WORK → PLAY.
-List<Widget> _buildNabeRows(List<Anchor> anchors) {
+List<Widget> _buildNabeRows(List<Anchor> anchors, void Function(Anchor)? onTap) {
   const order = {AnchorKind.live: 0, AnchorKind.work: 1, AnchorKind.play: 2};
   final sorted = List<Anchor>.from(anchors)
     ..sort((a, b) => (order[a.kind] ?? 3).compareTo(order[b.kind] ?? 3));
   final rows = <Widget>[];
   for (var i = 0; i < sorted.length; i++) {
     if (i > 0) rows.add(const SizedBox(height: FeelsSpacing.s3));
-    rows.add(_NabeRow(anchor: sorted[i]));
+    final a = sorted[i];
+    rows.add(_NabeRow(anchor: a, onTap: onTap == null ? null : () => onTap(a)));
   }
   return rows;
 }
 
 class _NabeRow extends StatelessWidget {
   final Anchor anchor;
+  final VoidCallback? onTap;
 
-  const _NabeRow({required this.anchor});
+  const _NabeRow({required this.anchor, this.onTap});
 
   IconData get _icon => switch (anchor.kind) {
         AnchorKind.live => Icons.home_outlined,
@@ -893,7 +903,7 @@ class _NabeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final place = anchor.ntaName ?? anchor.borough ?? 'Pinned';
-    return Row(
+    final content = Row(
       children: [
         Icon(_icon, size: 18, color: FeelsColors.primary),
         const SizedBox(width: FeelsSpacing.s2),
@@ -928,6 +938,9 @@ class _NabeRow extends StatelessWidget {
         ),
       ],
     );
+    return onTap == null
+        ? content
+        : InkWell(onTap: onTap, child: content);
   }
 }
 

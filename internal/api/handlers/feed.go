@@ -55,8 +55,9 @@ func (h *FeedHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("scope") == string(feed.ScopeEverywhere) {
 		scope = feed.ScopeEverywhere
 	}
+	ntaID := r.URL.Query().Get("nta_id")
 
-	resp, err := h.feedService.GetFeed(r.Context(), userID, limit, scope)
+	resp, err := h.feedService.GetFeed(r.Context(), userID, limit, scope, ntaID)
 	if err != nil {
 		if errors.Is(err, feed.ErrProfileRequired) {
 			jsonError(w, "profile required to use feed", http.StatusPreconditionRequired)

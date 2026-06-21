@@ -33,3 +33,7 @@ func (a *overlapAdapter) OverlappingCandidates(ctx context.Context, viewerID uui
 	}
 	return out, nil
 }
+
+func (a *overlapAdapter) UsersInNTA(ctx context.Context, ntaID string) (string, map[uuid.UUID]bool, error) {
+	return a.r.UsersInNTA(ctx, ntaID)
+}
