@@ -407,6 +407,33 @@ class _MatchOverlayState extends State<_MatchOverlay>
                           ),
                         ),
                       ),
+                      if (widget.profile.sharedPlace != null &&
+                          widget.profile.sharedPlace!.isNotEmpty) ...[
+                        const SizedBox(height: FeelsSpacing.s3),
+                        ScaleTransition(
+                          scale: _titleScale,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: FeelsColors.primaryMuted,
+                              borderRadius: FeelsRadius.fullAll,
+                            ),
+                            child: Text(
+                              "\u{1F3D8}️  You're both in "
+                              '${widget.profile.sharedPlace}',
+                              style: const TextStyle(
+                                fontSize: FeelsTypography.sizeSm,
+                                color: FeelsColors.primary,
+                                fontWeight: FeelsTypography.weightHeading,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: FeelsSpacing.s6),
 
                       // Avatar.
@@ -1077,13 +1104,14 @@ class _SkeletonActionButtonsState extends State<_SkeletonActionButtons>
 // Empty state
 // ---------------------------------------------------------------------------
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   final VoidCallback? onRefresh;
 
   const _EmptyState({this.onRefresh});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inNabes = ref.watch(feedScopeProvider) == FeedScope.myNabes;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(FeelsSpacing.s6),
@@ -1125,19 +1153,24 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: FeelsSpacing.s5),
-            const Text(
-              'You\'ve seen everyone nearby',
-              style: TextStyle(
+            Text(
+              inNabes
+                  ? "You've seen everyone in your nabes"
+                  : "You've seen everyone nearby",
+              style: const TextStyle(
                 fontSize: FeelsTypography.sizeTitle,
                 fontWeight: FeelsTypography.weightHeading,
                 color: FeelsColors.textPrimary,
                 height: FeelsTypography.lineHeightHeading,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: FeelsSpacing.s2),
-            const Text(
-              'We\'ll notify you when new people join',
-              style: TextStyle(
+            Text(
+              inNabes
+                  ? 'Want to look beyond your neighborhoods?'
+                  : "We'll notify you when new people join",
+              style: const TextStyle(
                 fontSize: FeelsTypography.sizeBase,
                 color: FeelsColors.textSecondary,
                 height: FeelsTypography.lineHeightBody,
@@ -1145,6 +1178,15 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: FeelsSpacing.s5),
+            if (inNabes) ...[
+              FilledButton(
+                onPressed: () => ref
+                    .read(feedProvider.notifier)
+                    .setScope(FeedScope.everywhere),
+                child: const Text('Look everywhere'),
+              ),
+              const SizedBox(height: FeelsSpacing.s3),
+            ],
             OutlinedButton(
               onPressed: onRefresh,
               child: const Text('Refresh'),
