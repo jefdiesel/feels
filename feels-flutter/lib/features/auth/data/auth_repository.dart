@@ -5,9 +5,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'auth_api.dart';
 
-const _keyAccessToken = 'access_token';
-const _keyRefreshToken = 'refresh_token';
-const _keyExpiresAt = 'expires_at';
+// NOTE: these MUST match the keys + storage options used by
+// SecureStorageService (lib/core/storage/secure_storage.dart), which is what
+// the Dio auth interceptor reads. Divergence = tokens written here are invisible
+// to every authenticated request → 401 on everything.
+const _keyAccessToken = 'feels_access_token';
+const _keyRefreshToken = 'feels_refresh_token';
+const _keyExpiresAt = 'feels_expires_at';
 
 class AuthSession {
   final String accessToken;
@@ -35,7 +39,13 @@ class AuthRepository {
     FlutterSecureStorage? storage,
     DeviceInfoPlugin? deviceInfo,
   })  : _api = api ?? AuthApi(),
-        _storage = storage ?? const FlutterSecureStorage(),
+        _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+              iOptions: IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock_this_device,
+              ),
+            ),
         _deviceInfo = deviceInfo ?? DeviceInfoPlugin();
 
   bool get isAuthenticated => _session != null;
@@ -43,8 +53,8 @@ class AuthRepository {
 
   /// Debug: save tokens directly (skips normal auth flow).
   Future<void> saveTokens(String accessToken, String refreshToken) async {
-    await _storage.write(key: 'access_token', value: accessToken);
-    await _storage.write(key: 'refresh_token', value: refreshToken);
+    await _storage.write(key: _keyAccessToken, value: accessToken);
+    await _storage.write(key: _keyRefreshToken, value: refreshToken);
     _session = AuthSession(accessToken: accessToken, refreshToken: refreshToken, expiresAt: DateTime.now().add(const Duration(minutes: 15)));
   }
 

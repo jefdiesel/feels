@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/api/endpoints.dart';
 import '../domain/models/match.dart';
 
 class MatchesApi {
@@ -9,7 +10,7 @@ class MatchesApi {
 
   /// Fetch all matches for the current user.
   Future<List<MatchWithProfile>> getMatches() async {
-    final response = await _dio.get('/matches');
+    final response = await _dio.get(Endpoints.matches);
     final data = response.data as List<dynamic>;
     return data
         .map((e) => MatchWithProfile.fromJson(e as Map<String, dynamic>))
@@ -18,12 +19,12 @@ class MatchesApi {
 
   /// Fetch a single match by ID.
   Future<MatchWithProfile> getMatch(String id) async {
-    final response = await _dio.get('/matches/$id');
+    final response = await _dio.get(Endpoints.match(id));
     return MatchWithProfile.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Unmatch (delete) a match.
   Future<void> unmatch(String id) async {
-    await _dio.delete('/matches/$id');
+    await _dio.delete(Endpoints.match(id));
   }
 }

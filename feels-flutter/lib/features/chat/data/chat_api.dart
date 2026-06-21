@@ -2,6 +2,7 @@ import 'dart:io' as io;
 
 import 'package:dio/dio.dart';
 
+import '../../../core/api/endpoints.dart';
 import '../domain/models/message.dart';
 
 class ChatApi {
@@ -16,7 +17,7 @@ class ChatApi {
     int offset = 0,
   }) async {
     final response = await _dio.get(
-      '/matches/$matchId/messages',
+      Endpoints.matchMessages(matchId),
       queryParameters: {'limit': limit, 'offset': offset},
     );
     return MessagesResponse.fromJson(response.data as Map<String, dynamic>);
@@ -30,7 +31,7 @@ class ChatApi {
     String? encryptedContent,
   }) async {
     final response = await _dio.post(
-      '/matches/$matchId/messages',
+      Endpoints.matchMessages(matchId),
       data: {
         if (content != null) 'content': content,
         if (imageUrl != null) 'image_url': imageUrl,
@@ -42,12 +43,12 @@ class ChatApi {
 
   /// Enable image sharing for the current user in this match.
   Future<void> enableImages(String matchId) async {
-    await _dio.post('/matches/$matchId/images/enable');
+    await _dio.post(Endpoints.matchImagesEnable(matchId));
   }
 
   /// Disable image sharing for the current user in this match.
   Future<void> disableImages(String matchId) async {
-    await _dio.post('/matches/$matchId/images/disable');
+    await _dio.post(Endpoints.matchImagesDisable(matchId));
   }
 
   /// Upload an image for this match conversation.
@@ -59,7 +60,7 @@ class ChatApi {
       ),
     });
     final response = await _dio.post(
-      '/matches/$matchId/images/upload',
+      Endpoints.matchImagesUpload(matchId),
       data: formData,
     );
     final data = response.data as Map<String, dynamic>;
@@ -69,7 +70,7 @@ class ChatApi {
   /// Send typing indicator.
   Future<void> sendTyping(String matchId, {required bool isTyping}) async {
     await _dio.post(
-      '/matches/$matchId/typing',
+      Endpoints.matchTyping(matchId),
       data: {'is_typing': isTyping},
     );
   }

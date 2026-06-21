@@ -47,7 +47,28 @@ class _FeelsAppState extends ConsumerState<FeelsApp> {
       debugShowCheckedModeBanner: false,
       theme: feelsTheme(),
       scaffoldMessengerKey: feelsScaffoldMessengerKey,
+      scrollBehavior: const _FeelsScrollBehavior(),
       routerConfig: router,
     );
+  }
+}
+
+/// App-wide scroll behavior with the platform overscroll indicator removed.
+///
+/// Android's default Material 3 [StretchingOverscrollIndicator] rubber-bands the
+/// whole list when you pull past the edge, which reads as janky on the feed and
+/// profile. Returning the child unwrapped gives a clean clamp. Pull-to-refresh
+/// still works — [RefreshIndicator] drives its own spinner from the overscroll
+/// gesture, independent of this indicator.
+class _FeelsScrollBehavior extends MaterialScrollBehavior {
+  const _FeelsScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }

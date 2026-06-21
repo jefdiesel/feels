@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/api/endpoints.dart';
 import '../domain/models/feed_profile.dart';
 import '../domain/models/swipe_action.dart';
 
@@ -21,7 +22,7 @@ class FeedApi {
     String? ntaId,
   }) async {
     final response = await _dio.get(
-      '/feed',
+      Endpoints.feed,
       queryParameters: {
         'limit': limit,
         'scope': scope,
@@ -45,7 +46,7 @@ class FeedApi {
   // ---------------------------------------------------------------------------
 
   Future<SwipeResult> like(String targetId) async {
-    final response = await _dio.post('/feed/like/$targetId');
+    final response = await _dio.post(Endpoints.feedLike(targetId));
     return SwipeResult.fromJson(response.data as Map<String, dynamic>);
   }
 
@@ -54,7 +55,7 @@ class FeedApi {
   // ---------------------------------------------------------------------------
 
   Future<SwipeResult> superlike(String targetId) async {
-    final response = await _dio.post('/feed/superlike/$targetId');
+    final response = await _dio.post(Endpoints.feedSuperlike(targetId));
     return SwipeResult.fromJson(response.data as Map<String, dynamic>);
   }
 
@@ -67,7 +68,7 @@ class FeedApi {
     String message,
   ) async {
     final response = await _dio.post(
-      '/feed/superlike/$targetId/message',
+      Endpoints.feedSuperlikeMessage(targetId),
       data: {'message': message},
     );
     return SwipeResult.fromJson(response.data as Map<String, dynamic>);
@@ -78,7 +79,7 @@ class FeedApi {
   // ---------------------------------------------------------------------------
 
   Future<void> pass(String targetId) async {
-    await _dio.post('/feed/pass/$targetId');
+    await _dio.post(Endpoints.feedPass(targetId));
   }
 
   // ---------------------------------------------------------------------------
@@ -86,7 +87,7 @@ class FeedApi {
   // ---------------------------------------------------------------------------
 
   Future<FeedProfile> rewind() async {
-    final response = await _dio.post('/feed/rewind');
+    final response = await _dio.post(Endpoints.feedRewind);
     return FeedProfile.fromJson(response.data as Map<String, dynamic>);
   }
 
@@ -95,7 +96,7 @@ class FeedApi {
   // ---------------------------------------------------------------------------
 
   Future<FeedApiResponse> getDailyPicks() async {
-    final response = await _dio.get('/feed/daily-picks');
+    final response = await _dio.get(Endpoints.feedDailyPicks);
     final data = response.data as Map<String, dynamic>;
     final rawProfiles = data['profiles'] as List<dynamic>? ?? [];
     return FeedApiResponse(
