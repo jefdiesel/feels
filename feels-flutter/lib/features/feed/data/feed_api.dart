@@ -15,10 +15,13 @@ class FeedApi {
   // GET /feed?limit=N
   // ---------------------------------------------------------------------------
 
-  Future<FeedApiResponse> getProfiles({int limit = 10}) async {
+  Future<FeedApiResponse> getProfiles({
+    int limit = 10,
+    String scope = 'my_nabes',
+  }) async {
     final response = await _dio.get(
       '/feed',
-      queryParameters: {'limit': limit},
+      queryParameters: {'limit': limit, 'scope': scope},
     );
     final data = response.data as Map<String, dynamic>;
     final rawProfiles = data['profiles'] as List<dynamic>? ?? [];

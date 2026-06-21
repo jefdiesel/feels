@@ -17,8 +17,11 @@ class FeedRepository {
   // Profiles
   // ---------------------------------------------------------------------------
 
-  Future<FeedResult<FeedApiResponse>> getProfiles({int limit = 10}) async {
-    return _guard(() => _api.getProfiles(limit: limit));
+  Future<FeedResult<FeedApiResponse>> getProfiles({
+    int limit = 10,
+    String scope = 'my_nabes',
+  }) async {
+    return _guard(() => _api.getProfiles(limit: limit, scope: scope));
   }
 
   Future<FeedResult<FeedApiResponse>> getDailyPicks() async {

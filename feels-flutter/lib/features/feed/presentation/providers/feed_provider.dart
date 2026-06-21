@@ -10,6 +10,17 @@ import '../../domain/models/swipe_action.dart';
 // Feed state
 // ---------------------------------------------------------------------------
 
+/// Feed ordering scope. [myNabes] ranks people in your neighborhoods first;
+/// [everywhere] drops the nabe boost so you can look beyond them.
+enum FeedScope {
+  myNabes('my_nabes', 'My nabes'),
+  everywhere('everywhere', 'Everywhere');
+
+  const FeedScope(this.apiValue, this.label);
+  final String apiValue;
+  final String label;
+}
+
 class FeedState {
   final List<FeedProfile> profiles;
   final int currentIndex;
@@ -84,7 +95,9 @@ class FeedNotifier extends AsyncNotifier<FeedState> {
   }
 
   Future<FeedState> _loadInitial() async {
-    final result = await _repo.getProfiles(limit: _batchSize);
+    final scope = ref.read(feedScopeProvider);
+    final result =
+        await _repo.getProfiles(limit: _batchSize, scope: scope.apiValue);
     if (result.isFailure) {
       return FeedState(error: result.error!.message);
     }
@@ -103,6 +116,13 @@ class FeedNotifier extends AsyncNotifier<FeedState> {
   Future<void> loadProfiles() async {
     state = const AsyncValue.loading();
     state = AsyncValue.data(await _loadInitial());
+  }
+
+  /// Switch nabe-first vs. everywhere, then reload from scratch.
+  Future<void> setScope(FeedScope scope) async {
+    if (scope == ref.read(feedScopeProvider)) return;
+    ref.read(feedScopeProvider.notifier).state = scope;
+    await loadProfiles();
   }
 
   /// Process a swipe action on the current top card.
@@ -287,3 +307,8 @@ final feedRepositoryProvider = Provider<FeedRepository>((ref) {
 
 final feedProvider =
     AsyncNotifierProvider<FeedNotifier, FeedState>(FeedNotifier.new);
+
+/// The user-facing feed scope (nabe-first vs everywhere). Lives outside
+/// FeedState so the header toggle reflects the selection instantly, even while
+/// the feed reloads the new scope.
+final feedScopeProvider = StateProvider<FeedScope>((ref) => FeedScope.myNabes);

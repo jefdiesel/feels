@@ -703,16 +703,17 @@ class _PremiumFeatureRow extends StatelessWidget {
 // Feed header
 // ---------------------------------------------------------------------------
 
-class _FeedHeader extends StatelessWidget {
+class _FeedHeader extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scope = ref.watch(feedScopeProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: FeelsLayout.screenPaddingHorizontal,
         vertical: FeelsSpacing.s2,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
           Text(
             'feels',
@@ -723,7 +724,62 @@ class _FeedHeader extends StatelessWidget {
               letterSpacing: FeelsTypography.letterSpacingTight,
             ),
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _ScopeToggle(
+              scope: scope,
+              onTap: () => ref.read(feedProvider.notifier).setScope(
+                    scope == FeedScope.myNabes
+                        ? FeedScope.everywhere
+                        : FeedScope.myNabes,
+                  ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tappable chip that toggles the feed between nabe-first and everywhere —
+/// the "look elsewhere" affordance.
+class _ScopeToggle extends StatelessWidget {
+  final FeedScope scope;
+  final VoidCallback onTap;
+
+  const _ScopeToggle({required this.scope, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isNabes = scope == FeedScope.myNabes;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isNabes ? FeelsColors.primaryMuted : FeelsColors.bgTertiary,
+          borderRadius: FeelsRadius.fullAll,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isNabes ? Icons.location_city : Icons.public,
+              size: 13,
+              color: isNabes ? FeelsColors.primary : FeelsColors.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              scope.label,
+              style: TextStyle(
+                fontSize: FeelsTypography.sizeSm,
+                color:
+                    isNabes ? FeelsColors.primary : FeelsColors.textSecondary,
+                fontWeight: FeelsTypography.weightHeading,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
