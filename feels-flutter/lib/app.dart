@@ -46,6 +46,7 @@ class _FeelsAppState extends ConsumerState<FeelsApp> {
       title: 'feels',
       debugShowCheckedModeBanner: false,
       theme: feelsTheme(),
+      scaffoldMessengerKey: feelsScaffoldMessengerKey,
       routerConfig: router,
     );
   }

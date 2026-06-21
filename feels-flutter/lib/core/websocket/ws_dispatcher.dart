@@ -1,11 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/chat/domain/models/message.dart';
 import '../../features/matches/presentation/providers/matches_provider.dart';
+import '../router/router.dart';
+import '../theme/theme.dart';
 import 'ws_events.dart';
 import 'ws_manager.dart';
+
+/// Global messenger key so the dispatcher can raise SnackBars (the match toast)
+/// from outside the widget tree. Wired into MaterialApp.router in app.dart.
+final feelsScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 /// The match id of the conversation currently on screen, or `null` if none.
 ///
@@ -43,8 +50,7 @@ class WsDispatcher {
       case NewMessageEvent e:
         _onNewMessage(e, matches);
       case MatchCreatedEvent e:
-        // Fetches the full match and prepends it ("It's a match").
-        matches.onMatchCreated(e.matchId);
+        _onMatchCreated(e);
       case MatchDeletedEvent e:
         matches.onMatchDeleted(e.matchId);
       default:
@@ -77,6 +83,67 @@ class WsDispatcher {
       createdAt: msg.createdAt,
       unreadIncrement: isReading ? null : 1,
     );
+  }
+
+  /// A new match arrived. Update the inbox, then toast it — unless the user is
+  /// on the feed, where the in-feed match animation already celebrates it (the
+  /// swiper gets both events; the other person only gets this).
+  Future<void> _onMatchCreated(MatchCreatedEvent e) async {
+    await _ref.read(matchesProvider.notifier).onMatchCreated(e.matchId);
+    if (_isOnFeed()) return;
+
+    final matched =
+        _ref.read(matchesProvider).matches.where((m) => m.id == e.matchId);
+    _showMatchToast(
+      e.matchId,
+      matched.isNotEmpty ? matched.first.otherUser.name : null,
+    );
+  }
+
+  bool _isOnFeed() {
+    try {
+      final path = _ref
+          .read(routerProvider)
+          .routerDelegate
+          .currentConfiguration
+          .uri
+          .path;
+      return path.startsWith(RoutePaths.feed);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showMatchToast(String matchId, String? name) {
+    final messenger = feelsScaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+    final who = (name != null && name.trim().isNotEmpty) ? name : 'someone new';
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: FeelsColors.primary,
+          duration: const Duration(seconds: 5),
+          content: Text(
+            "It's a match with $who \u{1F389}",
+            style: const TextStyle(
+              color: FeelsColors.textPrimary,
+              fontWeight: FeelsTypography.weightHeading,
+            ),
+          ),
+          action: SnackBarAction(
+            label: 'Say hi',
+            textColor: FeelsColors.textPrimary,
+            onPressed: () => _ref.read(routerProvider).go(
+                  Uri(
+                    path: '${RoutePaths.chat}/$matchId',
+                    queryParameters: name != null ? {'name': name} : null,
+                  ).toString(),
+                ),
+          ),
+        ),
+      );
   }
 
   /// Inbox preview text for a message. Image-only messages have no content, so
