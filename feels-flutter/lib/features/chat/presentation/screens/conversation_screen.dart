@@ -12,6 +12,8 @@ import '../../domain/models/message.dart';
 import '../../widgets/chat_bubble.dart';
 import '../../widgets/typing_indicator.dart';
 import '../providers/chat_provider.dart';
+import '../../../matches/presentation/providers/matches_provider.dart';
+import '../../../../core/websocket/ws_dispatcher.dart';
 import '../../../../core/websocket/ws_events.dart';
 import '../../../../core/websocket/ws_manager.dart';
 
@@ -62,10 +64,25 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final ws = ref.read(wsManagerProvider);
     ws.connect();
     _wsSub = ws.events.listen(_onWsEvent);
+
+    // Tell the global dispatcher we're reading this match so it won't raise an
+    // unread badge for it, and clear any existing badge now. The clear is
+    // deferred so we don't mutate the matches provider mid-navigation.
+    ref.read(activeConversationProvider.notifier).state = widget.matchId;
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(matchesProvider.notifier).clearUnread(widget.matchId);
+      }
+    });
   }
 
   @override
   void dispose() {
+    // Stop suppressing inbox badges for this match (unless we already moved on
+    // to another conversation, whose initState set it to a different id).
+    final active = ref.read(activeConversationProvider.notifier);
+    if (active.state == widget.matchId) active.state = null;
+
     _wsSub?.cancel();
     _scrollController.removeListener(_onScroll);
     _textController.removeListener(_onTextChanged);

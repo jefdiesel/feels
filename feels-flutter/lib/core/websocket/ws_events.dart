@@ -2,6 +2,7 @@
 ///
 /// All server->client events follow the format:
 ///   {"type": "event_name", "payload": {...}}
+library;
 
 sealed class WsEvent {
   const WsEvent();
