@@ -83,7 +83,11 @@ func (r *AnchorRepository) ListByUser(ctx context.Context, userID uuid.UUID) ([]
 	rows, err := r.db.Query(ctx, `
 		SELECT a.id, a.user_id, a.kind,
 		       ST_Y(a.point::geometry) AS lat, ST_X(a.point::geometry) AS lng,
-		       a.nta_id, n.name, n.borough, a.updated_at
+		       a.nta_id, n.name, n.borough,
+		       COALESCE((SELECT COUNT(DISTINCT ca.user_id)
+		                 FROM user_anchors ca
+		                 WHERE ca.nta_id = a.nta_id AND ca.user_id != a.user_id), 0) AS locals,
+		       a.updated_at
 		FROM user_anchors a
 		LEFT JOIN nyc_ntas n ON n.id = a.nta_id
 		WHERE a.user_id = $1
@@ -97,7 +101,7 @@ func (r *AnchorRepository) ListByUser(ctx context.Context, userID uuid.UUID) ([]
 	for rows.Next() {
 		var a anchor.Anchor
 		var kind string
-		if err := rows.Scan(&a.ID, &a.UserID, &kind, &a.Lat, &a.Lng, &a.NTAID, &a.NTAName, &a.Borough, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.UserID, &kind, &a.Lat, &a.Lng, &a.NTAID, &a.NTAName, &a.Borough, &a.Locals, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		a.Kind = anchor.Kind(kind)

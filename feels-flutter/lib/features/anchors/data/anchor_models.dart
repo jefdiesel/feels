@@ -42,6 +42,9 @@ class Anchor {
   final String? ntaName;
   final String? borough;
 
+  /// Other users who share this anchor's neighborhood.
+  final int locals;
+
   const Anchor({
     required this.id,
     required this.kind,
@@ -50,6 +53,7 @@ class Anchor {
     this.ntaId,
     this.ntaName,
     this.borough,
+    this.locals = 0,
   });
 
   factory Anchor.fromJson(Map<String, dynamic> j) => Anchor(
@@ -60,5 +64,6 @@ class Anchor {
         ntaId: j['nta_id'] as String?,
         ntaName: j['nta_name'] as String?,
         borough: j['borough'] as String?,
+        locals: j['locals'] as int? ?? 0,
       );
 }

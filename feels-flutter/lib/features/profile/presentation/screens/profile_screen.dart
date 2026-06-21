@@ -905,13 +905,25 @@ class _NabeRow extends StatelessWidget {
         ),
         const SizedBox(width: FeelsSpacing.s2),
         Expanded(
-          child: Text(
-            place,
-            style: FeelsTypography.body.copyWith(
-              fontWeight: FeelsTypography.weightHeading,
-            ),
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                place,
+                style: FeelsTypography.body.copyWith(
+                  fontWeight: FeelsTypography.weightHeading,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (anchor.locals > 0)
+                Text(
+                  anchor.locals == 1 ? '1 local' : '${anchor.locals} locals',
+                  style: FeelsTypography.bodySmall.copyWith(
+                    color: FeelsColors.textTertiary,
+                  ),
+                ),
+            ],
           ),
         ),
       ],

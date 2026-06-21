@@ -35,6 +35,7 @@ type Anchor struct {
 	NTAID     *string   `json:"nta_id,omitempty"`
 	NTAName   *string   `json:"nta_name,omitempty"`
 	Borough   *string   `json:"borough,omitempty"`
+	Locals    int       `json:"locals"` // other users who share this anchor's neighborhood
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
