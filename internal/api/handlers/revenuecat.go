@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/feels/feels/internal/repository"
@@ -214,20 +215,24 @@ func (h *RevenueCatHandler) handleProductChange(ctx context.Context, event Reven
 	)
 }
 
-// productToPlanType maps RevenueCat product IDs to your internal plan types
+// productToPlanType maps a RevenueCat/store product ID to an internal plan
+// type. It infers from the product ID's period keyword so it works across store
+// naming variations (feels_premium_annual, feels.annual.v2, com.feels.yearly,
+// etc.) without a hardcoded list — avoiding the common bug where an annual or
+// quarterly purchase is mis-recorded as monthly. Unknown IDs fall back to
+// monthly and are logged.
 func (h *RevenueCatHandler) productToPlanType(productID string) string {
-	// TODO: Update these mappings when you create products in App Store Connect
-	// Example product IDs: "feels_premium_monthly", "feels_premium_quarterly", "feels_premium_annual"
-	switch productID {
-	case "feels_premium_monthly", "feels_monthly":
-		return "monthly"
-	case "feels_premium_quarterly", "feels_quarterly":
-		return "quarterly"
-	case "feels_premium_annual", "feels_annual":
+	id := strings.ToLower(productID)
+	switch {
+	case strings.Contains(id, "annual") || strings.Contains(id, "year"):
 		return "annual"
+	case strings.Contains(id, "quarter") ||
+		strings.Contains(id, "3month") || strings.Contains(id, "3_month"):
+		return "quarterly"
+	case strings.Contains(id, "month"):
+		return "monthly"
 	default:
-		// Default to monthly if unknown
-		log.Printf("[WARN] RevenueCat: unknown product ID: %s, defaulting to monthly", productID)
+		log.Printf("[WARN] RevenueCat: unrecognized product ID %q; defaulting to monthly", productID)
 		return "monthly"
 	}
 }
