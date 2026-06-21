@@ -19,6 +19,7 @@ var (
 	ErrProfileRequired            = errors.New("profile required")
 	ErrInvalidPhotoType           = errors.New("invalid photo type, must be jpeg, png, gif, or webp")
 	ErrPhotoTooLarge              = errors.New("photo too large, max 10MB")
+	ErrPhotoRejected              = errors.New("photo rejected: inappropriate content detected")
 	ErrVerificationUnavailable    = errors.New("verification requires quarterly or annual subscription")
 	ErrAlreadyVerified            = errors.New("profile is already verified")
 	ErrVerificationAlreadyPending = errors.New("verification already submitted and pending review")
@@ -60,9 +61,10 @@ type Storage interface {
 }
 
 type Service struct {
-	repo        Repository
-	storage     Storage
-	subChecker  SubscriptionChecker
+	repo       Repository
+	storage    Storage
+	subChecker SubscriptionChecker
+	moderation PhotoModerator
 }
 
 func NewService(repo Repository, storage Storage) *Service {
@@ -70,6 +72,18 @@ func NewService(repo Repository, storage Storage) *Service {
 		repo:    repo,
 		storage: storage,
 	}
+}
+
+// PhotoModerator scans uploaded photos for policy violations. A non-nil error
+// rejects the upload.
+type PhotoModerator interface {
+	CheckImage(ctx context.Context, userID uuid.UUID, imageURL string) error
+}
+
+// SetPhotoModerator wires automated photo moderation (optional). When unset,
+// uploads are not scanned.
+func (s *Service) SetPhotoModerator(m PhotoModerator) {
+	s.moderation = m
 }
 
 // SetSubscriptionChecker sets the subscription checker for verification
@@ -342,6 +356,15 @@ func (s *Service) AddPhoto(ctx context.Context, userID uuid.UUID, reader io.Read
 	url, err := s.storage.UploadPhoto(ctx, userID, reader, size, contentType)
 	if err != nil {
 		return nil, err
+	}
+
+	// Scan the uploaded image before it becomes visible; delete + reject on a
+	// policy violation so it never reaches another user.
+	if s.moderation != nil {
+		if err := s.moderation.CheckImage(ctx, userID, url); err != nil {
+			s.storage.DeletePhoto(ctx, url)
+			return nil, ErrPhotoRejected
+		}
 	}
 
 	photo := &Photo{

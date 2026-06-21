@@ -52,6 +52,11 @@ func (a *moderationAdapter) CheckContent(ctx context.Context, userID uuid.UUID, 
 	return err
 }
 
+func (a *moderationAdapter) CheckImage(ctx context.Context, userID uuid.UUID, imageURL string) error {
+	_, err := a.svc.CheckImage(ctx, userID, imageURL)
+	return err
+}
+
 func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Router {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
@@ -153,6 +158,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, redisClient *redis.Client) 
 		ReviewThreshold: cfg.Moderation.ReviewThreshold,
 	})
 	messageService.SetModerationService(&moderationAdapter{svc: moderationService})
+	profileService.SetPhotoModerator(&moderationAdapter{svc: moderationService})
 	settingsService := settings.NewService(settingsRepo)
 	paymentService := payment.NewService(paymentRepo, userRepo, payment.Config{
 		SecretKey:        cfg.Stripe.SecretKey,

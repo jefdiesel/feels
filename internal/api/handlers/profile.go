@@ -183,6 +183,10 @@ func (h *ProfileHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "maximum 5 photos allowed", http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, profile.ErrPhotoRejected) {
+			jsonError(w, "photo rejected: it appears to violate our content policy", http.StatusUnprocessableEntity)
+			return
+		}
 		jsonError(w, "failed to upload photo", http.StatusInternalServerError)
 		return
 	}
