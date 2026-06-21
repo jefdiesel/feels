@@ -138,6 +138,25 @@ class ChatRepository {
     }
   }
 
+  /// Mark every message the other user just read as read.
+  ///
+  /// The server reports a whole-conversation read by [readerId] (the other
+  /// person), not a single id — so any message in this match not sent by them
+  /// is one of ours that they've now seen.
+  void markConversationRead(String matchId, String readerId) {
+    final messages = _messageCache[matchId];
+    if (messages == null) return;
+    for (var i = 0; i < messages.length; i++) {
+      final m = messages[i];
+      if (m.senderId != readerId && m.status != MessageStatus.read) {
+        messages[i] = m.copyWith(
+          status: MessageStatus.read,
+          readAt: DateTime.now(),
+        );
+      }
+    }
+  }
+
   /// Get cached messages for a conversation.
   List<Message> getCachedMessages(String matchId) =>
       List.unmodifiable(_messageCache[matchId] ?? []);

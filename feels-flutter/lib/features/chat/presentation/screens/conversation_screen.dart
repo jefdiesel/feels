@@ -115,6 +115,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       case NewMessageEvent e when e.matchId == widget.matchId:
         notifier.onNewMessage(Message.fromJson(e.message));
         _scrollToBottom();
+      case MessageReadEvent e when e.matchId == widget.matchId:
+        notifier.onConversationRead(e.readerId);
       case TypingStartEvent e when e.matchId == widget.matchId:
         ref.read(typingProvider(widget.matchId).notifier).onTypingStart();
       case TypingStopEvent e when e.matchId == widget.matchId:

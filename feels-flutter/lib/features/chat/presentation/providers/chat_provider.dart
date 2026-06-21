@@ -244,6 +244,15 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     );
   }
 
+  /// Handle a whole-conversation read receipt: the other user ([readerId]) read
+  /// our messages, so flip their status to read and the bubbles show ✓✓.
+  void onConversationRead(String readerId) {
+    _repository.markConversationRead(matchId, readerId);
+    state = state.copyWith(
+      messages: _repository.getCachedMessages(matchId),
+    );
+  }
+
   /// Toggle image sharing.
   Future<void> toggleImages({required bool enable}) async {
     try {
