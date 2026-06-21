@@ -84,6 +84,22 @@ class ProfileInfo extends StatelessWidget {
           ],
 
           // ------------------------------------------------------------------
+          // 1b. Mirror-match "why" chips — sparse signals ("Both want a
+          // relationship", "Same energy"). Empty for plenty of people; never
+          // forced.
+          // ------------------------------------------------------------------
+          if (profile.matchReasons.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: profile.matchReasons
+                  .map((r) => _MatchReasonChip(label: r))
+                  .toList(),
+            ),
+          ],
+
+          // ------------------------------------------------------------------
           // 2. Distance
           // ------------------------------------------------------------------
           if (profile.distance != null) ...[
@@ -242,6 +258,44 @@ class _SharedNabeBadge extends StatelessWidget {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A single mirror-match reason pill ("Same energy", "Both social"). Subtler
+/// than the nabe badge so the shared neighborhood stays the hero.
+class _MatchReasonChip extends StatelessWidget {
+  final String label;
+
+  const _MatchReasonChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: FeelsColors.primary.withValues(alpha: 0.10),
+        borderRadius: FeelsRadius.fullAll,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.auto_awesome,
+            size: 12,
+            color: FeelsColors.primary,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: FeelsTypography.sizeSm,
+              fontWeight: FeelsTypography.weightHeading,
+              color: FeelsColors.textSecondary,
             ),
           ),
         ],

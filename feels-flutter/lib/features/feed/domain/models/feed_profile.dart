@@ -35,6 +35,11 @@ class FeedProfile {
   final String priority;
   final List<Photo> photos;
   final List<String> genderTags;
+
+  /// Sparse "why you're seeing this person" labels from the mirror-match
+  /// ranker (e.g. "Both want a relationship", "Same energy"). Often empty —
+  /// not every match earns a label.
+  final List<String> matchReasons;
   final List<Prompt> prompts;
 
   const FeedProfile({
@@ -67,6 +72,7 @@ class FeedProfile {
     required this.priority,
     required this.photos,
     required this.genderTags,
+    this.matchReasons = const [],
     this.prompts = const [],
   });
 
@@ -110,6 +116,10 @@ class FeedProfile {
               ?.map((e) => e as String)
               .toList() ??
           [],
+      matchReasons: (json['match_reasons'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
       prompts: (json['prompts'] as List<dynamic>?)
               ?.map((e) => Prompt.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -148,6 +158,7 @@ class FeedProfile {
       'priority': priority,
       'photos': photos.map((e) => e.toJson()).toList(),
       'gender_tags': genderTags,
+      if (matchReasons.isNotEmpty) 'match_reasons': matchReasons,
       'prompts': prompts.map((e) => e.toJson()).toList(),
     };
   }

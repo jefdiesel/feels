@@ -16,6 +16,7 @@ type FeedProfile struct {
 	LookingForAlignment *string  `json:"looking_for_alignment,omitempty"` // alignment with viewer's intentions
 	GenderTags          []string `json:"gender_tags,omitempty"`           // gender-specific tags (e.g., "curious", "experienced")
 	SharedPlace         *string  `json:"shared_place,omitempty"`          // NYC anchor overlap: shared neighborhood name to surface on card
+	MatchReasons        []string `json:"match_reasons,omitempty"`         // mirror-match "why" labels; sparse — empty for plenty of people, never forced
 }
 
 // LookingFor alignment values

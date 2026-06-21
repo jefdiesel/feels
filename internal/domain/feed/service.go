@@ -281,16 +281,23 @@ func (s *Service) GetFeed(ctx context.Context, userID uuid.UUID, limit int, scop
 		aff, rerr := s.overlap.OverlappingCandidates(ctx, userID)
 		if rerr != nil {
 			log.Printf("[FEED] overlap lookup failed: %v (falling back to radius)", rerr)
-		} else if len(aff) > 0 {
-			for i := range profiles {
-				if a, ok := aff[profiles[i].UserID]; ok && a.SharedNTAName != "" {
-					name := a.SharedNTAName
-					profiles[i].SharedPlace = &name
-				}
+			aff = nil
+		}
+		// Annotate the shared neighborhood for the card badge.
+		for i := range profiles {
+			if a, ok := aff[profiles[i].UserID]; ok && a.SharedNTAName != "" {
+				name := a.SharedNTAName
+				profiles[i].SharedPlace = &name
 			}
-			if scope != ScopeEverywhere {
-				sortByOverlap(profiles, aff)
-			}
+		}
+		// Mirror ranking: order by who most resembles the viewer across every
+		// dimension they express, with nabe overlap as one signal (loud in
+		// my_nabes, a whisper in everywhere). Falls back to nabe-only sorting
+		// when the viewer's own profile isn't available.
+		if viewerProfile != nil {
+			rankByMirror(profiles, viewerProfile, aff, scope, time.Now())
+		} else if len(aff) > 0 && scope != ScopeEverywhere {
+			sortByOverlap(profiles, aff)
 		}
 	}
 
