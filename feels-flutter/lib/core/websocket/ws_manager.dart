@@ -141,6 +141,9 @@ class WsManager with WidgetsBindingObserver {
       _startPing();
       _flushOutboundQueue();
 
+      // Tell listeners we're (re)connected so they can resync missed data.
+      _eventController.add(const WsConnectedEvent());
+
       _socket!.listen(
         _onData,
         onError: _onError,

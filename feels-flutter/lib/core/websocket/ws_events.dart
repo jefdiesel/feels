@@ -38,9 +38,12 @@ class NewMessageEvent extends WsEvent {
   final Map<String, dynamic> message;
 
   factory NewMessageEvent.fromPayload(Map<String, dynamic> payload) {
+    // Server sends {"message": {...}} with match_id INSIDE the message object,
+    // not at the payload top level.
+    final message = payload['message'] as Map<String, dynamic>;
     return NewMessageEvent(
-      matchId: payload['match_id'] as String,
-      message: payload['message'] as Map<String, dynamic>,
+      matchId: message['match_id'] as String,
+      message: message,
     );
   }
 }
@@ -48,18 +51,27 @@ class NewMessageEvent extends WsEvent {
 class MessageReadEvent extends WsEvent {
   const MessageReadEvent({
     required this.matchId,
-    required this.messageId,
+    required this.readerId,
   });
 
   final String matchId;
-  final String messageId;
+
+  /// The user who read the messages (the other person). Server marks ALL of
+  /// their unread messages read at once and reports the reader, not a single id.
+  final String readerId;
 
   factory MessageReadEvent.fromPayload(Map<String, dynamic> payload) {
     return MessageReadEvent(
       matchId: payload['match_id'] as String,
-      messageId: payload['message_id'] as String,
+      readerId: payload['reader_id'] as String,
     );
   }
+}
+
+/// Synthetic client-side event emitted by [WsManager] when the socket
+/// (re)connects — lets open screens resync anything missed while offline.
+class WsConnectedEvent extends WsEvent {
+  const WsConnectedEvent();
 }
 
 class TypingStartEvent extends WsEvent {

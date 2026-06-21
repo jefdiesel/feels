@@ -12,6 +12,8 @@ import '../../domain/models/message.dart';
 import '../../widgets/chat_bubble.dart';
 import '../../widgets/typing_indicator.dart';
 import '../providers/chat_provider.dart';
+import '../../../../core/websocket/ws_events.dart';
+import '../../../../core/websocket/ws_manager.dart';
 
 class ConversationScreen extends ConsumerStatefulWidget {
   final String matchId;
@@ -47,15 +49,24 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   Timer? _typingDebounce;
   bool _isTypingSent = false;
 
+  StreamSubscription<WsEvent>? _wsSub;
+  bool _wsConnectedOnce = false;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     _textController.addListener(_onTextChanged);
+
+    // Real-time chat: ensure the socket is up and route events into this convo.
+    final ws = ref.read(wsManagerProvider);
+    ws.connect();
+    _wsSub = ws.events.listen(_onWsEvent);
   }
 
   @override
   void dispose() {
+    _wsSub?.cancel();
     _scrollController.removeListener(_onScroll);
     _textController.removeListener(_onTextChanged);
     _scrollController.dispose();
@@ -77,6 +88,41 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(conversationProvider(widget.matchId).notifier).loadMore();
     }
+  }
+
+  /// Routes real-time WebSocket events into this conversation.
+  void _onWsEvent(WsEvent event) {
+    if (!mounted) return;
+    final notifier = ref.read(conversationProvider(widget.matchId).notifier);
+    switch (event) {
+      case NewMessageEvent e when e.matchId == widget.matchId:
+        notifier.onNewMessage(Message.fromJson(e.message));
+        _scrollToBottom();
+      case TypingStartEvent e when e.matchId == widget.matchId:
+        ref.read(typingProvider(widget.matchId).notifier).onTypingStart();
+      case TypingStopEvent e when e.matchId == widget.matchId:
+        ref.read(typingProvider(widget.matchId).notifier).onTypingStop();
+      case ImageEnabledEvent e when e.matchId == widget.matchId:
+        notifier.loadMessages();
+      case ImageDisabledEvent e when e.matchId == widget.matchId:
+        notifier.loadMessages();
+      case WsConnectedEvent():
+        // Resync anything missed while the socket was down (skip first connect).
+        if (_wsConnectedOnce) notifier.loadMessages();
+        _wsConnectedOnce = true;
+      default:
+        break;
+    }
+  }
+
+  /// In a reverse ListView the newest message sits at offset 0.
+  void _scrollToBottom() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
   }
 
   void _onTextChanged() {

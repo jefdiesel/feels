@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/theme.dart';
@@ -62,11 +63,25 @@ class ChatBubble extends StatelessWidget {
                   if (message.imageUrl != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        message.imageUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: message.imageUrl!,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        // Disk + memory cached — no re-download / re-decode on
+                        // scroll, which is what makes image chat smooth.
+                        fadeInDuration: const Duration(milliseconds: 150),
+                        placeholder: (_, __) => Container(
+                          height: 120,
+                          color: FeelsColors.bgTertiary,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
                           height: 120,
                           color: FeelsColors.bgTertiary,
                           child: const Center(
