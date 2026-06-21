@@ -40,6 +40,13 @@ func NewRateLimitMiddleware(redis *redis.Client, config RateLimitConfig) *RateLi
 // Limit returns middleware that rate limits by IP
 func (m *RateLimitMiddleware) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Degraded mode: no Redis configured — skip rate limiting rather than
+		// panic on a nil client.
+		if m.redis == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		ip := extractClientIP(r)
 		key := fmt.Sprintf("%s:%s", m.config.KeyPrefix, ip)
 

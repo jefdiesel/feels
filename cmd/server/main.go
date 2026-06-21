@@ -45,13 +45,17 @@ func main() {
 	defer db.Close()
 	log.Println("Connected to database")
 
-	// Connect to Redis
+	// Connect to Redis. Redis backs only rate limiting + health checks, so a
+	// Redis outage must NOT take down the whole API — degrade instead of
+	// crashing. Rate limiting is skipped while Redis is unavailable.
 	redisClient, err := connectRedis(cfg.Redis.URL)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		log.Printf("WARNING: Redis unavailable, continuing without it (rate limiting disabled): %v", err)
+		redisClient = nil
+	} else {
+		defer redisClient.Close()
+		log.Println("Connected to Redis")
 	}
-	defer redisClient.Close()
-	log.Println("Connected to Redis")
 
 	// Create router
 	router := api.NewRouter(cfg, db, redisClient)
