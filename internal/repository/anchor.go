@@ -110,6 +110,34 @@ func (r *AnchorRepository) ListByUser(ctx context.Context, userID uuid.UUID) ([]
 	return out, rows.Err()
 }
 
+// PopularNTAs returns neighborhoods with at least one anchored user, most
+// populated first, for the Explore surface.
+func (r *AnchorRepository) PopularNTAs(ctx context.Context) ([]anchor.NTAStat, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT n.id, n.name, COALESCE(n.borough, ''), COALESCE(n.density_tier, ''),
+		       COUNT(DISTINCT ua.user_id) AS users
+		FROM nyc_ntas n
+		JOIN user_anchors ua ON ua.nta_id = n.id
+		GROUP BY n.id, n.name, n.borough, n.density_tier
+		HAVING COUNT(DISTINCT ua.user_id) > 0
+		ORDER BY users DESC, n.name
+		LIMIT 100
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []anchor.NTAStat
+	for rows.Next() {
+		var s anchor.NTAStat
+		if err := rows.Scan(&s.ID, &s.Name, &s.Borough, &s.DensityTier, &s.Users); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 func (r *AnchorRepository) Delete(ctx context.Context, userID uuid.UUID, kind anchor.Kind) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM user_anchors WHERE user_id = $1 AND kind = $2`, userID, string(kind))
 	return err

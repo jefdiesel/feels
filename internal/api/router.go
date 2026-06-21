@@ -348,6 +348,9 @@ func (r *Router) setupRoutes(
 				a.Delete("/{kind}", anchorHandler.Delete)
 			})
 
+			// Explore: NYC neighborhoods with anchored-user counts.
+			protected.Get("/neighborhoods", anchorHandler.ListNeighborhoods)
+
 			// Feed routes
 			protected.Route("/feed", func(f chi.Router) {
 				f.Get("/", feedHandler.GetFeed)

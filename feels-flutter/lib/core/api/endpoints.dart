@@ -128,4 +128,5 @@ class Endpoints {
 
   static const String anchors = '$_base/anchors';
   static String anchorByKind(String kind) => '$_base/anchors/$kind';
+  static const String neighborhoods = '$_base/neighborhoods';
 }

@@ -71,6 +71,21 @@ func (h *AnchorHandler) List(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]any{"anchors": out}, http.StatusOK)
 }
 
+// ListNeighborhoods returns NYC neighborhoods with at least one anchored user,
+// for the Explore surface. Not user-scoped.
+func (h *AnchorHandler) ListNeighborhoods(w http.ResponseWriter, r *http.Request) {
+	out, err := h.svc.Neighborhoods(r.Context())
+	if err != nil {
+		log.Printf("[ERROR] neighborhoods list: %v", err)
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if out == nil {
+		out = []anchor.NTAStat{}
+	}
+	jsonResponse(w, map[string]any{"neighborhoods": out}, http.StatusOK)
+}
+
 func (h *AnchorHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {

@@ -58,10 +58,21 @@ func inNYC(lat, lng float64) bool {
 	return lat >= nycMinLat && lat <= nycMaxLat && lng >= nycMinLng && lng <= nycMaxLng
 }
 
+// NTAStat is a neighborhood with how many users are anchored there, for the
+// Explore surface.
+type NTAStat struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Borough     string `json:"borough"`
+	DensityTier string `json:"density_tier"`
+	Users       int    `json:"users"`
+}
+
 type Repository interface {
 	Upsert(ctx context.Context, a *Anchor) (*Anchor, error)
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]Anchor, error)
 	Delete(ctx context.Context, userID uuid.UUID, kind Kind) error
+	PopularNTAs(ctx context.Context) ([]NTAStat, error)
 }
 
 type Service struct {
@@ -91,6 +102,12 @@ func (s *Service) Set(ctx context.Context, userID uuid.UUID, kind Kind, lat, lng
 
 func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Anchor, error) {
 	return s.repo.ListByUser(ctx, userID)
+}
+
+// Neighborhoods returns NYC neighborhoods that have at least one anchored user,
+// most-populated first, for the Explore surface.
+func (s *Service) Neighborhoods(ctx context.Context) ([]NTAStat, error) {
+	return s.repo.PopularNTAs(ctx)
 }
 
 func (s *Service) Delete(ctx context.Context, userID uuid.UUID, kind Kind) error {

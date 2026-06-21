@@ -26,6 +26,15 @@ class AnchorRepository {
   Future<void> delete(AnchorKind kind) async {
     await _dio.delete(Endpoints.anchorByKind(kind.apiValue));
   }
+
+  /// NYC neighborhoods with at least one anchored user (Explore).
+  Future<List<NeighborhoodStat>> neighborhoods() async {
+    final res = await _dio.get(Endpoints.neighborhoods);
+    final list = (res.data['neighborhoods'] as List?) ?? const [];
+    return list
+        .map((j) => NeighborhoodStat.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
 }
 
 final anchorRepositoryProvider = Provider<AnchorRepository>((ref) {
@@ -36,4 +45,9 @@ final anchorRepositoryProvider = Provider<AnchorRepository>((ref) {
 /// Invalidate after editing an anchor to refresh.
 final myAnchorsProvider = FutureProvider<List<Anchor>>((ref) {
   return ref.read(anchorRepositoryProvider).list();
+});
+
+/// NYC neighborhoods with anchored-user counts, for the Explore surface.
+final neighborhoodsProvider = FutureProvider<List<NeighborhoodStat>>((ref) {
+  return ref.read(anchorRepositoryProvider).neighborhoods();
 });

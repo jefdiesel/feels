@@ -67,3 +67,28 @@ class Anchor {
         locals: j['locals'] as int? ?? 0,
       );
 }
+
+/// A NYC neighborhood with how many users are anchored there (Explore surface).
+class NeighborhoodStat {
+  final String id;
+  final String name;
+  final String borough;
+  final String densityTier;
+  final int users;
+
+  const NeighborhoodStat({
+    required this.id,
+    required this.name,
+    required this.borough,
+    required this.densityTier,
+    required this.users,
+  });
+
+  factory NeighborhoodStat.fromJson(Map<String, dynamic> j) => NeighborhoodStat(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        borough: j['borough'] as String? ?? '',
+        densityTier: j['density_tier'] as String? ?? '',
+        users: j['users'] as int? ?? 0,
+      );
+}

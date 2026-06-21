@@ -9,6 +9,7 @@ import '../../../../core/theme/theme.dart';
 import '../../../anchors/data/anchor_models.dart';
 import '../../../anchors/data/anchor_repository.dart';
 import '../../../anchors/presentation/anchors_onboarding_screen.dart';
+import '../../../anchors/presentation/neighborhoods_screen.dart';
 import '../../../feed/presentation/providers/feed_provider.dart';
 import '../../domain/models/profile_models.dart';
 import '../../widgets/photo_grid.dart';
@@ -237,22 +238,41 @@ class _ProfileBody extends ConsumerWidget {
           title: 'Your neighborhoods',
           actionLabel: anchors.isNotEmpty ? 'Edit' : 'Add',
           onAction: () => _editAnchors(context, ref),
-          children: anchors.isNotEmpty
-              ? _buildNabeRows(anchors, (a) {
-                  if (a.ntaId != null && a.ntaName != null) {
-                    ref
-                        .read(feedProvider.notifier)
-                        .browseNabe(a.ntaId!, a.ntaName!);
-                    context.go('/home/feed');
-                  }
-                })
-              : [
-                  Text(
-                    'Add where you live, work, and play to match with people '
-                    'in your NYC neighborhoods.',
-                    style: FeelsTypography.bodySmall,
+          children: [
+            ...(anchors.isNotEmpty
+                ? _buildNabeRows(anchors, (a) {
+                    if (a.ntaId != null && a.ntaName != null) {
+                      ref
+                          .read(feedProvider.notifier)
+                          .browseNabe(a.ntaId!, a.ntaName!);
+                      context.go('/home/feed');
+                    }
+                  })
+                : [
+                    Text(
+                      'Add where you live, work, and play to match with people '
+                      'in your NYC neighborhoods.',
+                      style: FeelsTypography.bodySmall,
+                    ),
+                  ]),
+            const SizedBox(height: FeelsSpacing.s3),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NeighborhoodsScreen(),
                   ),
-                ],
+                ),
+                child: const Text('Explore neighborhoods'),
+              ),
+            ),
+          ],
         ),
 
         const SizedBox(height: FeelsSpacing.s4),
