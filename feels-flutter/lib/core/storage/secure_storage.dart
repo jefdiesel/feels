@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 const _keyAccessToken = 'feels_access_token';
 const _keyRefreshToken = 'feels_refresh_token';
 const _keyDeviceId = 'feels_device_id';
+const _keyAnchorsSkipped = 'feels_anchors_skipped';
 
 /// Provides a singleton [SecureStorageService] via Riverpod.
 final secureStorageProvider = Provider<SecureStorageService>((ref) {
@@ -65,6 +66,17 @@ class SecureStorageService {
       _storage.write(key: _keyDeviceId, value: id);
 
   // ---------------------------------------------------------------------------
+  // Anchors skip — set when a user proceeds without NYC anchors (radius
+  // fallback) so the splash doesn't keep forcing the anchor flow.
+  // ---------------------------------------------------------------------------
+
+  Future<bool> getAnchorsSkipped() async =>
+      (await _storage.read(key: _keyAnchorsSkipped)) == '1';
+
+  Future<void> setAnchorsSkipped() =>
+      _storage.write(key: _keyAnchorsSkipped, value: '1');
+
+  // ---------------------------------------------------------------------------
   // Clear all auth data (logout)
   // ---------------------------------------------------------------------------
 
@@ -72,6 +84,7 @@ class SecureStorageService {
     await Future.wait([
       deleteAccessToken(),
       deleteRefreshToken(),
+      _storage.delete(key: _keyAnchorsSkipped),
     ]);
   }
 

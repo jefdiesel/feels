@@ -82,6 +82,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'anchors',
         builder: (context, state) => AnchorsOnboardingScreen(
           onCompleted: () => context.go('/home/feed'),
+          allowSkip: true,
         ),
       ),
 

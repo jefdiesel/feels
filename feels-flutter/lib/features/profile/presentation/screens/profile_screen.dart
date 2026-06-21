@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../anchors/data/anchor_models.dart';
 import '../../../anchors/data/anchor_repository.dart';
+import '../../../anchors/presentation/anchors_onboarding_screen.dart';
 import '../../domain/models/profile_models.dart';
 import '../../widgets/photo_grid.dart';
 import '../providers/profile_provider.dart';
@@ -231,13 +232,22 @@ class _ProfileBody extends ConsumerWidget {
         const SizedBox(height: FeelsSpacing.s4),
 
         // --- "Your neighborhoods" card (NYC anchors) ---
-        if (anchors.isNotEmpty) ...[
-          _GroupedCard(
-            title: 'Your neighborhoods',
-            children: _buildNabeRows(anchors),
-          ),
-          const SizedBox(height: FeelsSpacing.s4),
-        ],
+        _GroupedCard(
+          title: 'Your neighborhoods',
+          actionLabel: anchors.isNotEmpty ? 'Edit' : 'Add',
+          onAction: () => _editAnchors(context, ref),
+          children: anchors.isNotEmpty
+              ? _buildNabeRows(anchors)
+              : [
+                  Text(
+                    'Add where you live, work, and play to match with people '
+                    'in your NYC neighborhoods.',
+                    style: FeelsTypography.bodySmall,
+                  ),
+                ],
+        ),
+
+        const SizedBox(height: FeelsSpacing.s4),
 
         // --- "About You" card: looking for + lifestyle ---
         _GroupedCard(
@@ -842,6 +852,19 @@ class _PromptCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Tag chip
 // ---------------------------------------------------------------------------
+
+/// Opens the anchor map editor (dismissible) and refreshes the nabe list.
+Future<void> _editAnchors(BuildContext context, WidgetRef ref) async {
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => AnchorsOnboardingScreen(
+        dismissible: true,
+        onCompleted: () => Navigator.of(context).pop(),
+      ),
+    ),
+  );
+  ref.invalidate(myAnchorsProvider);
+}
 
 /// Rows for the "Your neighborhoods" card, ordered LIVE → WORK → PLAY.
 List<Widget> _buildNabeRows(List<Anchor> anchors) {

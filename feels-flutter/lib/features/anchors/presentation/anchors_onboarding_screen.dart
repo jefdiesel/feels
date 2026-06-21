@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/storage/secure_storage.dart';
 import '../data/anchor_models.dart';
 import '../data/anchor_repository.dart';
 
@@ -11,7 +12,20 @@ import '../data/anchor_repository.dart';
 /// Pins are sent to the backend, which snaps them to the closest NYC NTA.
 class AnchorsOnboardingScreen extends ConsumerStatefulWidget {
   final VoidCallback onCompleted;
-  const AnchorsOnboardingScreen({super.key, required this.onCompleted});
+
+  /// Onboarding: show a "Not in NYC? Skip" path that proceeds with radius
+  /// matching and remembers the choice so the splash won't re-force anchors.
+  final bool allowSkip;
+
+  /// Editing (from Settings/profile): let the user back out without finishing.
+  final bool dismissible;
+
+  const AnchorsOnboardingScreen({
+    super.key,
+    required this.onCompleted,
+    this.allowSkip = false,
+    this.dismissible = false,
+  });
 
   @override
   ConsumerState<AnchorsOnboardingScreen> createState() =>
@@ -75,14 +89,19 @@ class _AnchorsOnboardingScreenState
     }
   }
 
+  Future<void> _skip() async {
+    await ref.read(secureStorageProvider).setAnchorsSkipped();
+    if (mounted) widget.onCompleted();
+  }
+
   @override
   Widget build(BuildContext context) {
     final kind = _steps[_step];
     return PopScope(
-      canPop: false, // anchors are required to use the app
+      canPop: widget.dismissible,
       child: Scaffold(
         appBar: AppBar(
-          automaticallyImplyLeading: false,
+          automaticallyImplyLeading: widget.dismissible,
           title: Text('Anchor ${_step + 1} of ${_steps.length} · ${kind.label}'),
         ),
         body: Column(
@@ -125,13 +144,23 @@ class _AnchorsOnboardingScreenState
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: FilledButton(
-                onPressed: _pin == null || _saving ? null : _saveAndNext,
-                child: Text(_saving
-                    ? 'Saving…'
-                    : _step == _steps.length - 1
-                        ? 'Finish'
-                        : 'Next'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FilledButton(
+                    onPressed: _pin == null || _saving ? null : _saveAndNext,
+                    child: Text(_saving
+                        ? 'Saving…'
+                        : _step == _steps.length - 1
+                            ? 'Finish'
+                            : 'Next'),
+                  ),
+                  if (widget.allowSkip)
+                    TextButton(
+                      onPressed: _saving ? null : _skip,
+                      child: const Text('Not in NYC? Skip for now'),
+                    ),
+                ],
               ),
             ),
             ),

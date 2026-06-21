@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/storage/secure_storage.dart';
 import '../../../anchors/data/anchor_repository.dart';
 import '../providers/auth_provider.dart';
 
@@ -80,7 +81,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     try {
       final repo = ref.read(anchorRepositoryProvider);
       final list = await repo.list();
-      return list.isEmpty;
+      if (list.isNotEmpty) return false;
+      // Respect a prior "not in NYC / skip" choice — don't keep forcing it.
+      return !await ref.read(secureStorageProvider).getAnchorsSkipped();
     } catch (_) {
       // If the check fails, don't block the feed — server still falls back
       // to radius for users with no anchors.
